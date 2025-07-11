@@ -247,7 +247,15 @@ data class FeatureConfig(
     val enableChatLogging: Boolean = true,
     
     @field:Comment("Enable chat filter system (placeholder for future implementation).")
-    val enableChatFilter: Boolean = false
+    val enableChatFilter: Boolean = false,
+    
+    @field:Comment("Custom advancement message formats mapped by advancement key. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
+    val customAdvancementMessages: Map<String, String> = mapOf(
+        "story/mine_stone" to "<player_name> just mined their first stone!"
+    ),
+    
+    @field:Comment("Default advancement message format when no specific format is found. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
+    val backupAdvancementMessage: String = "<gray>🎯</gray> <yellow><player_name></yellow> <gray>has made the advancement</gray> <green><advancement_name></green>"
 )
 
 @ConfigSerializable

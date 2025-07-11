@@ -66,7 +66,7 @@ class PaperMC : JavaPlugin() {
         server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerJoinQuitListener(configManager, chatFormattingService, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)
-        server.pluginManager.registerEvents(PlayerAdvancementListener(configManager), this)
+        server.pluginManager.registerEvents(PlayerAdvancementListener(configManager, messageFormattingService), this)
 
         logger.info("MiniMessageChatPlugin enabled successfully!")
         logger.info("Features enabled:")
