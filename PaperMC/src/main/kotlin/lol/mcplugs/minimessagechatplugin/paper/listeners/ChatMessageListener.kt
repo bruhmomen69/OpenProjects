@@ -22,7 +22,7 @@ class ChatMessageListener(
     private val logger = LoggerFactory.getLogger(ChatMessageListener::class.java)
     private val plainTextSerializer = PlainTextComponentSerializer.plainText()
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.MONITOR)
     fun onAsyncChat(event: AsyncChatEvent) {
         if (event.isCancelled) return
         
@@ -38,6 +38,8 @@ class ChatMessageListener(
             return
         }
 
+        event.isCancelled = true
+
         try {
             val player = event.player
             val message = plainTextSerializer.serialize(event.message())
@@ -49,15 +51,15 @@ class ChatMessageListener(
             
             val formattedMessage = chatFormattingService.formatMessage(player, message)
             event.message(formattedMessage)
-            
+            for (viewer in event.viewers()) {
+                viewer.sendMessage(formattedMessage)
+            }
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.cooldown", event.player, 
                 mapOf("time" to e.message!!.substringAfter("wait ").substringBefore(" seconds"))))
-            event.isCancelled = true
         } catch (e: Exception) {
             logger.error("Error formatting chat message for player ${event.player.name}", e)
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.formatting_error", event.player))
-            event.isCancelled = true
         }
     }
 }

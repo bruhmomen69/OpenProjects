@@ -43,7 +43,6 @@ dependencies {
     // PlaceholderAPI integration (optional)
     compileOnly("me.clip:placeholderapi:2.11.6")
 
-    implementation(project(":app"))
     implementation(project(":utils"))
 }
 
