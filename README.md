@@ -159,83 +159,6 @@ This plugin provides comprehensive chat formatting capabilities with rank-based 
 - **Error Handling & Logging** with SLF4J
 - **Modern Paper API Usage** (AsyncChatEvent, Adventure Components)
 
-# Configuration Examples
-
-## Default Configuration (config.conf)
-```hocon
-chatFormat {
-    defaultFormat = "<gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>"
-    
-    groupFormats {
-        owner = "<gradient:red:gold>[OWNER]</gradient> <gradient:gold:yellow>{player_name}</gradient> <gray>»</gray> <white>{message}</white>"
-        admin = "<red>[ADMIN]</red> <gold>{player_name}</gold> <gray>»</gray> <white>{message}</white>"
-        moderator = "<blue>[MOD]</blue> <yellow>{player_name}</yellow> <gray>»</gray> <white>{message}</white>"
-        helper = "<green>[HELPER]</green> <lime>{player_name}</lime> <gray>»</gray> <white>{message}</white>"
-        vip = "<green>[VIP]</green> <aqua>{player_name}</aqua> <gray>»</gray> <white>{message}</white>"
-        premium = "<gold>[PREMIUM]</gold> <yellow>{player_name}</yellow> <gray>»</gray> <white>{message}</white>"
-        donor = "<light_purple>[DONOR]</light_purple> <pink>{player_name}</pink> <gray>»</gray> <white>{message}</white>"
-        member = "<gray>[MEMBER]</gray> <white>{player_name}</white> <gray>»</gray> <gray>{message}</gray>"
-    }
-    
-    worldFormats {
-        world = "<green>[Overworld]</green> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>"
-        world_nether = "<red>[Nether]</red> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>"
-        world_the_end = "<dark_purple>[The End]</dark_purple> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>"
-    }
-    
-    enableGroupFormats = true
-    enableWorldFormats = false
-    formatPriority = ["permission", "world", "group", "default"]
-    enableRankedFormats = true
-    rankedFormatPriority = ["owner", "admin", "moderator", "helper", "vip", "premium", "donor", "member", "default"]
-    
-    enableHoverMessages = true
-    hoverMessages {
-        admin = "<red>Administrator</red>\n<gray>Click to message</gray>"
-        moderator = "<blue>Moderator</blue>\n<gray>Click to message</gray>"
-        vip = "<green>VIP Member</green>\n<gray>Click to message</gray>"
-        default = "<gray>Player</gray>\n<gray>Click to message</gray>"
-    }
-    
-    enableClickActions = true
-    clickActions {
-        default = "suggest_command:/msg {player_name} "
-    }
-}
-
-features {
-    enableColorCodes = true
-    enableFormatting = true
-    enableUrls = true
-    enableMentions = true
-    enableChatCooldown = false
-    chatCooldownSeconds = 3
-    enableJoinLeaveMessages = true
-    joinMessage = "<green>+ <yellow>{player_name}</yellow> joined the server</green>"
-    leaveMessage = "<red>- <yellow>{player_name}</yellow> left the server</red>"
-    enableDeathMessages = true
-    enableChatLogging = true
-}
-
-placeholders {
-    enableBuiltinPlaceholders = true
-    customPlaceholders {
-        server_name = "My Server"
-        website = "example.com"
-    }
-    enablePlaceholderAPI = true
-}
-
-permissions {
-    usePermissionBasedFormats = true
-    formatPermissionPrefix = "chatplugin.format."
-    colorPermission = "chatplugin.color"
-    formattingPermission = "chatplugin.formatting"
-    urlPermission = "chatplugin.url"
-    mentionPermission = "chatplugin.mention"
-}
-```
-
 ## Permission Setup Examples
 
 ### LuckPerms Commands:
@@ -283,10 +206,12 @@ permissions {
 - `./gradlew :PaperMC:shadowJar` - Build PaperMC plugin JAR
 - `./gradlew :PaperMC:runServer` - Run test server with plugin
 
+**ALWAYS BUILD FROM THE ROOT DIRECTORY OF THE REPOSITORY**
+
 ## Installation
 1. Build the plugin: `./gradlew :PaperMC:shadowJar`
 2. Copy `PaperMC/build/libs/PaperMC-1.0-SNAPSHOT-all.jar` to your server's `plugins/` folder
-3. Start your server
+3. (Re)Start your server
 4. Configure the plugin by editing `plugins/MiniMessageChatPlugin/config.conf`
 5. Use `/chatplugin reload` to reload configuration changes
 
@@ -419,7 +344,8 @@ public final class MyPlugin extends JavaPlugin {
             // Command logic here
         }
     }
-}```
+}
+```
 
 ```java
 @Plugin(id = "myplugin", name = "MyPlugin", version = "1.0")
@@ -439,7 +365,8 @@ public class MyPlugin {
             // Command logic here
         }
     }
-}```
+}
+```
 
 
 ```java
@@ -457,7 +384,8 @@ public class GameCommands {
         public void create(...) {}
         
     }
-}```
+}
+```
 
 # MiniMessage Placeholder Syntax
 Dynamic Replacements
