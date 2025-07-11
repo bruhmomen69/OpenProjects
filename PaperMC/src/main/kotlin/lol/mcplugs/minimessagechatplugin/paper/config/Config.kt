@@ -1,9 +1,11 @@
 package lol.mcplugs.minimessagechatplugin.paper.config
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
+import org.spongepowered.configurate.objectmapping.meta.Comment
 
 @ConfigSerializable
 data class Config(
+    @Comment("your comment goes here")
     val chatFormat: ChatFormatConfig = ChatFormatConfig(),
     val placeholders: PlaceholderConfig = PlaceholderConfig(),
     val permissions: PermissionConfig = PermissionConfig(),

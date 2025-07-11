@@ -5,6 +5,7 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.minimessage.MiniMessage
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
 import net.kyori.adventure.text.minimessage.tag.standard.StandardTags
 import org.bukkit.Bukkit
@@ -32,7 +33,7 @@ class ChatFormattingService(private val configManager: ConfigManager) {
         "world_displayname" to { it.world.name }, // Could be enhanced with world aliases
         "server_name" to { Bukkit.getServer().name },
         "server_version" to { Bukkit.getVersion() },
-        "server_motd" to { Bukkit.getMotd() },
+        "server_motd" to { net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(Bukkit.getServer().motd()) },
         "online_players" to { Bukkit.getOnlinePlayers().size.toString() },
         "max_players" to { Bukkit.getMaxPlayers().toString() },
         "time" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) },
@@ -83,21 +84,22 @@ class ChatFormattingService(private val configManager: ConfigManager) {
         // Get the appropriate format
         val format = getFormatForPlayer(player)
         
-        // Replace placeholders
-        val finalFormat = replacePlaceholders(format, player, processedMessage)
-        
         // Add hover and click actions if enabled
-        val enhancedFormat = addInteractiveElements(finalFormat, player)
+        val enhancedFormat = addInteractiveElements(format, player)
         
-        // Parse with MiniMessage
+        // Create TagResolver with placeholders
+        val placeholderResolver = createPlaceholderResolver(player, processedMessage)
+        
+        // Parse with MiniMessage using proper TagResolver
         return try {
-            val tagResolver = if (config.features.enableColorCodes && player.hasPermission(config.permissions.colorPermission)) {
+            val baseTagResolver = if (config.features.enableColorCodes && player.hasPermission(config.permissions.colorPermission)) {
                 TagResolver.standard()
             } else {
                 TagResolver.resolver(StandardTags.decorations())
             }
             
-            miniMessage.deserialize(enhancedFormat, tagResolver)
+            val combinedResolver = TagResolver.resolver(baseTagResolver, placeholderResolver)
+            miniMessage.deserialize(enhancedFormat, combinedResolver)
         } catch (e: Exception) {
             logger.warn("Failed to parse message format for player ${player.name}: $enhancedFormat", e)
             miniMessage.deserialize("<gray>[${player.name}]</gray> <white>$processedMessage</white>")
@@ -180,30 +182,31 @@ class ChatFormattingService(private val configManager: ConfigManager) {
         return null
     }
     
-    private fun replacePlaceholders(format: String, player: Player, message: String): String {
-        var result = format
+    private fun createPlaceholderResolver(player: Player, message: String): TagResolver {
+        val resolvers = mutableListOf<TagResolver>()
         
-        // Replace message placeholder
-        result = result.replace("{message}", message)
+        // Add message placeholder
+        resolvers.add(Placeholder.unparsed("message", message))
         
-        // Replace built-in placeholders
+        // Add built-in placeholders
         if (configManager.config.placeholders.enableBuiltinPlaceholders) {
             for ((placeholder, resolver) in builtinPlaceholders) {
-                result = result.replace("{$placeholder}", resolver(player))
+                resolvers.add(Placeholder.unparsed(placeholder, resolver(player)))
             }
         }
         
-        // Replace custom placeholders
+        // Add custom placeholders
         for ((placeholder, value) in configManager.config.placeholders.customPlaceholders) {
-            result = result.replace("{$placeholder}", value)
+            resolvers.add(Placeholder.unparsed(placeholder, value))
         }
         
-        // TODO: Add PlaceholderAPI support here if enabled
+        // Add PlaceholderAPI support if enabled
         if (configManager.config.placeholders.enablePlaceholderAPI) {
-            result = processPlaceholderAPI(result, player)
+            // TODO: Add PlaceholderAPI integration here
+            // This would require checking if PlaceholderAPI is available and processing placeholders
         }
         
-        return result
+        return TagResolver.resolver(resolvers)
     }
     
     private fun addInteractiveElements(format: String, player: Player): String {
@@ -216,11 +219,12 @@ class ChatFormattingService(private val configManager: ConfigManager) {
             val hoverMessage = config.hoverMessages[playerRank] ?: config.hoverMessages["default"]
             
             if (hoverMessage != null) {
+                // Process hover message with basic placeholder replacement
                 val processedHover = hoverMessage.replace("{player_name}", player.name)
                 
-                // Wrap player name with hover
-                result = result.replace("{player_name}", 
-                    "<hover:show_text:'$processedHover'>{player_name}</hover>")
+                // Wrap player_name placeholder with hover
+                result = result.replace("<player_name>", 
+                    "<hover:show_text:'$processedHover'><player_name></hover>")
             }
         }
         
@@ -230,17 +234,18 @@ class ChatFormattingService(private val configManager: ConfigManager) {
             val clickAction = config.clickActions[playerRank] ?: config.clickActions["default"]
             
             if (clickAction != null) {
+                // Process click action with basic placeholder replacement
                 val processedClick = clickAction.replace("{player_name}", player.name)
                 
-                // Wrap player name with click action
+                // Wrap player_name placeholder with click action
                 if (result.contains("<hover:")) {
                     // If hover is already present, add click inside hover
                     result = result.replace("<hover:show_text:'", "<click:$processedClick><hover:show_text:'")
                     result = result.replace("</hover>", "</hover></click>")
                 } else {
                     // Add click action directly
-                    result = result.replace("{player_name}", 
-                        "<click:$processedClick>{player_name}</click>")
+                    result = result.replace("<player_name>", 
+                        "<click:$processedClick><player_name></click>")
                 }
             }
         }

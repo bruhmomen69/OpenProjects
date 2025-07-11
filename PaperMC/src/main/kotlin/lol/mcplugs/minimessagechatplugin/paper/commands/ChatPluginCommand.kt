@@ -28,6 +28,7 @@ class ChatPluginCommands(
     }
 
     @Subcommand("info")
+    @CommandPermission("chatplugin.admin.info")
     fun info(actor: BukkitCommandActor) {
         val config = configManager.config
         val message = """
@@ -48,6 +49,7 @@ class ChatPluginCommands(
     }
 
     @Subcommand("test")
+    @CommandPermission("chatplugin.admin.test")
     fun test(actor: BukkitCommandActor, message: String) {
         if (actor.sender() !is Player) {
             actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
@@ -65,6 +67,7 @@ class ChatPluginCommands(
         private val configManager: ConfigManager
     ) {
         @Subcommand("set default")
+        @CommandPermission("chatplugin.admin.format")
         fun setDefault(actor: BukkitCommandActor, format: String) {
             val newConfig = configManager.config.copy(
                 chatFormat = configManager.config.chatFormat.copy(
@@ -80,6 +83,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("set group")
+        @CommandPermission("chatplugin.admin.format")
         fun setGroup(actor: BukkitCommandActor, groupName: String, format: String) {
             val newGroupFormats = configManager.config.chatFormat.groupFormats.toMutableMap()
             newGroupFormats[groupName] = format
@@ -98,6 +102,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("set world")
+        @CommandPermission("chatplugin.admin.format")
         fun setWorld(actor: BukkitCommandActor, worldName: String, format: String) {
             val newWorldFormats = configManager.config.chatFormat.worldFormats.toMutableMap()
             newWorldFormats[worldName] = format
@@ -116,6 +121,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("list")
+        @CommandPermission("chatplugin.admin.format")
         fun list(actor: BukkitCommandActor) {
             val config = configManager.config.chatFormat
             val message = StringBuilder("<gold>===== Chat Formats =====</gold>\n")
@@ -147,6 +153,7 @@ class ChatPluginCommands(
     ) {
 
         @Subcommand("colors")
+        @CommandPermission("chatplugin.admin.toggle")
         fun toggleColors(actor: BukkitCommandActor) {
             val newValue = !configManager.config.features.enableColorCodes
             val newConfig = configManager.config.copy(
@@ -162,6 +169,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("formatting")
+        @CommandPermission("chatplugin.admin.toggle")
         fun toggleFormatting(actor: BukkitCommandActor) {
             val newValue = !configManager.config.features.enableFormatting
             val newConfig = configManager.config.copy(
@@ -177,6 +185,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("mentions")
+        @CommandPermission("chatplugin.admin.toggle")
         fun toggleMentions(actor: BukkitCommandActor) {
             val newValue = !configManager.config.features.enableMentions
             val newConfig = configManager.config.copy(
@@ -192,6 +201,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("cooldown")
+        @CommandPermission("chatplugin.admin.toggle")
         fun toggleCooldown(actor: BukkitCommandActor) {
             val newValue = !configManager.config.features.enableChatCooldown
             val newConfig = configManager.config.copy(
