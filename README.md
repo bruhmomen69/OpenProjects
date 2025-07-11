@@ -35,13 +35,53 @@ This plugin provides comprehensive chat formatting capabilities with rank-based 
 - **Chat Cooldowns** with bypass permissions for staff
 - **Permission-Based Feature Access** (colors, formatting, URLs, mentions)
 
-### 🎮 **Admin Commands** (All Permission-Protected)
+### 📨 **Private Messaging System**
+- **Full private messaging** with `/msg`, `/message`, `/tell`, `/whisper`, `/w` commands
+- **Reply system** with `/reply`, `/r` commands for quick responses
+- **Configurable message formats** for sender and recipient with MiniMessage support
+- **Message cooldowns** with bypass permissions for staff
+- **Message logging** for moderation and audit purposes
+
+### 🔄 **Chat Toggle System**
+- **Independent toggles** for public chat and private messages
+- **Player commands**: `/chatplugin toggle chat`, `/chatplugin toggle messages`
+- **Persistent state** across server restarts and reconnections
+- **Staff bypass permissions** for moderation purposes
+- **Configurable linking** - optionally link chat and message toggles
+
+### 👁️ **Social Spy & Moderation**
+- **Social spy system** for moderators to monitor private messages
+- **Command spy** (optional) to monitor player commands
+- **Toggle command**: `/chatplugin toggle socialspy`
+- **Ignore moderator messages** option for privacy
+- **Console logging** for audit and compliance
+
+### 🔌 **PlaceholderAPI Integration**
+- **Full PlaceholderAPI support** with automatic detection
+- **Bridge to MiniMessage** using TagResolver system
+- **External plugin placeholders** (e.g., `%vault_rank%`, `%luckperms_prefix%`)
+- **Graceful fallbacks** when PlaceholderAPI unavailable
+- **Performance optimized** with timeout protection
+
+### 🎮 **Player Commands**
+- `/msg <player> <message>` - Send private message (aliases: `/message`, `/tell`, `/whisper`, `/w`)
+- `/reply <message>` - Reply to last sender (alias: `/r`)
+- `/chatplugin toggle chat` - Toggle public chat on/off
+- `/chatplugin toggle messages` - Toggle private messages on/off
+- `/chatplugin toggle socialspy` - Toggle social spy (moderators only)
+- `/chatplugin status` - View current chat status
+
+### 🛠️ **Admin Commands** (All Permission-Protected)
 - `/chatplugin reload` - Reload configuration (`chatplugin.admin.reload`)
 - `/chatplugin info` - View plugin status (`chatplugin.admin.info`)
 - `/chatplugin test <message>` - Test formatting (`chatplugin.admin.test`)
 - `/chatplugin format set default/group/world <format>` - Configure formats (`chatplugin.admin.format`)
 - `/chatplugin format list` - List all formats (`chatplugin.admin.format`)
 - `/chatplugin toggle colors/formatting/mentions/cooldown` - Toggle features (`chatplugin.admin.toggle`)
+- `/chatplugin admin toggle chat/messages/all <player> <true/false>` - Force toggle player settings
+- `/chatplugin admin socialspy <player> <true/false>` - Manage social spy access
+- `/chatplugin admin stats` - View system statistics and active users
+- `/chatplugin admin clear <toggles/socialspy/cooldowns/all>` - Clear various data types
 
 ### 🔧 **Technical Excellence**
 - **Modern Paper API** usage (AsyncChatEvent, Adventure Components)
@@ -73,18 +113,40 @@ This plugin provides comprehensive chat formatting capabilities with rank-based 
   - Death message customization
   - Chat logging
   - Permission-based feature access
+- **Private Messaging System** with full MiniMessage support:
+  - `/msg`, `/message`, `/tell`, `/whisper`, `/w` - Send private messages
+  - `/reply`, `/r` - Reply to last sender
+  - Configurable sender/recipient message formats
+  - Message cooldowns with bypass permissions
+  - Message logging for moderation
+- **Chat Toggle System** for player control:
+  - `/chatplugin toggle chat` - Toggle public chat
+  - `/chatplugin toggle messages` - Toggle private messages
+  - Independent or linked toggle behavior (configurable)
+  - Persistent state across server restarts
+  - Staff bypass permissions
+- **Social Spy & Moderation Tools**:
+  - `/chatplugin toggle socialspy` - Monitor private messages
+  - Optional command spy for monitoring player commands
+  - Ignore moderator messages option
+  - Console logging for audit purposes
+- **PlaceholderAPI Integration**:
+  - Automatic detection and optional loading
+  - Bridge to MiniMessage TagResolver system
+  - Support for all external plugin placeholders
+  - Performance optimized with timeout protection
 - **Comprehensive Command System** using Lamp framework:
   - `/chatplugin reload` - Reload configuration
   - `/chatplugin info` - View plugin information
   - `/chatplugin test <message>` - Test chat formatting
-  - `/chatplugin format set default <format>` - Set default format
-  - `/chatplugin format set group <group> <format>` - Set group format
-  - `/chatplugin format set world <world> <format>` - Set world format
+  - `/chatplugin status` - View current chat status
+  - `/chatplugin format set default/group/world <format>` - Configure formats
   - `/chatplugin format list` - List all formats
-  - `/chatplugin toggle colors` - Toggle color codes
-  - `/chatplugin toggle formatting` - Toggle text formatting
-  - `/chatplugin toggle mentions` - Toggle player mentions
-  - `/chatplugin toggle cooldown` - Toggle chat cooldown
+  - `/chatplugin toggle colors/formatting/mentions/cooldown` - Toggle features
+  - `/chatplugin admin toggle chat/messages/all <player> <true/false>` - Admin toggles
+  - `/chatplugin admin socialspy <player> <true/false>` - Manage social spy
+  - `/chatplugin admin stats` - View system statistics
+  - `/chatplugin admin clear <type>` - Clear various data types
 - **Built-in Placeholder System** with extensive placeholders:
   - Player info: `{player_name}`, `{player_displayname}`, `{player_uuid}`
   - World info: `{world}`, `{world_displayname}`
@@ -92,7 +154,7 @@ This plugin provides comprehensive chat formatting capabilities with rank-based 
   - Online players: `{online_players}`, `{max_players}`
   - Time/Date: `{time}`, `{date}`, `{datetime}`
   - Custom placeholders support
-  - PlaceholderAPI integration ready
+  - PlaceholderAPI integration with automatic detection and bridge to MiniMessage
 - **Advanced Permission System** with granular controls
 - **Error Handling & Logging** with SLF4J
 - **Modern Paper API Usage** (AsyncChatEvent, Adventure Components)
@@ -234,6 +296,47 @@ permissions {
 3. Test the plugin: `/chatplugin test Hello World!`
 4. Configure formats: `/chatplugin format set default <red>[<white>{player_name}</white>]</red> <gray>{message}</gray>`
 5. Set up rank formats using permissions like `chatplugin.format.vip`
+6. Try private messaging: `/msg PlayerName Hello there!`
+7. Toggle features: `/chatplugin toggle chat` or `/chatplugin toggle socialspy`
+
+## Permission Setup
+
+### 🔑 **Essential Permissions**
+```bash
+# Basic user permissions (give to default group)
+chatplugin.message          # Send/receive private messages
+chatplugin.toggle.chat       # Toggle own public chat
+chatplugin.toggle.messages   # Toggle own private messages
+chatplugin.status           # View own chat status
+chatplugin.color            # Use colors in chat
+chatplugin.formatting       # Use text formatting
+
+# Staff permissions
+chatplugin.admin            # All admin commands
+chatplugin.socialspy        # Monitor private messages
+chatplugin.bypass.cooldown  # Bypass chat cooldowns
+chatplugin.bypass.chattoggle # Always able to chat
+```
+
+### 🎨 **Rank Format Permissions**
+```bash
+# Format-specific permissions (one per rank)
+chatplugin.format.owner     # Use owner chat format
+chatplugin.format.admin     # Use admin chat format
+chatplugin.format.moderator # Use moderator chat format
+chatplugin.format.vip       # Use VIP chat format
+chatplugin.format.premium   # Use premium chat format
+```
+
+### 🛠️ **Admin Permission Examples**
+```bash
+# LuckPerms examples for setting up permissions
+/lp group admin permission set chatplugin.admin true
+/lp group moderator permission set chatplugin.socialspy true
+/lp group vip permission set chatplugin.format.vip true
+/lp group default permission set chatplugin.message true
+/lp group default permission set chatplugin.color true
+```
 
 # Code Structure
 - Common code is in the `utils` project

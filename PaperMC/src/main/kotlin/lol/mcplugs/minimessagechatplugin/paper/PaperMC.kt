@@ -6,10 +6,19 @@ import lol.mcplugs.minimessagechatplugin.paper.commands.ChatPluginCommands
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import lol.mcplugs.minimessagechatplugin.paper.listeners.ChatListener
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
+import lol.mcplugs.minimessagechatplugin.paper.services.PlaceholderAPIService
+import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
+import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
+import lol.mcplugs.minimessagechatplugin.paper.services.PrivateMessageService
+import lol.mcplugs.minimessagechatplugin.paper.commands.*
 import org.bukkit.plugin.java.JavaPlugin
 
 class PaperMC : JavaPlugin() {
     private lateinit var configManager: ConfigManager
+    private lateinit var placeholderAPIService: PlaceholderAPIService
+    private lateinit var chatToggleService: ChatToggleService
+    private lateinit var socialSpyService: SocialSpyService
+    private lateinit var privateMessageService: PrivateMessageService
     private lateinit var chatFormattingService: ChatFormattingService
     private lateinit var lamp: Lamp<*>
 
@@ -21,7 +30,11 @@ class PaperMC : JavaPlugin() {
         }
 
         // Initialize services
-        chatFormattingService = ChatFormattingService(configManager)
+        placeholderAPIService = PlaceholderAPIService(configManager)
+        chatToggleService = ChatToggleService(configManager)
+        socialSpyService = SocialSpyService(configManager, placeholderAPIService)
+        privateMessageService = PrivateMessageService(configManager, placeholderAPIService, chatToggleService, socialSpyService)
+        chatFormattingService = ChatFormattingService(configManager, placeholderAPIService)
 
         // Initialize command framework
         lamp = BukkitLamp.builder(this).build()
@@ -31,9 +44,17 @@ class PaperMC : JavaPlugin() {
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
+        
+        // Register private message commands
+        lamp.register(MessageCommand(privateMessageService))
+        lamp.register(ReplyCommand(privateMessageService))
+        
+        // Register chat toggle and admin commands
+        lamp.register(ChatToggleCommands(chatToggleService, socialSpyService, privateMessageService))
+        lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService))
 
         // Register event listeners
-        server.pluginManager.registerEvents(ChatListener(configManager, chatFormattingService), this)
+        server.pluginManager.registerEvents(ChatListener(configManager, chatFormattingService, chatToggleService), this)
 
         logger.info("MiniMessageChatPlugin enabled successfully!")
         logger.info("Features enabled:")
@@ -46,6 +67,7 @@ class PaperMC : JavaPlugin() {
         logger.info("  - Chat cooldown: ${configManager.config.features.enableChatCooldown}")
         logger.info("  - Mentions: ${configManager.config.features.enableMentions}")
         logger.info("  - URLs: ${configManager.config.features.enableUrls}")
+        logger.info("  - PlaceholderAPI: ${placeholderAPIService.isEnabled()}")
     }
 
     override fun onDisable() {

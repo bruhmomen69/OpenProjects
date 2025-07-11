@@ -17,7 +17,10 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.Pattern
 
-class ChatFormattingService(private val configManager: ConfigManager) {
+class ChatFormattingService(
+    private val configManager: ConfigManager,
+    private val placeholderAPIService: PlaceholderAPIService
+) {
     private val logger = LoggerFactory.getLogger(ChatFormattingService::class.java)
     private val miniMessage = MiniMessage.miniMessage()
     private val chatCooldowns = ConcurrentHashMap<UUID, Long>()
@@ -88,7 +91,7 @@ class ChatFormattingService(private val configManager: ConfigManager) {
         val enhancedFormat = addInteractiveElements(format, player)
         
         // Create TagResolver with placeholders
-        val placeholderResolver = createPlaceholderResolver(player, processedMessage)
+        val placeholderResolver = createPlaceholderResolver(player, processedMessage, enhancedFormat)
         
         // Parse with MiniMessage using proper TagResolver
         return try {
@@ -182,7 +185,7 @@ class ChatFormattingService(private val configManager: ConfigManager) {
         return null
     }
     
-    private fun createPlaceholderResolver(player: Player, message: String): TagResolver {
+    private fun createPlaceholderResolver(player: Player, message: String, format: String): TagResolver {
         val resolvers = mutableListOf<TagResolver>()
         
         // Add message placeholder
@@ -201,9 +204,9 @@ class ChatFormattingService(private val configManager: ConfigManager) {
         }
         
         // Add PlaceholderAPI support if enabled
-        if (configManager.config.placeholders.enablePlaceholderAPI) {
-            // TODO: Add PlaceholderAPI integration here
-            // This would require checking if PlaceholderAPI is available and processing placeholders
+        if (placeholderAPIService.isEnabled()) {
+            val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(player, format)
+            resolvers.add(placeholderAPIResolver)
         }
         
         return TagResolver.resolver(resolvers)
@@ -337,8 +340,9 @@ class ChatFormattingService(private val configManager: ConfigManager) {
     }
     
     fun reloadPlaceholders() {
-        // Clear any cached placeholder data
-        logger.info("Placeholder cache cleared")
+        // Reload PlaceholderAPI service
+        placeholderAPIService.reload()
+        logger.info("Placeholder cache cleared and PlaceholderAPI service reloaded")
     }
     
     fun clearCooldown(player: Player) {

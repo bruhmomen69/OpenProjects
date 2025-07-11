@@ -15,7 +15,16 @@ data class Config(
     val permissions: PermissionConfig = PermissionConfig(),
     
     @Comment("Feature toggles and message configuration for chat, join/leave, death, and other server messages")
-    val features: FeatureConfig = FeatureConfig()
+    val features: FeatureConfig = FeatureConfig(),
+    
+    @Comment("Private messaging system configuration including formats, cooldowns, and permissions")
+    val privateMessages: PrivateMessageConfig = PrivateMessageConfig(),
+    
+    @Comment("Chat toggle system allowing players to disable chat and private messages")
+    val chatToggle: ChatToggleConfig = ChatToggleConfig(),
+    
+    @Comment("Social spy system for moderators to monitor private messages and commands")
+    val socialSpy: SocialSpyConfig = SocialSpyConfig()
 )
 
 @ConfigSerializable
@@ -91,7 +100,29 @@ data class PlaceholderConfig(
         "website" to "example.com"
     ),
     
-    @Comment("Enable PlaceholderAPI integration for external plugin placeholders (requires PlaceholderAPI plugin).")
+    @Comment("""
+        Enable PlaceholderAPI integration for external plugin placeholders.
+        
+        Requirements:
+        - PlaceholderAPI plugin must be installed on the server
+        - This plugin will automatically detect PlaceholderAPI availability
+        
+        Usage in chat formats:
+        - Use standard PlaceholderAPI syntax: %plugin_placeholder%
+        - Example: "%player_level% %vault_rank% %luckperms_prefix%"
+        - Placeholders are automatically converted to MiniMessage format
+        
+        Supported PlaceholderAPI features:
+        - All registered PlaceholderAPI expansions
+        - Player-specific placeholders
+        - Server-wide placeholders
+        - Custom expansion placeholders
+        
+        Performance:
+        - Placeholders are cached and processed efficiently
+        - Failed placeholders fallback gracefully
+        - Timeout protection prevents server lag
+    """)
     val enablePlaceholderAPI: Boolean = true,
     
     @Comment("Timeout in milliseconds for PlaceholderAPI placeholder resolution to prevent server lag.")
@@ -176,4 +207,91 @@ data class FeatureConfig(
     
     @Comment("Enable chat filter system (placeholder for future implementation).")
     val enableChatFilter: Boolean = false
+)
+
+@ConfigSerializable
+data class PrivateMessageConfig(
+    @Comment("Enable the private messaging system (/msg, /tell, /message, /reply, /r commands).")
+    val enablePrivateMessages: Boolean = true,
+    
+    @Comment("Message format sent to the sender of a private message. Supports MiniMessage and placeholders.")
+    val senderFormat: String = "<gray>[<yellow>You</yellow> -> <green>{recipient}</green>]</gray> <white>{message}</white>",
+    
+    @Comment("Message format sent to the recipient of a private message. Supports MiniMessage and placeholders.")
+    val recipientFormat: String = "<gray>[<green>{sender}</green> -> <yellow>You</yellow>]</gray> <white>{message}</white>",
+    
+    @Comment("Enable cooldown system for private messages to prevent spam.")
+    val enableMessageCooldown: Boolean = true,
+    
+    @Comment("Cooldown time in seconds between private messages.")
+    val messageCooldownSeconds: Int = 2,
+    
+    @Comment("Message shown when trying to message a player who is not online.")
+    val playerNotFoundMessage: String = "<red>Player '{player}' is not online!</red>",
+    
+    @Comment("Message shown when trying to message a player who has messages disabled.")
+    val messagesDisabledMessage: String = "<red>{player} has private messages disabled!</red>",
+    
+    @Comment("Enable logging of private messages to console for moderation purposes.")
+    val enableMessageLogging: Boolean = true,
+    
+    @Comment("Allow players to use colors and formatting in private messages (requires permissions).")
+    val allowFormattingInMessages: Boolean = true
+)
+
+@ConfigSerializable
+data class ChatToggleConfig(
+    @Comment("Enable chat toggle functionality allowing players to disable public chat.")
+    val enableChatToggle: Boolean = true,
+    
+    @Comment("Enable message toggle functionality allowing players to disable private messages.")
+    val enableMessageToggle: Boolean = true,
+    
+    @Comment("Persist toggle states across server restarts and player reconnections.")
+    val persistToggleState: Boolean = true,
+    
+    @Comment("When toggling chat, also toggle private messages automatically. Set to false for independent toggles.")
+    val linkChatAndMessages: Boolean = false,
+    
+    @Comment("Message shown when a player enables their chat.")
+    val chatEnabledMessage: String = "<green>Chat enabled! You can now send and see chat messages.</green>",
+    
+    @Comment("Message shown when a player disables their chat.")
+    val chatDisabledMessage: String = "<red>Chat disabled! You will not see chat messages.</red>",
+    
+    @Comment("Message shown when a player enables their private messages.")
+    val messagesEnabledMessage: String = "<green>Private messages enabled! You can now receive messages.</green>",
+    
+    @Comment("Message shown when a player disables their private messages.")
+    val messagesDisabledMessage: String = "<red>Private messages disabled! You will not receive messages.</red>"
+)
+
+@ConfigSerializable
+data class SocialSpyConfig(
+    @Comment("Enable social spy system for moderators to monitor private messages.")
+    val enableSocialSpy: Boolean = true,
+    
+    @Comment("Enable command spy to monitor player commands (requires chatplugin.commandspy permission).")
+    val enableCommandSpy: Boolean = false,
+    
+    @Comment("Format for social spy messages showing private message monitoring.")
+    val socialSpyFormat: String = "<dark_gray>[<red>SPY</red>]</dark_gray> <gray>{sender} -> {recipient}:</gray> <white>{message}</white>",
+    
+    @Comment("Format for command spy messages showing command monitoring.")
+    val commandSpyFormat: String = "<dark_gray>[<blue>CMD</blue>]</dark_gray> <gray>{player}:</gray> <yellow>{command}</yellow>",
+    
+    @Comment("Message shown when social spy is enabled for a moderator.")
+    val socialSpyEnabledMessage: String = "<green>Social spy enabled! You will now see private messages.</green>",
+    
+    @Comment("Message shown when social spy is disabled for a moderator.")
+    val socialSpyDisabledMessage: String = "<red>Social spy disabled! You will no longer see private messages.</red>",
+    
+    @Comment("Ignore messages between moderators (players with chatplugin.socialspy permission).")
+    val ignoreModerators: Boolean = true,
+    
+    @Comment("Log social spy messages to console for audit purposes.")
+    val logToConsole: Boolean = true,
+    
+    @Comment("Persist social spy states across server restarts and moderator reconnections.")
+    val persistSocialSpyState: Boolean = true
 )

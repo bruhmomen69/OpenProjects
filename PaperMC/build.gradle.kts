@@ -16,6 +16,7 @@ repositories {
         name = "sonatype"
     }
     maven("https://jitpack.io")
+    maven("https://repo.extendedclip.com/releases/")
 }
 
 dependencies {
@@ -38,6 +39,9 @@ dependencies {
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.7")
     implementation("org.slf4j:slf4j-simple:2.0.7")
+
+    // PlaceholderAPI integration (optional)
+    compileOnly("me.clip:placeholderapi:2.11.6")
 
     implementation(project(":app"))
     implementation(project(":utils"))

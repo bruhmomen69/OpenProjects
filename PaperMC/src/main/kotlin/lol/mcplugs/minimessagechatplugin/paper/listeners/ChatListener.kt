@@ -4,6 +4,7 @@ import io.papermc.paper.event.player.AsyncChatEvent
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatCooldownException
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
+import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
@@ -17,7 +18,8 @@ import org.slf4j.LoggerFactory
 
 class ChatListener(
     private val configManager: ConfigManager,
-    private val chatFormattingService: ChatFormattingService
+    private val chatFormattingService: ChatFormattingService,
+    private val chatToggleService: ChatToggleService
 ) : Listener {
     
     private val logger = LoggerFactory.getLogger(ChatListener::class.java)
@@ -31,6 +33,13 @@ class ChatListener(
         // Check if chat formatting is enabled
         if (!configManager.config.features.enableChatFormatting) {
             return // Let vanilla handle the chat
+        }
+        
+        // Check if player can send chat messages
+        if (!chatToggleService.canSendChat(event.player)) {
+            event.isCancelled = true
+            event.player.sendMessage(miniMessage.deserialize("<red>You have chat disabled! Use /chatplugin toggle chat to enable it.</red>"))
+            return
         }
         
         event.isCancelled = true

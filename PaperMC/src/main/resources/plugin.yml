@@ -13,6 +13,18 @@ commands:
     usage: /chatplugin <subcommand>
     permission: chatplugin.admin
     aliases: [mcp, chatformat]
+  
+  msg:
+    description: Send a private message to another player
+    usage: /msg <player> <message>
+    permission: chatplugin.message
+    aliases: [message, tell, whisper, w]
+  
+  reply:
+    description: Reply to the last player who sent you a message
+    usage: /reply <message>
+    permission: chatplugin.message
+    aliases: [r]
 
 permissions:
   chatplugin.*:
@@ -88,3 +100,46 @@ permissions:
   chatplugin.format.vip:
     description: Use VIP chat format
     default: false
+  
+  # Private messaging permissions
+  chatplugin.message:
+    description: Permission to send and receive private messages
+    default: true
+  
+  # Chat toggle permissions
+  chatplugin.toggle:
+    description: All chat toggle permissions
+    children:
+      chatplugin.toggle.chat: true
+      chatplugin.toggle.messages: true
+    default: true
+  
+  chatplugin.toggle.chat:
+    description: Permission to toggle public chat on/off
+    default: true
+  
+  chatplugin.toggle.messages:
+    description: Permission to toggle private messages on/off
+    default: true
+  
+  chatplugin.status:
+    description: Permission to view chat status
+    default: true
+  
+  # Social spy permissions
+  chatplugin.socialspy:
+    description: Permission to use social spy to monitor private messages
+    default: op
+  
+  chatplugin.commandspy:
+    description: Permission to use command spy to monitor player commands
+    default: op
+  
+  # Additional bypass permissions
+  chatplugin.bypass.chattoggle:
+    description: Bypass chat toggle restrictions (staff can always chat)
+    default: op
+  
+  chatplugin.bypass.messagetoggle:
+    description: Bypass message toggle restrictions (staff can always message)
+    default: op
