@@ -4,7 +4,10 @@ import revxrsal.commands.Lamp
 import revxrsal.commands.bukkit.BukkitLamp
 import lol.mcplugs.minimessagechatplugin.paper.commands.ChatPluginCommands
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
-import lol.mcplugs.minimessagechatplugin.paper.listeners.ChatListener
+import lol.mcplugs.minimessagechatplugin.paper.listeners.ChatMessageListener
+import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerJoinQuitListener
+import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerDeathListener
+import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerAdvancementListener
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
 import lol.mcplugs.minimessagechatplugin.paper.services.PlaceholderAPIService
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
@@ -60,7 +63,10 @@ class PaperMC : JavaPlugin() {
         lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
 
         // Register event listeners
-        server.pluginManager.registerEvents(ChatListener(configManager, chatFormattingService, chatToggleService, messageFormattingService), this)
+        server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService), this)
+        server.pluginManager.registerEvents(PlayerJoinQuitListener(configManager, chatFormattingService, messageFormattingService), this)
+        server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)
+        server.pluginManager.registerEvents(PlayerAdvancementListener(configManager), this)
 
         logger.info("MiniMessageChatPlugin enabled successfully!")
         logger.info("Features enabled:")
