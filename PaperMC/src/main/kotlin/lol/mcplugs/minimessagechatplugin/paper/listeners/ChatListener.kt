@@ -28,6 +28,11 @@ class ChatListener(
     fun onAsyncChat(event: AsyncChatEvent) {
         if (event.isCancelled) return
         
+        // Check if chat formatting is enabled
+        if (!configManager.config.features.enableChatFormatting) {
+            return // Let vanilla handle the chat
+        }
+        
         event.isCancelled = true
         
         try {
@@ -54,21 +59,29 @@ class ChatListener(
 
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onPlayerJoin(event: PlayerJoinEvent) {
-        if (!configManager.config.features.enableJoinLeaveMessages) {
+        if (!configManager.config.features.enableJoinMessages) {
             event.joinMessage(null)
             return
         }
         
         val joinMessage = configManager.config.features.joinMessage
+        
+        // If join message is empty, disable join messages
+        if (joinMessage.isBlank()) {
+            event.joinMessage(null)
+            return
+        }
+        
+        val processedMessage = joinMessage
             .replace("{player_name}", event.player.name)
             .replace("{player_displayname}", plainTextSerializer.serialize(event.player.displayName()))
             .replace("{online_players}", event.player.server.onlinePlayers.size.toString())
             .replace("{max_players}", event.player.server.maxPlayers.toString())
         
         try {
-            event.joinMessage(miniMessage.deserialize(joinMessage))
+            event.joinMessage(miniMessage.deserialize(processedMessage))
         } catch (e: Exception) {
-            logger.warn("Failed to parse join message format: $joinMessage", e)
+            logger.warn("Failed to parse join message format: $processedMessage", e)
             event.joinMessage(miniMessage.deserialize("<yellow>${event.player.name} joined the game</yellow>"))
         }
     }
@@ -78,49 +91,69 @@ class ChatListener(
         // Clear cooldown when player leaves
         chatFormattingService.clearCooldown(event.player)
         
-        if (!configManager.config.features.enableJoinLeaveMessages) {
+        if (!configManager.config.features.enableLeaveMessages) {
             event.quitMessage(null)
             return
         }
         
-        val quitMessage = configManager.config.features.leaveMessage
+        val leaveMessage = configManager.config.features.leaveMessage
+        
+        // If leave message is empty, disable leave messages
+        if (leaveMessage.isBlank()) {
+            event.quitMessage(null)
+            return
+        }
+        
+        val processedMessage = leaveMessage
             .replace("{player_name}", event.player.name)
             .replace("{player_displayname}", plainTextSerializer.serialize(event.player.displayName()))
             .replace("{online_players}", (event.player.server.onlinePlayers.size - 1).toString())
             .replace("{max_players}", event.player.server.maxPlayers.toString())
         
         try {
-            event.quitMessage(miniMessage.deserialize(quitMessage))
+            event.quitMessage(miniMessage.deserialize(processedMessage))
         } catch (e: Exception) {
-            logger.warn("Failed to parse quit message format: $quitMessage", e)
+            logger.warn("Failed to parse quit message format: $processedMessage", e)
             event.quitMessage(miniMessage.deserialize("<yellow>${event.player.name} left the game</yellow>"))
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onPlayerDeath(event: PlayerDeathEvent) {
-        if (!configManager.config.features.enableDeathMessages) {
+        // Check if death messages should be completely disabled
+        if (configManager.config.features.disableDeathMessages) {
             event.deathMessage(null)
             return
         }
         
+        // Check if custom death messages are enabled
+        if (!configManager.config.features.enableDeathMessages) {
+            return // Let vanilla handle death messages
+        }
+        
         val originalMessage = event.deathMessage() ?: return
-
         val deathCause = plainTextSerializer.serialize(originalMessage)
         val customMessage = configManager.config.features.customDeathMessages[deathCause]
         
         if (customMessage != null) {
-            val formattedMessage = customMessage
+            // If custom message is empty, disable this specific death message
+            if (customMessage.isBlank()) {
+                event.deathMessage(null)
+                return
+            }
+            
+            val processedMessage = customMessage
                 .replace("{player_name}", event.player.name)
                 .replace("{player_displayname}", plainTextSerializer.serialize(event.player.displayName()))
             
             try {
-                event.deathMessage(miniMessage.deserialize(formattedMessage))
+                event.deathMessage(miniMessage.deserialize(processedMessage))
             } catch (e: Exception) {
-                logger.warn("Failed to parse custom death message format: $formattedMessage", e)
+                logger.warn("Failed to parse custom death message format: $processedMessage", e)
                 // Keep original message
             }
         }
+        // If no custom message is defined, keep the original vanilla message
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
