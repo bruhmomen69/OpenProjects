@@ -30,28 +30,28 @@ data class Config(
 @ConfigSerializable
 data class ChatFormatConfig(
     @Comment("Default chat format used when no group or world format applies. Supports MiniMessage syntax and placeholders.")
-    val defaultFormat: String = "<gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>",
+    val defaultFormat: String = "<gray>[<white><player_name></white>]</gray> <gray><message></gray>",
     
     @Comment("Group-based chat formats mapped by group/rank name. Higher priority groups should be listed first in rankedFormatPriority.")
     val groupFormats: Map<String, String> = mapOf(
-        "owner" to "<gradient:red:gold>[OWNER]</gradient> <gradient:gold:yellow>{player_name}</gradient> <gray>»</gray> <white>{message}</white>",
-        "admin" to "<red>[ADMIN]</red> <gold>{player_name}</gold> <gray>»</gray> <white>{message}</white>",
-        "moderator" to "<blue>[MOD]</blue> <yellow>{player_name}</yellow> <gray>»</gray> <white>{message}</white>",
-        "helper" to "<green>[HELPER]</green> <lime>{player_name}</lime> <gray>»</gray> <white>{message}</white>",
-        "vip" to "<green>[VIP]</green> <aqua>{player_name}</aqua> <gray>»</gray> <white>{message}</white>",
-        "premium" to "<gold>[PREMIUM]</gold> <yellow>{player_name}</yellow> <gray>»</gray> <white>{message}</white>",
-        "donor" to "<light_purple>[DONOR]</light_purple> <pink>{player_name}</pink> <gray>»</gray> <white>{message}</white>",
-        "member" to "<gray>[MEMBER]</gray> <white>{player_name}</white> <gray>»</gray> <gray>{message}</gray>",
-        "default" to "<gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>"
+        "owner" to "<gradient:red:gold>[OWNER]</gradient> <gradient:gold:yellow><player_name></gradient> <gray>»</gray> <white><message></white>",
+        "admin" to "<red>[ADMIN]</red> <gold><player_name></gold> <gray>»</gray> <white><message></white>",
+        "moderator" to "<blue>[MOD]</blue> <yellow><player_name></yellow> <gray>»</gray> <white><message></white>",
+        "helper" to "<green>[HELPER]</green> <lime><player_name></lime> <gray>»</gray> <white><message></white>",
+        "vip" to "<green>[VIP]</green> <aqua><player_name></aqua> <gray>»</gray> <white><message></white>",
+        "premium" to "<gold>[PREMIUM]</gold> <yellow><player_name></yellow> <gray>»</gray> <white><message></white>",
+        "donor" to "<light_purple>[DONOR]</light_purple> <pink><player_name></pink> <gray>»</gray> <white><message></white>",
+        "member" to "<gray>[MEMBER]</gray> <white><player_name></white> <gray>»</gray> <gray><message></gray>",
+        "default" to "<gray>[<white><player_name></white>]</gray> <gray><message></gray>"
     ),
     
     @Comment("World-specific chat formats mapped by world name. Useful for different gamemodes or themed worlds.")
     val worldFormats: Map<String, String> = mapOf(
-        "world" to "<green>[Overworld]</green> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>",
-        "world_nether" to "<red>[Nether]</red> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>",
-        "world_the_end" to "<dark_purple>[The End]</dark_purple> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>",
-        "creative" to "<yellow>[Creative]</yellow> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>",
-        "survival" to "<green>[Survival]</green> <gray>[<white>{player_name}</white>]</gray> <gray>{message}</gray>"
+        "world" to "<green>[Overworld]</green> <gray>[<white><player_name></white>]</gray> <gray><message></gray>",
+        "world_nether" to "<red>[Nether]</red> <gray>[<white><player_name></white>]</gray> <gray><message></gray>",
+        "world_the_end" to "<dark_purple>[The End]</dark_purple> <gray>[<white><player_name></white>]</gray> <gray><message></gray>",
+        "creative" to "<yellow>[Creative]</yellow> <gray>[<white><player_name></white>]</gray> <gray><message></gray>",
+        "survival" to "<green>[Survival]</green> <gray>[<white><player_name></white>]</gray> <gray><message></gray>"
     ),
     
     @Comment("Enable or disable group-based chat formats. When disabled, only default format is used.")
@@ -85,13 +85,13 @@ data class ChatFormatConfig(
     
     @Comment("Custom click actions for player names, mapped by rank/group. Supports: suggest_command, run_command, open_url, copy_to_clipboard")
     val clickActions: Map<String, String> = mapOf(
-        "default" to "suggest_command:/msg {player_name} "
+        "default" to "suggest_command:/msg <player_name> "
     )
 )
 
 @ConfigSerializable
 data class PlaceholderConfig(
-    @Comment("Enable built-in placeholders like {player_name}, {world}, {server_name}, {time}, etc.")
+    @Comment("Enable built-in placeholders like <player_name>, <max_players>, <time>, etc.")
     val enableBuiltinPlaceholders: Boolean = true,
     
     @Comment("Custom server-specific placeholders. Use {placeholder_name} in formats to reference these values.")
@@ -134,7 +134,7 @@ data class PermissionConfig(
     @Comment("Enable permission-based format selection. When true, players need specific permissions to use group formats.")
     val usePermissionBasedFormats: Boolean = true,
     
-    @Comment("Permission prefix for format-specific permissions. Players need '{prefix}{group}' permission for group formats.")
+    @Comment("Permission prefix for format-specific permissions. Players need '<prefix><group>' permission for group formats.")
     val formatPermissionPrefix: String = "chatplugin.format.",
     
     @Comment("Permission required for players to use color codes in chat messages.")
@@ -179,14 +179,14 @@ data class FeatureConfig(
     val enableJoinMessages: Boolean = true,
     
     @Comment("Custom join message format. Set to empty string to disable join messages entirely.")
-    val joinMessage: String = "<green>+ <yellow>{player_name}</yellow> joined the server</green>",
+    val joinMessage: String = "<green>+ <yellow><player_name></yellow> joined the server</green>",
     
     // === LEAVE MESSAGES ===
     @Comment("Enable custom leave messages. When false, no leave messages are sent.")
     val enableLeaveMessages: Boolean = true,
     
     @Comment("Custom leave message format. Set to empty string to disable leave messages entirely.")
-    val leaveMessage: String = "<red>- <yellow>{player_name}</yellow> left the server</red>",
+    val leaveMessage: String = "<red>- <yellow><player_name></yellow> left the server</red>",
     
     // === DEATH MESSAGES ===
     @Comment("Enable custom death messages. When false, vanilla death messages are used.")
@@ -215,10 +215,10 @@ data class PrivateMessageConfig(
     val enablePrivateMessages: Boolean = true,
     
     @Comment("Message format sent to the sender of a private message. Supports MiniMessage and placeholders.")
-    val senderFormat: String = "<gray>[<yellow>You</yellow> -> <green>{recipient}</green>]</gray> <white>{message}</white>",
+    val senderFormat: String = "<gray>[<yellow>You</yellow> -> <green>{recipient}</green>]</gray> <white><message></white>",
     
     @Comment("Message format sent to the recipient of a private message. Supports MiniMessage and placeholders.")
-    val recipientFormat: String = "<gray>[<green>{sender}</green> -> <yellow>You</yellow>]</gray> <white>{message}</white>",
+    val recipientFormat: String = "<gray>[<green>{sender}</green> -> <yellow>You</yellow>]</gray> <white><message></white>",
     
     @Comment("Enable cooldown system for private messages to prevent spam.")
     val enableMessageCooldown: Boolean = true,
@@ -275,7 +275,7 @@ data class SocialSpyConfig(
     val enableCommandSpy: Boolean = false,
     
     @Comment("Format for social spy messages showing private message monitoring.")
-    val socialSpyFormat: String = "<dark_gray>[<red>SPY</red>]</dark_gray> <gray>{sender} -> {recipient}:</gray> <white>{message}</white>",
+    val socialSpyFormat: String = "<dark_gray>[<red>SPY</red>]</dark_gray> <gray>{sender} -> {recipient}:</gray> <white><message></white>",
     
     @Comment("Format for command spy messages showing command monitoring.")
     val commandSpyFormat: String = "<dark_gray>[<blue>CMD</blue>]</dark_gray> <gray>{player}:</gray> <yellow>{command}</yellow>",

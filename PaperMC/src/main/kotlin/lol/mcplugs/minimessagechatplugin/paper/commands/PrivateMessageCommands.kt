@@ -8,6 +8,8 @@ import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
 import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
+import revxrsal.commands.annotation.Switch
+import revxrsal.commands.annotation.Values
 
 /**
  * Commands for private messaging, chat toggle, and social spy functionality
@@ -43,14 +45,14 @@ class ReplyCommand(private val privateMessageService: PrivateMessageService) {
 /**
  * Chat toggle commands as subcommands of the main chatplugin command
  */
+@Command("chatplugin toggle", "chattoggle", "ct", "chatstatus")
 class ChatToggleCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
     private val privateMessageService: PrivateMessageService
 ) {
     
-    @Subcommand("toggle chat")
-    
+    @Subcommand("chat")
     fun toggleChat(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
@@ -61,8 +63,14 @@ class ChatToggleCommands(
         chatToggleService.toggleChat(player)
     }
     
-    @Subcommand("toggle messages")
-    
+    /**
+     * Toggle private messages for the executing player.
+     * This command allows players to enable or disable their private message reception.
+     * Only players can execute this command.
+     *
+     * @param actor The command actor executing the command
+     */
+    @Subcommand("messages")
     fun toggleMessages(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
@@ -73,8 +81,7 @@ class ChatToggleCommands(
         chatToggleService.togglePrivateMessages(player)
     }
     
-    @Subcommand("toggle socialspy")
-    
+    @Subcommand("socialspy")
     fun toggleSocialSpy(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
@@ -86,7 +93,6 @@ class ChatToggleCommands(
     }
     
     @Subcommand("status")
-    
     fun status(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
@@ -112,14 +118,13 @@ class ChatToggleCommands(
 /**
  * Admin commands for managing chat features
  */
+@Command("chatplugin admin")
 class ChatAdminCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
     private val privateMessageService: PrivateMessageService
 ) {
-    
-    @Subcommand("admin toggle chat")
-    
+    @Subcommand("toggle chat")
     fun adminToggleChat(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -136,8 +141,7 @@ class ChatAdminCommands(
         }
     }
     
-    @Subcommand("admin toggle messages")
-    
+    @Subcommand("toggle messages")
     fun adminToggleMessages(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -154,8 +158,7 @@ class ChatAdminCommands(
         }
     }
     
-    @Subcommand("admin toggle all")
-    
+    @Subcommand("toggle all")
     fun adminToggleAll(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -172,8 +175,7 @@ class ChatAdminCommands(
         }
     }
     
-    @Subcommand("admin socialspy")
-    
+    @Subcommand("socialspy")
     fun adminSocialSpy(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -193,8 +195,7 @@ class ChatAdminCommands(
         }
     }
     
-    @Subcommand("admin stats")
-    
+    @Subcommand("stats")
     fun adminStats(actor: BukkitCommandActor) {
         val toggleStats = chatToggleService.getToggleStats()
         val spyStats = socialSpyService.getSocialSpyStats()
@@ -215,9 +216,8 @@ class ChatAdminCommands(
         actor.reply(MiniMessage.miniMessage().deserialize(message))
     }
     
-    @Subcommand("admin clear")
-    
-    fun adminClear(actor: BukkitCommandActor, type: String) {
+    @Subcommand("clear")
+    fun adminClear(actor: BukkitCommandActor, @Values("toggles", "socialspy", "cooldowns", "all") type: String) {
         when (type.lowercase()) {
             "toggles" -> {
                 chatToggleService.clearAllToggles()

@@ -147,7 +147,6 @@ class ChatPluginCommands(
     }
 
     @Command("chatplugin toggle")
-    
     class ToggleCommands(
         private val configManager: ConfigManager
     ) {

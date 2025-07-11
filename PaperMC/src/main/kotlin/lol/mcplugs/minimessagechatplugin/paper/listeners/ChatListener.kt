@@ -41,9 +41,7 @@ class ChatListener(
             event.player.sendMessage(miniMessage.deserialize("<red>You have chat disabled! Use /chatplugin toggle chat to enable it.</red>"))
             return
         }
-        
-        event.isCancelled = true
-        
+
         try {
             val player = event.player
             val message = plainTextSerializer.serialize(event.message())
@@ -56,6 +54,7 @@ class ChatListener(
             val formattedMessage = chatFormattingService.formatMessage(player, message)
 
             event.message(formattedMessage)
+            // If we need to do custom message sending, make the prio monitor, and cancel the event
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(miniMessage.deserialize("<red>${e.message}</red>"))
             event.isCancelled = true

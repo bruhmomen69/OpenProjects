@@ -24,10 +24,10 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     // Kyori Adventure
-    implementation("net.kyori:adventure-api:4.23.0")
-    implementation("net.kyori:adventure-text-serializer-legacy:4.23.0")
-    implementation("net.kyori:adventure-text-serializer-gson:4.23.0")
-    implementation("net.kyori:adventure-text-minimessage:4.23.0")
+    compileOnly("net.kyori:adventure-api:4.23.0")
+    compileOnly("net.kyori:adventure-text-serializer-legacy:4.23.0")
+    compileOnly("net.kyori:adventure-text-serializer-gson:4.23.0")
+    compileOnly("net.kyori:adventure-text-minimessage:4.23.0")
 
     // Configurate
     implementation("org.spongepowered:configurate-hocon:4.1.2")
