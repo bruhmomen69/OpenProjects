@@ -1,0 +1,209 @@
+package lol.mcplugs.minimessagechatplugin.paper.commands
+
+import revxrsal.commands.annotation.Command
+import revxrsal.commands.annotation.Subcommand
+import revxrsal.commands.bukkit.actor.BukkitCommandActor
+import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
+import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
+import net.kyori.adventure.text.minimessage.MiniMessage
+import org.bukkit.entity.Player
+import revxrsal.commands.bukkit.annotation.CommandPermission
+
+@Command("chatplugin")
+class ChatPluginCommands(
+    private val configManager: ConfigManager,
+    private val chatFormattingService: ChatFormattingService
+) {
+
+    @Subcommand("reload")
+    @CommandPermission("chatplugin.admin.reload")
+    fun reload(actor: BukkitCommandActor) {
+        val success = configManager.reloadConfig()
+        if (success) {
+            chatFormattingService.reloadPlaceholders()
+            actor.reply(MiniMessage.miniMessage().deserialize("<green>Configuration reloaded successfully!</green>"))
+        } else {
+            actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to reload configuration. Check console for errors.</red>"))
+        }
+    }
+
+    @Subcommand("info")
+    fun info(actor: BukkitCommandActor) {
+        val config = configManager.config
+        val message = """
+            <gold>===== ChatPlugin Info =====</gold>
+            <yellow>Default Format:</yellow> <gray>${config.chatFormat.defaultFormat}</gray>
+            <yellow>Group Formats Enabled:</yellow> <gray>${config.chatFormat.enableGroupFormats}</gray>
+            <yellow>World Formats Enabled:</yellow> <gray>${config.chatFormat.enableWorldFormats}</gray>
+            <yellow>PlaceholderAPI Enabled:</yellow> <gray>${config.placeholders.enablePlaceholderAPI}</gray>
+            <yellow>Features:</yellow>
+            <gray>  - Colors: ${config.features.enableColorCodes}</gray>
+            <gray>  - Formatting: ${config.features.enableFormatting}</gray>
+            <gray>  - URLs: ${config.features.enableUrls}</gray>
+            <gray>  - Mentions: ${config.features.enableMentions}</gray>
+            <gray>  - Chat Cooldown: ${config.features.enableChatCooldown}</gray>
+        """.trimIndent()
+        
+        actor.reply(MiniMessage.miniMessage().deserialize(message))
+    }
+
+    @Subcommand("test")
+    fun test(actor: BukkitCommandActor, message: String) {
+        if (actor.sender() !is Player) {
+            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            return
+        }
+        
+        val player = actor.sender() as Player
+        val formattedMessage = chatFormattingService.formatMessage(player, message)
+        actor.reply(MiniMessage.miniMessage().deserialize("<yellow>Test Result:</yellow>"))
+        actor.reply(formattedMessage)
+    }
+
+    @Command("chatplugin format")
+    class FormatCommands(
+        private val configManager: ConfigManager
+    ) {
+        @Subcommand("set default")
+        fun setDefault(actor: BukkitCommandActor, format: String) {
+            val newConfig = configManager.config.copy(
+                chatFormat = configManager.config.chatFormat.copy(
+                    defaultFormat = format
+                )
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Default format updated successfully!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+
+        @Subcommand("set group")
+        fun setGroup(actor: BukkitCommandActor, groupName: String, format: String) {
+            val newGroupFormats = configManager.config.chatFormat.groupFormats.toMutableMap()
+            newGroupFormats[groupName] = format
+            
+            val newConfig = configManager.config.copy(
+                chatFormat = configManager.config.chatFormat.copy(
+                    groupFormats = newGroupFormats
+                )
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Group format for '$groupName' updated successfully!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+
+        @Subcommand("set world")
+        fun setWorld(actor: BukkitCommandActor, worldName: String, format: String) {
+            val newWorldFormats = configManager.config.chatFormat.worldFormats.toMutableMap()
+            newWorldFormats[worldName] = format
+            
+            val newConfig = configManager.config.copy(
+                chatFormat = configManager.config.chatFormat.copy(
+                    worldFormats = newWorldFormats
+                )
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>World format for '$worldName' updated successfully!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+
+        @Subcommand("list")
+        fun list(actor: BukkitCommandActor) {
+            val config = configManager.config.chatFormat
+            val message = StringBuilder("<gold>===== Chat Formats =====</gold>\n")
+            
+            message.append("<yellow>Default:</yellow> <gray>${config.defaultFormat}</gray>\n")
+            
+            if (config.groupFormats.isNotEmpty()) {
+                message.append("<yellow>Group Formats:</yellow>\n")
+                config.groupFormats.forEach { (group, format) ->
+                    message.append("<gray>  $group:</gray> <white>$format</white>\n")
+                }
+            }
+            
+            if (config.worldFormats.isNotEmpty()) {
+                message.append("<yellow>World Formats:</yellow>\n")
+                config.worldFormats.forEach { (world, format) ->
+                    message.append("<gray>  $world:</gray> <white>$format</white>\n")
+                }
+            }
+            
+            actor.reply(MiniMessage.miniMessage().deserialize(message.toString()))
+        }
+    }
+
+    @Command("chatplugin toggle")
+    
+    class ToggleCommands(
+        private val configManager: ConfigManager
+    ) {
+
+        @Subcommand("colors")
+        fun toggleColors(actor: BukkitCommandActor) {
+            val newValue = !configManager.config.features.enableColorCodes
+            val newConfig = configManager.config.copy(
+                features = configManager.config.features.copy(enableColorCodes = newValue)
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                val status = if (newValue) "enabled" else "disabled"
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Color codes $status!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+
+        @Subcommand("formatting")
+        fun toggleFormatting(actor: BukkitCommandActor) {
+            val newValue = !configManager.config.features.enableFormatting
+            val newConfig = configManager.config.copy(
+                features = configManager.config.features.copy(enableFormatting = newValue)
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                val status = if (newValue) "enabled" else "disabled"
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Text formatting $status!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+
+        @Subcommand("mentions")
+        fun toggleMentions(actor: BukkitCommandActor) {
+            val newValue = !configManager.config.features.enableMentions
+            val newConfig = configManager.config.copy(
+                features = configManager.config.features.copy(enableMentions = newValue)
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                val status = if (newValue) "enabled" else "disabled"
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Player mentions $status!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+
+        @Subcommand("cooldown")
+        fun toggleCooldown(actor: BukkitCommandActor) {
+            val newValue = !configManager.config.features.enableChatCooldown
+            val newConfig = configManager.config.copy(
+                features = configManager.config.features.copy(enableChatCooldown = newValue)
+            )
+            
+            if (configManager.updateConfig(newConfig)) {
+                val status = if (newValue) "enabled" else "disabled"
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Chat cooldown $status!</green>"))
+            } else {
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
+            }
+        }
+    }
+}

@@ -1,5 +1,90 @@
-name: PaperMC
-version: '1.0-SNAPSHOT'
+name: MiniMessageChatPlugin
 main: lol.mcplugs.minimessagechatplugin.paper.PaperMC
-api-version: '1.13'
+version: ${version}
+api-version: '1.20'
+author: MCPlugs
+description: A highly configurable kyori adventure (minimessage) powered chat formatting plugin
+website: https://github.com/mcplugs/minimessage-chat-plugin
 load: STARTUP
+
+commands:
+  chatplugin:
+    description: Main command for MiniMessage Chat Plugin
+    usage: /chatplugin <subcommand>
+    permission: chatplugin.admin
+    aliases: [mcp, chatformat]
+
+permissions:
+  chatplugin.*:
+    description: All ChatPlugin permissions
+    children:
+      chatplugin.admin: true
+      chatplugin.color: true
+      chatplugin.formatting: true
+      chatplugin.url: true
+      chatplugin.mention: true
+      chatplugin.bypass.cooldown: true
+    default: op
+  
+  chatplugin.admin:
+    description: Access to admin commands
+    children:
+      chatplugin.admin.reload: true
+      chatplugin.admin.info: true
+      chatplugin.admin.test: true
+      chatplugin.admin.format: true
+      chatplugin.admin.toggle: true
+    default: op
+  
+  chatplugin.admin.reload:
+    description: Reload plugin configuration
+    default: op
+  
+  chatplugin.admin.info:
+    description: View plugin information
+    default: op
+  
+  chatplugin.admin.test:
+    description: Test chat formatting
+    default: op
+  
+  chatplugin.admin.format:
+    description: Manage chat formats
+    default: op
+  
+  chatplugin.admin.toggle:
+    description: Toggle plugin features
+    default: op
+  
+  chatplugin.color:
+    description: Use color codes in chat
+    default: true
+  
+  chatplugin.formatting:
+    description: Use text formatting in chat
+    default: true
+  
+  chatplugin.url:
+    description: Post clickable URLs in chat
+    default: true
+  
+  chatplugin.mention:
+    description: Mention other players in chat
+    default: true
+  
+  chatplugin.bypass.cooldown:
+    description: Bypass chat cooldown
+    default: op
+  
+  # Format-specific permissions
+  chatplugin.format.admin:
+    description: Use admin chat format
+    default: op
+  
+  chatplugin.format.moderator:
+    description: Use moderator chat format
+    default: false
+  
+  chatplugin.format.vip:
+    description: Use VIP chat format
+    default: false
