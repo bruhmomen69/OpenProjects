@@ -27,14 +27,14 @@ class PlayerJoinQuitListener(
 
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onPlayerJoin(event: PlayerJoinEvent) {
-        if (!configManager.config.features.enableJoinMessages) {
+        if (!configManager.config.joinLeave.enableJoin) {
             event.joinMessage(null)
             return
         }
         
         val player = event.player
         val originalMessage = event.joinMessage()
-        val joinMessage = configManager.config.features.joinMessage
+        val joinMessage = configManager.config.joinLeave.joinMessage
         
         if (joinMessage.isBlank()) {
             event.joinMessage(null)
@@ -65,7 +65,7 @@ class PlayerJoinQuitListener(
             
             event.joinMessage(enhancedMessage)
             
-            if (configManager.config.features.enableChatLogging) {
+            if (configManager.config.chat.enableLogging) {
                 logger.info("[JOIN] ${player.name} joined the server")
             }
             
@@ -93,14 +93,14 @@ class PlayerJoinQuitListener(
         // Clear cooldown when player leaves
         chatFormattingService.clearCooldown(event.player)
         
-        if (!configManager.config.features.enableLeaveMessages) {
+        if (!configManager.config.joinLeave.enableLeave) {
             event.quitMessage(null)
             return
         }
         
         val player = event.player
         val originalMessage = event.quitMessage()
-        val leaveMessage = configManager.config.features.leaveMessage
+        val leaveMessage = configManager.config.joinLeave.leaveMessage
         
         if (leaveMessage.isBlank()) {
             event.quitMessage(null)
@@ -131,7 +131,7 @@ class PlayerJoinQuitListener(
             
             event.quitMessage(enhancedMessage)
             
-            if (configManager.config.features.enableChatLogging) {
+            if (configManager.config.chat.enableLogging) {
                 logger.info("[QUIT] ${player.name} left the server")
             }
             

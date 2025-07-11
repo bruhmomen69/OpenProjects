@@ -28,9 +28,9 @@ class ChatFormattingService(
         val config = configManager.config
         
         // Check cooldown
-        if (config.features.enableChatCooldown && !player.hasPermission("chatplugin.bypass.cooldown")) {
+        if (config.chat.enableCooldown && !player.hasPermission("chatplugin.bypass.cooldown")) {
             val lastMessage = chatCooldowns[player.uniqueId] ?: 0
-            val cooldownTime = config.features.chatCooldownSeconds * 1000L
+            val cooldownTime = config.chat.cooldownSeconds * 1000L
             val currentTime = System.currentTimeMillis()
             
             if (currentTime - lastMessage < cooldownTime) {
@@ -52,16 +52,16 @@ class ChatFormattingService(
         
         // Use MessageFormattingService to format the final message
         val additionalPlaceholders = mapOf("message" to processedMessage)
-        val allowColors = config.features.enableColorCodes && player.hasPermission(config.permissions.colorPermission)
-        val allowFormatting = config.features.enableFormatting && player.hasPermission(config.permissions.formattingPermission)
+        val allowColors = config.chat.enableColorCodes && player.hasPermission(config.permissions.colorPermission)
+        val allowFormatting = config.chat.enableTextFormatting && player.hasPermission(config.permissions.formattingPermission)
         
         return try {
             messageFormattingService.formatMessage(
                 format = enhancedFormat,
                 player = player,
                 additionalPlaceholders = additionalPlaceholders,
-                processUrls = config.features.enableUrls && player.hasPermission(config.permissions.urlPermission),
-                processMentions = config.features.enableMentions && player.hasPermission(config.permissions.mentionPermission),
+                processUrls = config.chat.enableUrls && player.hasPermission(config.permissions.urlPermission),
+                processMentions = config.chat.enableMentions && player.hasPermission(config.permissions.mentionPermission),
                 allowColors = allowColors,
                 allowFormatting = allowFormatting
             )

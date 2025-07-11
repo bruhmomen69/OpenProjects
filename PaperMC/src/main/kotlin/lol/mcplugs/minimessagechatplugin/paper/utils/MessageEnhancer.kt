@@ -45,24 +45,24 @@ class MessageEnhancer(
         // Get the appropriate configuration based on message type
         val (hoverEnabled, hoverFormat, clickAction) = when (messageType) {
             MessageType.JOIN -> Triple(
-                configManager.config.features.enableJoinHoverMessages,
-                configManager.config.features.joinHoverMessage,
-                configManager.config.features.joinClickAction
+                configManager.config.joinLeave.enableJoinHover,
+                configManager.config.joinLeave.joinHoverMessage,
+                configManager.config.joinLeave.joinClickAction
             )
             MessageType.LEAVE -> Triple(
-                configManager.config.features.enableLeaveHoverMessages,
-                configManager.config.features.leaveHoverMessage,
-                configManager.config.features.leaveClickAction
+                configManager.config.joinLeave.enableLeaveHover,
+                configManager.config.joinLeave.leaveHoverMessage,
+                configManager.config.joinLeave.leaveClickAction
             )
             MessageType.DEATH -> Triple(
-                configManager.config.features.enableDeathHoverMessages,
-                configManager.config.features.deathHoverMessage,
-                configManager.config.features.deathClickAction
+                configManager.config.death.enableHover,
+                configManager.config.death.hoverMessage,
+                configManager.config.death.clickAction
             )
             MessageType.ADVANCEMENT -> Triple(
-                configManager.config.features.enableAdvancementHoverMessages,
-                configManager.config.features.advancementHoverMessage,
-                configManager.config.features.advancementClickAction
+                configManager.config.advancement.enableHover,
+                configManager.config.advancement.hoverMessage,
+                configManager.config.advancement.clickAction
             )
         }
 

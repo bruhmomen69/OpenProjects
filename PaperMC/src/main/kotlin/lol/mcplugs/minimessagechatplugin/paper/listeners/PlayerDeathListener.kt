@@ -24,13 +24,13 @@ class PlayerDeathListener(
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onPlayerDeath(event: PlayerDeathEvent) {
         // Check if death messages should be completely disabled
-        if (configManager.config.features.disableDeathMessages) {
+        if (configManager.config.death.disabled) {
             event.deathMessage(null)
             return
         }
         
         // Check if custom death messages are enabled
-        if (!configManager.config.features.enableDeathMessages) {
+        if (!configManager.config.death.enabled) {
             return // Let vanilla handle death messages
         }
         
@@ -41,17 +41,17 @@ class PlayerDeathListener(
         val deathCause = player.lastDamageCause?.cause?.name ?: "UNKNOWN"
         
         // First try to find a custom message by death cause
-        var customMessage = configManager.config.features.customDeathMessages[deathCause]
+        var customMessage = configManager.config.death.messages[deathCause]
         
         // If not found by death cause, try to find by the original vanilla message text
         if (customMessage == null) {
             val originalText = plainTextSerializer.serialize(originalMessage)
-            customMessage = configManager.config.features.customDeathMessages[originalText]
+            customMessage = configManager.config.death.messages[originalText]
         }
         
         // If still no custom message found, use the backup death message
         if (customMessage == null) {
-            customMessage = configManager.config.features.backupDeathMessage
+            customMessage = configManager.config.death.defaultMessage
         }
         
         // If custom message is empty, disable this specific death message
@@ -101,7 +101,7 @@ class PlayerDeathListener(
             event.deathMessage(enhancedMessage)
             
             // Log the death if chat logging is enabled
-            if (configManager.config.features.enableChatLogging) {
+            if (configManager.config.chat.enableLogging) {
                 logger.info("[DEATH] ${player.name} died: $deathCause at $worldName ${location.blockX}, ${location.blockY}, ${location.blockZ}")
             }
             

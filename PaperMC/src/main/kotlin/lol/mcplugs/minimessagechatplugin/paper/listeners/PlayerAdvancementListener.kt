@@ -24,7 +24,7 @@ class PlayerAdvancementListener(
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onPlayerAdvancement(event: PlayerAdvancementDoneEvent) {
         // Check if advancement messages are enabled
-        if (!configManager.config.features.enableAdvancementMessages) {
+        if (!configManager.config.advancement.enabled) {
             return
         }
         
@@ -59,8 +59,8 @@ class PlayerAdvancementListener(
         
         try {
             // Get the appropriate message format
-            val messageFormat = configManager.config.features.customAdvancementMessages[advancementKey]
-                ?: configManager.config.features.backupAdvancementMessage
+            val messageFormat = configManager.config.advancement.messages[advancementKey]
+                ?: configManager.config.advancement.defaultMessage
             
             if (messageFormat.isBlank()) {
                 return // Skip if message format is empty
@@ -97,7 +97,7 @@ class PlayerAdvancementListener(
             event.message(finalMessage)
             
             // Log the advancement if chat logging is enabled
-            if (configManager.config.features.enableChatLogging) {
+            if (configManager.config.chat.enableLogging) {
                 logger.info("[ADVANCEMENT] ${player.name} completed advancement: $advancementKey ($advancementName)")
             }
         } catch (e: Exception) {

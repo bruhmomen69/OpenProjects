@@ -27,7 +27,7 @@ class ChatMessageListener(
         if (event.isCancelled) return
         
         // Check if chat formatting is enabled
-        if (!configManager.config.features.enableChatFormatting) {
+        if (!configManager.config.chat.enableFormatting) {
             return // Let vanilla handle the chat
         }
         
@@ -45,7 +45,7 @@ class ChatMessageListener(
             val message = plainTextSerializer.serialize(event.message())
             
             // Log the chat message if enabled
-            if (configManager.config.features.enableChatLogging) {
+            if (configManager.config.chat.enableLogging) {
                 logger.info("[CHAT] ${player.name}: $message")
             }
             

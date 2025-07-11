@@ -92,13 +92,13 @@ class MessageFormattingService(
         processedFormat = convertLegacyPlaceholders(processedFormat)
         
         // Process URLs if enabled and player has permission
-        if (processUrls && player != null && configManager.config.features.enableUrls && 
+        if (processUrls && player != null && configManager.config.chat.enableUrls && 
             player.hasPermission(configManager.config.permissions.urlPermission)) {
             processedFormat = processUrls(processedFormat)
         }
         
         // Process mentions if enabled and player has permission
-        if (processMentions && player != null && configManager.config.features.enableMentions && 
+        if (processMentions && player != null && configManager.config.chat.enableMentions && 
             player.hasPermission(configManager.config.permissions.mentionPermission)) {
             processedFormat = processMentions(processedFormat)
         }
@@ -130,12 +130,12 @@ class MessageFormattingService(
         val config = configManager.config
         
         // Strip formatting if player doesn't have permission
-        if (player != null && (!config.features.enableFormatting || !player.hasPermission(config.permissions.formattingPermission))) {
+        if (player != null && (!config.chat.enableTextFormatting || !player.hasPermission(config.permissions.formattingPermission))) {
             processedMessage = stripFormatting(processedMessage)
         }
         
         // Strip colors if player doesn't have permission
-        if (player != null && (!config.features.enableColorCodes || !player.hasPermission(config.permissions.colorPermission))) {
+        if (player != null && (!config.chat.enableColorCodes || !player.hasPermission(config.permissions.colorPermission))) {
             processedMessage = stripColors(processedMessage)
         }
         

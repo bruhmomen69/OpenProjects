@@ -40,11 +40,15 @@ class ChatPluginCommands(
             <yellow>World Formats Enabled:</yellow> <gray>${config.chatFormat.enableWorldFormats}</gray>
             <yellow>PlaceholderAPI Enabled:</yellow> <gray>${config.placeholders.enablePlaceholderAPI}</gray>
             <yellow>Features:</yellow>
-            <gray>  - Colors: ${config.features.enableColorCodes}</gray>
-            <gray>  - Formatting: ${config.features.enableFormatting}</gray>
-            <gray>  - URLs: ${config.features.enableUrls}</gray>
-            <gray>  - Mentions: ${config.features.enableMentions}</gray>
-            <gray>  - Chat Cooldown: ${config.features.enableChatCooldown}</gray>
+            <gray>  - Colors: ${config.chat.enableColorCodes}</gray>
+            <gray>  - Text Formatting: ${config.chat.enableTextFormatting}</gray>
+            <gray>  - URLs: ${config.chat.enableUrls}</gray>
+            <gray>  - Mentions: ${config.chat.enableMentions}</gray>
+            <gray>  - Chat Cooldown: ${config.chat.enableCooldown} (${config.chat.cooldownSeconds}s)</gray>
+            <gray>  - Join Messages: ${config.joinLeave.enableJoin}</gray>
+            <gray>  - Leave Messages: ${config.joinLeave.enableLeave}</gray>
+            <gray>  - Death Messages: ${config.death.enabled}</gray>
+            <gray>  - Advancement Messages: ${config.advancement.enabled}</gray>
         """.trimIndent()
         
         actor.reply(MiniMessage.miniMessage().deserialize(message))
@@ -156,9 +160,10 @@ class ChatPluginCommands(
         @Subcommand("colors")
         @CommandPermission("chatplugin.admin.toggle")
         fun toggleColors(actor: BukkitCommandActor) {
-            val newValue = !configManager.config.features.enableColorCodes
+            val chatConfig = configManager.config.chat
+            val newValue = !chatConfig.enableColorCodes
             val newConfig = configManager.config.copy(
-                features = configManager.config.features.copy(enableColorCodes = newValue)
+                chat = chatConfig.copy(enableColorCodes = newValue)
             )
             
             if (configManager.updateConfig(newConfig)) {
@@ -172,9 +177,10 @@ class ChatPluginCommands(
         @Subcommand("formatting")
         @CommandPermission("chatplugin.admin.toggle")
         fun toggleFormatting(actor: BukkitCommandActor) {
-            val newValue = !configManager.config.features.enableFormatting
+            val chatConfig = configManager.config.chat
+            val newValue = !chatConfig.enableTextFormatting
             val newConfig = configManager.config.copy(
-                features = configManager.config.features.copy(enableFormatting = newValue)
+                chat = chatConfig.copy(enableTextFormatting = newValue)
             )
             
             if (configManager.updateConfig(newConfig)) {
@@ -188,9 +194,10 @@ class ChatPluginCommands(
         @Subcommand("mentions")
         @CommandPermission("chatplugin.admin.toggle")
         fun toggleMentions(actor: BukkitCommandActor) {
-            val newValue = !configManager.config.features.enableMentions
+            val chatConfig = configManager.config.chat
+            val newValue = !chatConfig.enableMentions
             val newConfig = configManager.config.copy(
-                features = configManager.config.features.copy(enableMentions = newValue)
+                chat = chatConfig.copy(enableMentions = newValue)
             )
             
             if (configManager.updateConfig(newConfig)) {
@@ -204,9 +211,10 @@ class ChatPluginCommands(
         @Subcommand("cooldown")
         @CommandPermission("chatplugin.admin.toggle")
         fun toggleCooldown(actor: BukkitCommandActor) {
-            val newValue = !configManager.config.features.enableChatCooldown
+            val chatConfig = configManager.config.chat
+            val newValue = !chatConfig.enableCooldown
             val newConfig = configManager.config.copy(
-                features = configManager.config.features.copy(enableChatCooldown = newValue)
+                chat = chatConfig.copy(enableCooldown = newValue)
             )
             
             if (configManager.updateConfig(newConfig)) {
