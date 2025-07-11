@@ -2,11 +2,11 @@ package lol.mcplugs.minimessagechatplugin.paper.services
 
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
 import net.kyori.adventure.text.minimessage.tag.standard.StandardTags
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
@@ -26,7 +26,8 @@ class MessageFormattingService(
     private val miniMessage = MiniMessage.miniMessage()
     private val urlPattern = Pattern.compile("https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+")
     private val mentionPattern = Pattern.compile("@(\\w+)")
-    
+    private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
+
     // Built-in placeholder resolvers
     private val builtinPlaceholders = mapOf<String, (Player?) -> String>(
         "player_name" to { it?.name ?: "Unknown" },
@@ -50,13 +51,36 @@ class MessageFormattingService(
         "online_players_after_leave" to { (Bukkit.getOnlinePlayers().size - 1).toString() } // Will be overridden in quit events
     )
 
-    /**
-     * Format a message with full processing including placeholders, URLs, mentions, and permissions
-     */
     fun formatMessage(
         format: String,
         player: Player? = null,
         additionalPlaceholders: Map<String, String> = emptyMap(),
+        processUrls: Boolean = true,
+        processMentions: Boolean = true,
+        allowColors: Boolean = true,
+        allowFormatting: Boolean = true
+    ): Component {
+        val componentMap = mutableMapOf<String, Component>()
+        additionalPlaceholders.forEach { (key, value) ->
+            componentMap[key] = legacySerializer.deserialize(value)
+        }
+        return formatMessageComponent(
+            format = format,
+            player = player,
+            additionalPlaceholders = componentMap,
+            processUrls = processUrls,
+            processMentions = processMentions,
+            allowColors = allowColors,
+            allowFormatting = allowFormatting
+        )
+    }
+    /**
+     * Format a message with full processing including placeholders, URLs, mentions, and permissions
+     */
+    fun formatMessageComponent(
+        format: String,
+        player: Player? = null,
+        additionalPlaceholders: Map<String, Component> = emptyMap(),
         processUrls: Boolean = true,
         processMentions: Boolean = true,
         allowColors: Boolean = true,
@@ -123,14 +147,14 @@ class MessageFormattingService(
      */
     private fun createPlaceholderResolver(
         player: Player?, 
-        additionalPlaceholders: Map<String, String>,
+        additionalPlaceholders: Map<String, Component>,
         format: String
     ): TagResolver {
         val resolvers = mutableListOf<TagResolver>()
         
         // Add additional placeholders first (highest priority)
         for ((placeholder, value) in additionalPlaceholders) {
-            resolvers.add(Placeholder.unparsed(placeholder, value))
+            resolvers.add(Placeholder.component(placeholder, value))
         }
         
         // Add built-in placeholders

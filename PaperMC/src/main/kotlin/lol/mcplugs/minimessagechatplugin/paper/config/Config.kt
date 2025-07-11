@@ -271,7 +271,55 @@ data class FeatureConfig(
     """.trimIndent(),
     
     @field:Comment("Click action for advancement messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
-    val advancementClickAction: String = "suggest_command:/advancement grant @s only <advancement_key>"
+    val advancementClickAction: String = "suggest_command:/advancement grant @s only <advancement_key>",
+    
+    // Join Message Settings
+    @field:Comment("Enable hover messages for join announcements")
+    val enableJoinHoverMessages: Boolean = true,
+    
+    @field:Comment("Hover message format for join messages. Supports placeholders: <player_name>, <display_name>, <ping>, <world>, <x>, <y>, <z>")
+    val joinHoverMessage: String = """
+        <gradient:yellow:gold><b>Welcome <player_name>!</b></gradient>
+        <gray>Joined at: <time></gray>
+        <gray>Ping: <ping>ms</gray>
+        <gray>Location: <x>, <y>, <z></gray>
+        <gray>Click to send a message</gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for join messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val joinClickAction: String = "suggest_command:/msg <player_name> ",
+    
+    // Leave Message Settings
+    @field:Comment("Enable hover messages for leave announcements")
+    val enableLeaveHoverMessages: Boolean = true,
+    
+    @field:Comment("Hover message format for leave messages. Supports placeholders: <player_name>, <display_name>, <world>, <x>, <y>, <z>")
+    val leaveHoverMessage: String = """
+        <gradient:yellow:gold><b><player_name> left the game</b></gradient>
+        <gray>Last seen: <time></gray>
+        <gray>Location: <x>, <y>, <z></gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for leave messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val leaveClickAction: String = "suggest_command:/msg <player_name> ",
+    
+    // Death Message Settings
+    @field:Comment("Enable hover messages for death announcements")
+    val enableDeathHoverMessages: Boolean = true,
+    
+    @field:Comment("Hover message format for death messages. Supports placeholders: <player_name>, <death_cause>, <death_message>, <world>, <x>, <y>, <z>")
+    val deathHoverMessage: String = """
+        <gradient:red:dark_red><b>Death Details</b></gradient>
+        <gray>Player: <player_name></gray>
+        <gray>Cause: <death_cause></gray>
+        <gray>Message: <death_message></gray>
+        <gray>Location: <x>, <y>, <z></gray>
+        <gray>World: <world></gray>
+        <gray>Click to teleport</gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for death messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val deathClickAction: String = "suggest_command:/tp <x> <y> <z>"
 )
 
 @ConfigSerializable

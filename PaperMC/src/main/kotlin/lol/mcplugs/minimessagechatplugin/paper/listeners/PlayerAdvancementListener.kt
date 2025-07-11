@@ -3,9 +3,8 @@ package lol.mcplugs.minimessagechatplugin.paper.listeners
 import io.papermc.paper.advancement.AdvancementDisplay
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
+import lol.mcplugs.minimessagechatplugin.paper.utils.MessageEnhancer
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.ClickEvent
-import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -17,6 +16,8 @@ class PlayerAdvancementListener(
     private val configManager: ConfigManager,
     private val messageFormattingService: MessageFormattingService
 ) : Listener {
+    
+    private val messageEnhancer = MessageEnhancer(configManager, messageFormattingService)
     private val logger = LoggerFactory.getLogger(PlayerAdvancementListener::class.java)
     private val plainTextSerializer = PlainTextComponentSerializer.plainText()
 
@@ -44,6 +45,18 @@ class PlayerAdvancementListener(
         // Get the advancement key without the namespace
         val advancementKey = advancement.key.key
         
+        // Get advancement details
+        val advancementName = display.title()?.let { plainTextSerializer.serialize(it) } ?: advancementKey
+        val advancementDescription = display.description()?.let { plainTextSerializer.serialize(it) } ?: ""
+        
+        // Get advancement type
+        val advancementType = when (display.frame()) {
+            AdvancementDisplay.Frame.TASK -> "task"
+            AdvancementDisplay.Frame.GOAL -> "goal"
+            AdvancementDisplay.Frame.CHALLENGE -> "challenge"
+            else -> "advancement"
+        }
+        
         try {
             // Get the appropriate message format
             val messageFormat = configManager.config.features.customAdvancementMessages[advancementKey]
@@ -53,85 +66,35 @@ class PlayerAdvancementListener(
                 return // Skip if message format is empty
             }
             
-            // Get advancement details
-            val advancementName = plainTextSerializer.serialize(display.title())
-            val advancementDescription = plainTextSerializer.serialize(display.description())
-            val advancementType = when (display.frame()) {
-                AdvancementDisplay.Frame.TASK -> "task"
-                AdvancementDisplay.Frame.GOAL -> "goal"
-                AdvancementDisplay.Frame.CHALLENGE -> "challenge"
-                else -> "advancement"
-            }
+            // Create placeholders for the message
+            val placeholders = mapOf(
+                "advancement_name" to advancementName,
+                "advancement_description" to advancementDescription,
+                "advancement_type" to advancementType,
+                "advancement_key" to advancementKey
+            )
             
             // Format the base message
             val baseMessage = messageFormattingService.formatMessage(
                 format = messageFormat,
                 player = player,
-                additionalPlaceholders = mapOf(
-                    "advancement_name" to advancementName,
-                    "advancement_description" to advancementDescription,
-                    "advancement_type" to advancementType,
-                    "advancement_key" to advancementKey
-                ),
+                additionalPlaceholders = placeholders,
                 processUrls = false,
                 processMentions = false,
                 allowColors = true,
                 allowFormatting = true
             )
             
-            // Create the final message component
-            val finalMessage = Component.text().append(baseMessage)
-            
-            // Add hover and click actions if enabled
-            if (configManager.config.features.enableAdvancementHoverMessages) {
-                // Format the hover message
-                val hoverText = messageFormattingService.formatMessage(
-                    format = configManager.config.features.advancementHoverMessage,
-                    player = player,
-                    additionalPlaceholders = mapOf(
-                        "advancement_name" to advancementName,
-                        "advancement_description" to advancementDescription,
-                        "advancement_type" to advancementType,
-                        "advancement_key" to advancementKey
-                    ),
-                    processUrls = false,
-                    processMentions = false,
-                    allowColors = true,
-                    allowFormatting = true
-                )
-                
-                // Add hover event
-                finalMessage.hoverEvent(HoverEvent.showText(hoverText))
-                
-                // Add click action if configured
-                val clickAction = configManager.config.features.advancementClickAction
-                if (clickAction.isNotBlank()) {
-                    val (actionType, actionValue) = when {
-                        clickAction.startsWith("suggest_command:") -> 
-                            ClickEvent.Action.SUGGEST_COMMAND to clickAction.substringAfter("suggest_command:")
-                        clickAction.startsWith("run_command:") -> 
-                            ClickEvent.Action.RUN_COMMAND to clickAction.substringAfter("run_command:")
-                        clickAction.startsWith("open_url:") -> 
-                            ClickEvent.Action.OPEN_URL to clickAction.substringAfter("open_url:")
-                        clickAction.startsWith("copy_to_clipboard:") -> 
-                            ClickEvent.Action.COPY_TO_CLIPBOARD to clickAction.substringAfter("copy_to_clipboard:")
-                        else -> null to null
-                    }
-                    
-                    if (actionType != null && actionValue != null) {
-                        val processedActionValue = actionValue
-                            .replace("<player_name>", player.name)
-                            .replace("<advancement_key>", advancementKey)
-                            .replace("<advancement_name>", advancementName)
-                            .replace("<advancement_type>", advancementType)
-                        
-                        finalMessage.clickEvent(ClickEvent.clickEvent(actionType, processedActionValue))
-                    }
-                }
-            }
+            // Enhance the message with hover and click actions
+            val finalMessage = messageEnhancer.enhanceMessage(
+                message = baseMessage,
+                player = player,
+                messageType = MessageEnhancer.MessageType.ADVANCEMENT,
+                additionalPlaceholders = placeholders
+            )
             
             // Set the final message
-            event.message(finalMessage.build())
+            event.message(finalMessage)
             
             // Log the advancement if chat logging is enabled
             if (configManager.config.features.enableChatLogging) {
@@ -142,20 +105,33 @@ class PlayerAdvancementListener(
             
             // Fall back to a simple message if formatting fails
             try {
-                val fallbackMessage = messageFormattingService.formatMessage(
+                val fallbackBase = messageFormattingService.formatMessage(
                     format = "<gray>🎯</gray> <yellow><player_name></yellow> <gray>completed an advancement: <green>$advancementKey</green></gray>",
                     player = player,
                     additionalPlaceholders = mapOf(
-                        "advancement_name" to advancementKey,
+                        "advancement_name" to advancementName,
                         "advancement_key" to advancementKey,
-                        "advancement_type" to "advancement"
+                        "advancement_type" to advancementType,
+                        "advancement_description" to advancementDescription
                     ),
                     processUrls = false,
                     processMentions = false,
                     allowColors = true,
                     allowFormatting = true
                 )
-                event.message(fallbackMessage)
+                
+                val fallbackEnhanced = messageEnhancer.enhanceMessage(
+                    message = fallbackBase,
+                    player = player,
+                    messageType = MessageEnhancer.MessageType.ADVANCEMENT,
+                    additionalPlaceholders = mapOf(
+                        "advancement_name" to advancementName,
+                        "advancement_key" to advancementKey,
+                        "advancement_type" to advancementType,
+                        "advancement_description" to advancementDescription
+                    )
+                )
+                event.message(fallbackEnhanced)
             } catch (fallbackException: Exception) {
                 logger.error("Failed to format fallback advancement message", fallbackException)
                 // Let the default message through if we can't format our fallback
