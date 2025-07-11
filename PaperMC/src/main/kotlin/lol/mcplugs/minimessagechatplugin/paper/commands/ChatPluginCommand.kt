@@ -5,6 +5,7 @@ import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
+import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
 import revxrsal.commands.bukkit.annotation.CommandPermission
@@ -12,7 +13,8 @@ import revxrsal.commands.bukkit.annotation.CommandPermission
 @Command("chatplugin")
 class ChatPluginCommands(
     private val configManager: ConfigManager,
-    private val chatFormattingService: ChatFormattingService
+    private val chatFormattingService: ChatFormattingService,
+    private val messageFormattingService: MessageFormattingService
 ) {
 
     @Subcommand("reload")
@@ -21,9 +23,9 @@ class ChatPluginCommands(
         val success = configManager.reloadConfig()
         if (success) {
             chatFormattingService.reloadPlaceholders()
-            actor.reply(MiniMessage.miniMessage().deserialize("<green>Configuration reloaded successfully!</green>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.reload_success"))
         } else {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to reload configuration. Check console for errors.</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.reload_failed"))
         }
     }
 
@@ -52,7 +54,7 @@ class ChatPluginCommands(
     @CommandPermission("chatplugin.admin.test")
     fun test(actor: BukkitCommandActor, message: String) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         

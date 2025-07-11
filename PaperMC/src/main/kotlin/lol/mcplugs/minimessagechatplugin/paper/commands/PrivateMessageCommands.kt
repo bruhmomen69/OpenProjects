@@ -6,6 +6,7 @@ import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import lol.mcplugs.minimessagechatplugin.paper.services.PrivateMessageService
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
 import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
+import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Switch
@@ -15,11 +16,14 @@ import revxrsal.commands.annotation.Values
  * Commands for private messaging, chat toggle, and social spy functionality
  */
 @Command("msg", "message", "tell", "whisper", "w")
-class MessageCommand(private val privateMessageService: PrivateMessageService) {
+class MessageCommand(
+    private val privateMessageService: PrivateMessageService,
+    private val messageFormattingService: MessageFormattingService
+) {
     
     fun msg(actor: BukkitCommandActor, recipient: String, message: String) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         
@@ -29,11 +33,14 @@ class MessageCommand(private val privateMessageService: PrivateMessageService) {
 }
 
 @Command("reply", "r")
-class ReplyCommand(private val privateMessageService: PrivateMessageService) {
+class ReplyCommand(
+    private val privateMessageService: PrivateMessageService,
+    private val messageFormattingService: MessageFormattingService
+) {
     
     fun reply(actor: BukkitCommandActor, message: String) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         
@@ -49,13 +56,14 @@ class ReplyCommand(private val privateMessageService: PrivateMessageService) {
 class ChatToggleCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
-    private val privateMessageService: PrivateMessageService
+    private val privateMessageService: PrivateMessageService,
+    private val messageFormattingService: MessageFormattingService
 ) {
     
     @Subcommand("chat")
     fun toggleChat(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         
@@ -73,7 +81,7 @@ class ChatToggleCommands(
     @Subcommand("messages")
     fun toggleMessages(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         
@@ -84,7 +92,7 @@ class ChatToggleCommands(
     @Subcommand("socialspy")
     fun toggleSocialSpy(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         
@@ -95,7 +103,7 @@ class ChatToggleCommands(
     @Subcommand("status")
     fun status(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>This command can only be used by players!</red>"))
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
         
@@ -122,7 +130,8 @@ class ChatToggleCommands(
 class ChatAdminCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
-    private val privateMessageService: PrivateMessageService
+    private val privateMessageService: PrivateMessageService,
+    private val messageFormattingService: MessageFormattingService
 ) {
     @Subcommand("toggle chat")
     fun adminToggleChat(actor: BukkitCommandActor, playerName: String, enable: Boolean) {

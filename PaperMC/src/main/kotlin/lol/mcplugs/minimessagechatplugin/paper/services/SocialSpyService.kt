@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class SocialSpyService(
     private val configManager: ConfigManager,
-    private val placeholderAPIService: PlaceholderAPIService
+    private val messageFormattingService: MessageFormattingService
 ) {
     private val logger = LoggerFactory.getLogger(SocialSpyService::class.java)
     private val miniMessage = MiniMessage.miniMessage()
@@ -31,12 +31,12 @@ class SocialSpyService(
         val config = configManager.config.socialSpy
         
         if (!config.enableSocialSpy) {
-            player.sendMessage(miniMessage.deserialize("<red>Social spy is currently disabled.</red>"))
+            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.system_disabled", player))
             return false
         }
         
         if (!player.hasPermission("chatplugin.socialspy")) {
-            player.sendMessage(miniMessage.deserialize("<red>You don't have permission to use social spy!</red>"))
+            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.no_permission", player))
             return false
         }
         
@@ -44,11 +44,11 @@ class SocialSpyService(
         
         if (wasEnabled) {
             socialSpyEnabled.remove(player.uniqueId)
-            player.sendMessage(miniMessage.deserialize(config.socialSpyDisabledMessage))
+            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.disabled", player))
             logger.info("${player.name} disabled social spy")
         } else {
             socialSpyEnabled.add(player.uniqueId)
-            player.sendMessage(miniMessage.deserialize(config.socialSpyEnabledMessage))
+            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.enabled", player))
             logger.info("${player.name} enabled social spy")
         }
         
@@ -71,7 +71,19 @@ class SocialSpyService(
             return
         }
         
-        val spyMessage = createSpyMessage(config.socialSpyFormat, sender, recipient, message)
+        val spyMessage = messageFormattingService.formatMessage(
+            format = config.socialSpyFormat,
+            player = sender,
+            additionalPlaceholders = mapOf(
+                "sender" to sender.name,
+                "recipient" to recipient.name,
+                "message" to message
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = true,
+            allowFormatting = true
+        )
         
         // Send to all social spy users
         for (spyPlayerUUID in socialSpyEnabled) {
@@ -90,34 +102,6 @@ class SocialSpyService(
         }
     }
     
-    /**
-     * Create a formatted social spy message
-     */
-    private fun createSpyMessage(format: String, sender: Player, recipient: Player, message: String): Component {
-        val resolvers = mutableListOf<TagResolver>()
-        
-        // Add basic placeholders
-        resolvers.add(Placeholder.unparsed("sender", sender.name))
-        resolvers.add(Placeholder.unparsed("recipient", recipient.name))
-        resolvers.add(Placeholder.unparsed("message", message))
-        resolvers.add(Placeholder.component("sender_displayname", sender.displayName()))
-        resolvers.add(Placeholder.component("recipient_displayname", recipient.displayName()))
-        
-        // Add PlaceholderAPI support if enabled
-        if (placeholderAPIService.isEnabled()) {
-            val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(sender, format)
-            resolvers.add(placeholderAPIResolver)
-        }
-        
-        val combinedResolver = TagResolver.resolver(resolvers)
-        
-        return try {
-            miniMessage.deserialize(format, combinedResolver)
-        } catch (e: Exception) {
-            logger.warn("Failed to parse social spy format: $format", e)
-            miniMessage.deserialize("<dark_gray>[SPY]</dark_gray> <gray>${sender.name} -> ${recipient.name}:</gray> <white>$message</white>")
-        }
-    }
     
     /**
      * Check if a player has social spy enabled
@@ -206,10 +190,17 @@ class SocialSpyService(
             return
         }
         
-        val spyMessage = miniMessage.deserialize(
-            config.commandSpyFormat
-                .replace("{player}", player.name)
-                .replace("{command}", command)
+        val spyMessage = messageFormattingService.formatMessage(
+            format = config.commandSpyFormat,
+            player = player,
+            additionalPlaceholders = mapOf(
+                "player" to player.name,
+                "command" to command
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = true,
+            allowFormatting = true
         )
         
         // Send to all social spy users

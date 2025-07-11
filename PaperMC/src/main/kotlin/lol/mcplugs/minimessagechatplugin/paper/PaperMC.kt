@@ -10,12 +10,14 @@ import lol.mcplugs.minimessagechatplugin.paper.services.PlaceholderAPIService
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
 import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
 import lol.mcplugs.minimessagechatplugin.paper.services.PrivateMessageService
+import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
 import lol.mcplugs.minimessagechatplugin.paper.commands.*
 import org.bukkit.plugin.java.JavaPlugin
 
 class PaperMC : JavaPlugin() {
     private lateinit var configManager: ConfigManager
     private lateinit var placeholderAPIService: PlaceholderAPIService
+    private lateinit var messageFormattingService: MessageFormattingService
     private lateinit var chatToggleService: ChatToggleService
     private lateinit var socialSpyService: SocialSpyService
     private lateinit var privateMessageService: PrivateMessageService
@@ -31,30 +33,31 @@ class PaperMC : JavaPlugin() {
 
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
-        chatToggleService = ChatToggleService(configManager)
-        socialSpyService = SocialSpyService(configManager, placeholderAPIService)
-        privateMessageService = PrivateMessageService(configManager, placeholderAPIService, chatToggleService, socialSpyService)
-        chatFormattingService = ChatFormattingService(configManager, placeholderAPIService)
+        messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
+        chatToggleService = ChatToggleService(configManager, messageFormattingService)
+        socialSpyService = SocialSpyService(configManager, messageFormattingService)
+        privateMessageService = PrivateMessageService(configManager, messageFormattingService, chatToggleService, socialSpyService)
+        chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
 
         // Initialize command framework
         lamp = BukkitLamp.builder(this).build()
         
         // Register commands
-        val commands = ChatPluginCommands(configManager, chatFormattingService)
+        val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService)
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
         
         // Register private message commands
-        lamp.register(MessageCommand(privateMessageService))
-        lamp.register(ReplyCommand(privateMessageService))
+        lamp.register(MessageCommand(privateMessageService, messageFormattingService))
+        lamp.register(ReplyCommand(privateMessageService, messageFormattingService))
         
         // Register chat toggle and admin commands
-        lamp.register(ChatToggleCommands(chatToggleService, socialSpyService, privateMessageService))
-        lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService))
+        lamp.register(ChatToggleCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
+        lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
 
         // Register event listeners
-        server.pluginManager.registerEvents(ChatListener(configManager, chatFormattingService, chatToggleService), this)
+        server.pluginManager.registerEvents(ChatListener(configManager, chatFormattingService, chatToggleService, messageFormattingService), this)
 
         logger.info("MiniMessageChatPlugin enabled successfully!")
         logger.info("Features enabled:")

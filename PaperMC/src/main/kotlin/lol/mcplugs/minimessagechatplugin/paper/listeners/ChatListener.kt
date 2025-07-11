@@ -5,6 +5,7 @@ import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatCooldownException
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
+import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
@@ -19,7 +20,8 @@ import org.slf4j.LoggerFactory
 class ChatListener(
     private val configManager: ConfigManager,
     private val chatFormattingService: ChatFormattingService,
-    private val chatToggleService: ChatToggleService
+    private val chatToggleService: ChatToggleService,
+    private val messageFormattingService: MessageFormattingService
 ) : Listener {
     
     private val logger = LoggerFactory.getLogger(ChatListener::class.java)
@@ -38,7 +40,7 @@ class ChatListener(
         // Check if player can send chat messages
         if (!chatToggleService.canSendChat(event.player)) {
             event.isCancelled = true
-            event.player.sendMessage(miniMessage.deserialize("<red>You have chat disabled! Use /chatplugin toggle chat to enable it.</red>"))
+            event.player.sendMessage(messageFormattingService.getConfigMessage("chat.disabled_self", event.player))
             return
         }
 
@@ -56,11 +58,11 @@ class ChatListener(
             event.message(formattedMessage)
             // If we need to do custom message sending, make the prio monitor, and cancel the event
         } catch (e: ChatCooldownException) {
-            event.player.sendMessage(miniMessage.deserialize("<red>${e.message}</red>"))
+            event.player.sendMessage(messageFormattingService.getConfigMessage("chat.cooldown", event.player, mapOf("time" to e.message!!.substringAfter("wait ").substringBefore(" seconds"))))
             event.isCancelled = true
         } catch (e: Exception) {
             logger.error("Error formatting chat message for player ${event.player.name}", e)
-            event.player.sendMessage(miniMessage.deserialize("<red>An error occurred while formatting your message.</red>"))
+            event.player.sendMessage(messageFormattingService.getConfigMessage("chat.formatting_error", event.player))
             event.isCancelled = true
         }
     }

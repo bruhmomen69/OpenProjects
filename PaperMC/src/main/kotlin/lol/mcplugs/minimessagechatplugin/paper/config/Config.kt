@@ -24,7 +24,10 @@ data class Config(
     val chatToggle: ChatToggleConfig = ChatToggleConfig(),
     
     @Comment("Social spy system for moderators to monitor private messages and commands")
-    val socialSpy: SocialSpyConfig = SocialSpyConfig()
+    val socialSpy: SocialSpyConfig = SocialSpyConfig(),
+    
+    @Comment("All configurable messages used throughout the plugin. Supports MiniMessage formatting and placeholders.")
+    val messages: MessagesConfig = MessagesConfig()
 )
 
 @ConfigSerializable
@@ -294,4 +297,142 @@ data class SocialSpyConfig(
     
     @Comment("Persist social spy states across server restarts and moderator reconnections.")
     val persistSocialSpyState: Boolean = true
+)
+
+@ConfigSerializable
+data class MessagesConfig(
+    @Comment("Command-related messages")
+    val commands: CommandMessagesConfig = CommandMessagesConfig(),
+    
+    @Comment("Private messaging system messages")
+    val privateMessages: PrivateMessageMessagesConfig = PrivateMessageMessagesConfig(),
+    
+    @Comment("Chat system messages")
+    val chat: ChatMessagesConfig = ChatMessagesConfig(),
+    
+    @Comment("Chat toggle system messages")
+    val chatToggle: ChatToggleMessagesConfig = ChatToggleMessagesConfig(),
+    
+    @Comment("Social spy system messages")
+    val socialSpy: SocialSpyMessagesConfig = SocialSpyMessagesConfig(),
+    
+    @Comment("Error and system messages")
+    val system: SystemMessagesConfig = SystemMessagesConfig()
+)
+
+@ConfigSerializable
+data class CommandMessagesConfig(
+    @Comment("Message shown when a command can only be used by players")
+    val playerOnly: String = "<red>This command can only be used by players!</red>",
+    
+    @Comment("Message shown when a player lacks permission for a command")
+    val noPermission: String = "<red>You don't have permission to use this command!</red>",
+    
+    @Comment("Message shown when configuration is successfully reloaded")
+    val reloadSuccess: String = "<green>Configuration reloaded successfully!</green>",
+    
+    @Comment("Message shown when configuration reload fails")
+    val reloadFailed: String = "<red>Failed to reload configuration. Check console for errors.</red>",
+    
+    @Comment("Message shown when a player is not found")
+    val playerNotFound: String = "<red>Player '<player>' is not online!</red>",
+    
+    @Comment("Message shown when a feature is successfully enabled")
+    val featureEnabled: String = "<green><feature> enabled!</green>",
+    
+    @Comment("Message shown when a feature is successfully disabled")
+    val featureDisabled: String = "<green><feature> disabled!</green>",
+    
+    @Comment("Message shown when a configuration update fails")
+    val updateFailed: String = "<red>Failed to update configuration!</red>",
+    
+    @Comment("Message shown when a format is successfully updated")
+    val formatUpdated: String = "<green><type> format updated successfully!</green>"
+)
+
+@ConfigSerializable
+data class PrivateMessageMessagesConfig(
+    @Comment("Message shown when private messages are disabled")
+    val systemDisabled: String = "<red>Private messages are currently disabled.</red>",
+    
+    @Comment("Message shown when a player is on cooldown")
+    val cooldown: String = "<red>You must wait <time> seconds before sending another message!</red>",
+    
+    @Comment("Message shown when target player is not found")
+    val playerNotFound: String = "<red>Player '<player>' is not online!</red>",
+    
+    @Comment("Message shown when trying to message yourself")
+    val selfMessage: String = "<red>You cannot send a message to yourself!</red>",
+    
+    @Comment("Message shown when target player has messages disabled")
+    val targetMessagesDisabled: String = "<red><player> has private messages disabled!</red>",
+    
+    @Comment("Message shown when no one has sent a message to reply to")
+    val noReplyTarget: String = "<red>No one has sent you a message to reply to!</red>",
+    
+    @Comment("Message shown when reply target is no longer online")
+    val replyTargetOffline: String = "<red>The player you're trying to reply to is no longer online!</red>"
+)
+
+@ConfigSerializable
+data class ChatMessagesConfig(
+    @Comment("Message shown when a player has chat disabled and tries to send a message")
+    val disabledSelf: String = "<red>You have chat disabled! Use /chatplugin toggle chat to enable it.</red>",
+    
+    @Comment("Message shown when there's an error formatting a chat message")
+    val formattingError: String = "<red>An error occurred while formatting your message.</red>",
+    
+    @Comment("Message shown when a player is on chat cooldown")
+    val cooldown: String = "<red>You must wait <time> seconds before sending another message!</red>"
+)
+
+@ConfigSerializable
+data class ChatToggleMessagesConfig(
+    @Comment("Message shown when chat toggle system is disabled")
+    val systemDisabled: String = "<red>Chat toggle is currently disabled.</red>",
+    
+    @Comment("Message shown when message toggle system is disabled")
+    val messageToggleDisabled: String = "<red>Message toggle is currently disabled.</red>",
+    
+    @Comment("Message shown when a player enables their chat")
+    val chatEnabled: String = "<green>Chat enabled! You can now send and see chat messages.</green>",
+    
+    @Comment("Message shown when a player disables their chat")
+    val chatDisabled: String = "<red>Chat disabled! You will not see chat messages.</red>",
+    
+    @Comment("Message shown when a player enables their private messages")
+    val messagesEnabled: String = "<green>Private messages enabled! You can now receive messages.</green>",
+    
+    @Comment("Message shown when a player disables their private messages")
+    val messagesDisabled: String = "<red>Private messages disabled! You will not receive messages.</red>"
+)
+
+@ConfigSerializable
+data class SocialSpyMessagesConfig(
+    @Comment("Message shown when social spy system is disabled")
+    val systemDisabled: String = "<red>Social spy is currently disabled.</red>",
+    
+    @Comment("Message shown when a player lacks social spy permission")
+    val noPermission: String = "<red>You don't have permission to use social spy!</red>",
+    
+    @Comment("Message shown when social spy is enabled")
+    val enabled: String = "<green>Social spy enabled! You can now see private messages.</green>",
+    
+    @Comment("Message shown when social spy is disabled")
+    val disabled: String = "<red>Social spy disabled! You will no longer see private messages.</red>"
+)
+
+@ConfigSerializable
+data class SystemMessagesConfig(
+    @Comment("Message shown for general errors")
+    val error: String = "<red>An error occurred. Please try again.</red>",
+    
+    @Comment("Message shown when an operation is successful")
+    val success: String = "<green>Operation completed successfully!</green>",
+    
+    @Comment("Message shown when data is cleared")
+    val dataCleared: String = "<green>Cleared <type>!</green>",
+    
+    @Comment("Message shown for invalid usage")
+    val invalidUsage: String = "<red>Usage: <usage></red>"
 )

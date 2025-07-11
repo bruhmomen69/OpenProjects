@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class PrivateMessageService(
     private val configManager: ConfigManager,
-    private val placeholderAPIService: PlaceholderAPIService,
+    private val messageFormattingService: MessageFormattingService,
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService
 ) {
@@ -37,7 +37,7 @@ class PrivateMessageService(
         
         // Check if private messages are enabled
         if (!config.enablePrivateMessages) {
-            sender.sendMessage(miniMessage.deserialize("<red>Private messages are currently disabled.</red>"))
+            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.system_disabled"))
             return false
         }
         
@@ -49,7 +49,11 @@ class PrivateMessageService(
             
             if (currentTime - lastMessage < cooldownTime) {
                 val remainingTime = (cooldownTime - (currentTime - lastMessage)) / 1000.0
-                sender.sendMessage(miniMessage.deserialize("<red>You must wait ${String.format("%.1f", remainingTime)} seconds before sending another message!</red>"))
+                sender.sendMessage(messageFormattingService.getConfigMessage(
+                    "private_messages.cooldown", 
+                    sender, 
+                    mapOf("time" to String.format("%.1f", remainingTime))
+                ))
                 return false
             }
             
@@ -59,28 +63,61 @@ class PrivateMessageService(
         // Find recipient
         val recipient = Bukkit.getPlayer(recipientName)
         if (recipient == null) {
-            sender.sendMessage(miniMessage.deserialize(config.playerNotFoundMessage.replace("{player}", recipientName)))
+            sender.sendMessage(messageFormattingService.getConfigMessage(
+                "private_messages.player_not_found", 
+                sender, 
+                mapOf("player" to recipientName)
+            ))
             return false
         }
         
         // Check if recipient is the same as sender
         if (recipient.uniqueId == sender.uniqueId) {
-            sender.sendMessage(miniMessage.deserialize("<red>You cannot send a message to yourself!</red>"))
+            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.self_message", sender))
             return false
         }
         
         // Check if recipient has messages disabled
         if (!chatToggleService.canReceiveMessages(recipient)) {
-            sender.sendMessage(miniMessage.deserialize(config.messagesDisabledMessage.replace("{player}", recipient.name)))
+            sender.sendMessage(messageFormattingService.getConfigMessage(
+                "private_messages.target_messages_disabled", 
+                sender, 
+                mapOf("player" to recipient.name)
+            ))
             return false
         }
         
-        // Process message content
-        val processedMessage = processMessageContent(sender, message)
+        // Process message content using MessageFormattingService
+        val processedMessage = messageFormattingService.processMessageContent(sender, message)
         
-        // Create formatted messages
-        val senderMessage = createFormattedMessage(config.senderFormat, sender, recipient, processedMessage)
-        val recipientMessage = createFormattedMessage(config.recipientFormat, sender, recipient, processedMessage)
+        // Create formatted messages using MessageFormattingService
+        val senderMessage = messageFormattingService.formatMessage(
+            format = config.senderFormat,
+            player = sender,
+            additionalPlaceholders = mapOf(
+                "sender" to sender.name,
+                "recipient" to recipient.name,
+                "message" to processedMessage
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = config.allowFormattingInMessages && sender.hasPermission(configManager.config.permissions.colorPermission),
+            allowFormatting = config.allowFormattingInMessages && sender.hasPermission(configManager.config.permissions.formattingPermission)
+        )
+        
+        val recipientMessage = messageFormattingService.formatMessage(
+            format = config.recipientFormat,
+            player = recipient,
+            additionalPlaceholders = mapOf(
+                "sender" to sender.name,
+                "recipient" to recipient.name,
+                "message" to processedMessage
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = config.allowFormattingInMessages && sender.hasPermission(configManager.config.permissions.colorPermission),
+            allowFormatting = config.allowFormattingInMessages && sender.hasPermission(configManager.config.permissions.formattingPermission)
+        )
         
         // Send messages
         sender.sendMessage(senderMessage)
@@ -106,13 +143,13 @@ class PrivateMessageService(
     fun replyToLastSender(sender: Player, message: String): Boolean {
         val lastSenderUUID = lastSenders[sender.uniqueId]
         if (lastSenderUUID == null) {
-            sender.sendMessage(miniMessage.deserialize("<red>No one has sent you a message to reply to!</red>"))
+            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.no_reply_target", sender))
             return false
         }
         
         val lastSender = Bukkit.getPlayer(lastSenderUUID)
         if (lastSender == null) {
-            sender.sendMessage(miniMessage.deserialize("<red>The player you're trying to reply to is no longer online!</red>"))
+            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.reply_target_offline", sender))
             lastSenders.remove(sender.uniqueId)
             return false
         }
@@ -120,72 +157,6 @@ class PrivateMessageService(
         return sendPrivateMessage(sender, lastSender.name, message)
     }
     
-    /**
-     * Process message content (handle colors, formatting, etc.)
-     */
-    private fun processMessageContent(sender: Player, message: String): String {
-        var processedMessage = message
-        val config = configManager.config
-        
-        // Strip formatting if player doesn't have permission
-        if (!config.features.enableFormatting || !sender.hasPermission(config.permissions.formattingPermission)) {
-            processedMessage = stripFormatting(processedMessage)
-        }
-        
-        // Strip colors if player doesn't have permission
-        if (!config.features.enableColorCodes || !sender.hasPermission(config.permissions.colorPermission)) {
-            processedMessage = stripColors(processedMessage)
-        }
-        
-        return processedMessage
-    }
-    
-    /**
-     * Create a formatted message using MiniMessage
-     */
-    private fun createFormattedMessage(format: String, sender: Player, recipient: Player, message: String): Component {
-        // Create placeholder resolver
-        val resolvers = mutableListOf<TagResolver>()
-        
-        // Add basic placeholders
-        resolvers.add(Placeholder.unparsed("sender", sender.name))
-        resolvers.add(Placeholder.unparsed("recipient", recipient.name))
-        resolvers.add(Placeholder.unparsed("message", message))
-        resolvers.add(Placeholder.component("sender_displayname", sender.displayName()))
-        resolvers.add(Placeholder.component("recipient_displayname", recipient.displayName()))
-        
-        // Add PlaceholderAPI support if enabled
-        if (placeholderAPIService.isEnabled()) {
-            val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(sender, format)
-            resolvers.add(placeholderAPIResolver)
-        }
-        
-        val combinedResolver = TagResolver.resolver(resolvers)
-        
-        return try {
-            miniMessage.deserialize(format, combinedResolver)
-        } catch (e: Exception) {
-            logger.warn("Failed to parse private message format: $format", e)
-            miniMessage.deserialize("<gray>[${sender.name} -> ${recipient.name}]</gray> <white>$message</white>")
-        }
-    }
-    
-    
-    /**
-     * Strip MiniMessage formatting tags
-     */
-    private fun stripFormatting(message: String): String {
-        return message.replace(Regex("</?(?:bold|b|italic|i|underlined|u|strikethrough|st|obfuscated|obf)>"), "")
-    }
-    
-    /**
-     * Strip MiniMessage color tags
-     */
-    private fun stripColors(message: String): String {
-        return message
-            .replace(Regex("</?(?:color:[^>]+|[a-z_]+|#[0-9a-fA-F]{6})>"), "")
-            .replace(Regex("<[^>]*>"), "")
-    }
     
     /**
      * Clear message cooldown for a player

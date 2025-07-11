@@ -19,30 +19,10 @@ import java.util.regex.Pattern
 
 class ChatFormattingService(
     private val configManager: ConfigManager,
-    private val placeholderAPIService: PlaceholderAPIService
+    private val messageFormattingService: MessageFormattingService
 ) {
     private val logger = LoggerFactory.getLogger(ChatFormattingService::class.java)
-    private val miniMessage = MiniMessage.miniMessage()
     private val chatCooldowns = ConcurrentHashMap<UUID, Long>()
-    private val urlPattern = Pattern.compile("https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+")
-    private val mentionPattern = Pattern.compile("@(\\w+)")
-    
-    // Built-in placeholder resolvers
-    private val builtinPlaceholders = mapOf<String, (Player) -> String>(
-        "player_name" to { it.name },
-        "player_displayname" to { net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(it.displayName()) },
-        "player_uuid" to { it.uniqueId.toString() },
-        "world" to { it.world.name },
-        "world_displayname" to { it.world.name }, // Could be enhanced with world aliases
-        "server_name" to { Bukkit.getServer().name },
-        "server_version" to { Bukkit.getVersion() },
-        "server_motd" to { net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(Bukkit.getServer().motd()) },
-        "online_players" to { Bukkit.getOnlinePlayers().size.toString() },
-        "max_players" to { Bukkit.getMaxPlayers().toString() },
-        "time" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) },
-        "date" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) },
-        "datetime" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) }
-    )
 
     fun formatMessage(player: Player, message: String): Component {
         val config = configManager.config
@@ -61,28 +41,8 @@ class ChatFormattingService(
             chatCooldowns[player.uniqueId] = currentTime
         }
         
-        // Process message content
-        var processedMessage = message
-        
-        // Handle mentions
-        if (config.features.enableMentions && player.hasPermission(config.permissions.mentionPermission)) {
-            processedMessage = processMentions(processedMessage)
-        }
-        
-        // Handle URLs
-        if (config.features.enableUrls && player.hasPermission(config.permissions.urlPermission)) {
-            processedMessage = processUrls(processedMessage)
-        }
-        
-        // Strip formatting if player doesn't have permission
-        if (!config.features.enableFormatting || !player.hasPermission(config.permissions.formattingPermission)) {
-            processedMessage = stripFormatting(processedMessage)
-        }
-        
-        // Strip colors if player doesn't have permission
-        if (!config.features.enableColorCodes || !player.hasPermission(config.permissions.colorPermission)) {
-            processedMessage = stripColors(processedMessage)
-        }
+        // Process message content using MessageFormattingService
+        val processedMessage = messageFormattingService.processMessageContent(player, message)
         
         // Get the appropriate format
         val format = getFormatForPlayer(player)
@@ -90,22 +50,32 @@ class ChatFormattingService(
         // Add hover and click actions if enabled
         val enhancedFormat = addInteractiveElements(format, player)
         
-        // Create TagResolver with placeholders
-        val placeholderResolver = createPlaceholderResolver(player, processedMessage, enhancedFormat)
+        // Use MessageFormattingService to format the final message
+        val additionalPlaceholders = mapOf("message" to processedMessage)
+        val allowColors = config.features.enableColorCodes && player.hasPermission(config.permissions.colorPermission)
+        val allowFormatting = config.features.enableFormatting && player.hasPermission(config.permissions.formattingPermission)
         
-        // Parse with MiniMessage using proper TagResolver
         return try {
-            val baseTagResolver = if (config.features.enableColorCodes && player.hasPermission(config.permissions.colorPermission)) {
-                TagResolver.standard()
-            } else {
-                TagResolver.resolver(StandardTags.decorations())
-            }
-            
-            val combinedResolver = TagResolver.resolver(baseTagResolver, placeholderResolver)
-            miniMessage.deserialize(enhancedFormat, combinedResolver)
+            messageFormattingService.formatMessage(
+                format = enhancedFormat,
+                player = player,
+                additionalPlaceholders = additionalPlaceholders,
+                processUrls = config.features.enableUrls && player.hasPermission(config.permissions.urlPermission),
+                processMentions = config.features.enableMentions && player.hasPermission(config.permissions.mentionPermission),
+                allowColors = allowColors,
+                allowFormatting = allowFormatting
+            )
         } catch (e: Exception) {
-            logger.warn("Failed to parse message format for player ${player.name}: $enhancedFormat", e)
-            miniMessage.deserialize("<gray>[${player.name}]</gray> <white>$processedMessage</white>")
+            logger.warn("Failed to format message for player ${player.name}: $enhancedFormat", e)
+            messageFormattingService.formatMessage(
+                format = "<gray>[<player_name>]</gray> <white><message></white>",
+                player = player,
+                additionalPlaceholders = additionalPlaceholders,
+                processUrls = false,
+                processMentions = false,
+                allowColors = true,
+                allowFormatting = true
+            )
         }
     }
     
@@ -185,32 +155,6 @@ class ChatFormattingService(
         return null
     }
     
-    private fun createPlaceholderResolver(player: Player, message: String, format: String): TagResolver {
-        val resolvers = mutableListOf<TagResolver>()
-        
-        // Add message placeholder
-        resolvers.add(Placeholder.unparsed("message", message))
-        
-        // Add built-in placeholders
-        if (configManager.config.placeholders.enableBuiltinPlaceholders) {
-            for ((placeholder, resolver) in builtinPlaceholders) {
-                resolvers.add(Placeholder.unparsed(placeholder, resolver(player)))
-            }
-        }
-        
-        // Add custom placeholders
-        for ((placeholder, value) in configManager.config.placeholders.customPlaceholders) {
-            resolvers.add(Placeholder.unparsed(placeholder, value))
-        }
-        
-        // Add PlaceholderAPI support if enabled
-        if (placeholderAPIService.isEnabled()) {
-            val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(player, format)
-            resolvers.add(placeholderAPIResolver)
-        }
-        
-        return TagResolver.resolver(resolvers)
-    }
     
     private fun addInteractiveElements(format: String, player: Player): String {
         val config = configManager.config.chatFormat
@@ -282,67 +226,11 @@ class ChatFormattingService(
         return "default"
     }
     
-    private fun processPlaceholderAPI(text: String, player: Player): String {
-        // Placeholder for PlaceholderAPI integration
-        // This would require adding PlaceholderAPI as a dependency
-        // Example implementation:
-        // if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-        //     return PlaceholderAPI.setPlaceholders(player, text)
-        // }
-        return text
-    }
-    
-    private fun processMentions(message: String): String {
-        val matcher = mentionPattern.matcher(message)
-        val result = StringBuffer()
-        
-        while (matcher.find()) {
-            val playerName = matcher.group(1)
-            val targetPlayer = Bukkit.getPlayer(playerName)
-            
-            if (targetPlayer != null && targetPlayer.isOnline) {
-                val replacement = "<click:suggest_command:/msg $playerName ><hover:show_text:'Click to message $playerName'><yellow>@$playerName</yellow></hover></click>"
-                matcher.appendReplacement(result, replacement)
-            } else {
-                matcher.appendReplacement(result, matcher.group())
-            }
-        }
-        matcher.appendTail(result)
-        
-        return result.toString()
-    }
-    
-    private fun processUrls(message: String): String {
-        val matcher = urlPattern.matcher(message)
-        val result = StringBuffer()
-        
-        while (matcher.find()) {
-            val url = matcher.group()
-            val replacement = "<click:open_url:'$url'><hover:show_text:'Click to open $url'><blue><u>$url</u></blue></hover></click>"
-            matcher.appendReplacement(result, replacement)
-        }
-        matcher.appendTail(result)
-        
-        return result.toString()
-    }
-    
-    private fun stripFormatting(message: String): String {
-        // Remove MiniMessage formatting tags but keep colors
-        return message
-            .replace(Regex("</?(?:bold|b|italic|i|underlined|u|strikethrough|st|obfuscated|obf)>"), "")
-    }
-    
-    private fun stripColors(message: String): String {
-        // Remove all MiniMessage color tags
-        return message
-            .replace(Regex("</?(?:color:[^>]+|[a-z_]+|#[0-9a-fA-F]{6})>"), "")
-            .replace(Regex("<[^>]*>"), "") // Remove any remaining tags
-    }
     
     fun reloadPlaceholders() {
-        // Reload PlaceholderAPI service
-        placeholderAPIService.reload()
-        logger.info("Placeholder cache cleared and PlaceholderAPI service reloaded")
+        // Reload MessageFormattingService
+        messageFormattingService.reload()
+        logger.info("Placeholder cache cleared and MessageFormattingService reloaded")
     }
     
     fun clearCooldown(player: Player) {

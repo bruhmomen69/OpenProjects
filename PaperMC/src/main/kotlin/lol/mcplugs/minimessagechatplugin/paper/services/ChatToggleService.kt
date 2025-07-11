@@ -10,7 +10,10 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Service for managing per-player chat toggle functionality
  */
-class ChatToggleService(private val configManager: ConfigManager) {
+class ChatToggleService(
+    private val configManager: ConfigManager,
+    private val messageFormattingService: MessageFormattingService
+) {
     private val logger = LoggerFactory.getLogger(ChatToggleService::class.java)
     private val miniMessage = MiniMessage.miniMessage()
     
@@ -27,7 +30,7 @@ class ChatToggleService(private val configManager: ConfigManager) {
         val config = configManager.config.chatToggle
         
         if (!config.enableChatToggle) {
-            player.sendMessage(miniMessage.deserialize("<red>Chat toggle is currently disabled.</red>"))
+            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.system_disabled", player))
             return false
         }
         
@@ -39,7 +42,7 @@ class ChatToggleService(private val configManager: ConfigManager) {
             if (config.linkChatAndMessages) {
                 messagesDisabledPlayers.remove(player.uniqueId)
             }
-            player.sendMessage(miniMessage.deserialize(config.chatEnabledMessage))
+            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.chat_enabled", player))
             logger.info("${player.name} enabled their chat")
         } else {
             chatDisabledPlayers.add(player.uniqueId)
@@ -47,7 +50,7 @@ class ChatToggleService(private val configManager: ConfigManager) {
             if (config.linkChatAndMessages) {
                 messagesDisabledPlayers.add(player.uniqueId)
             }
-            player.sendMessage(miniMessage.deserialize(config.chatDisabledMessage))
+            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.chat_disabled", player))
             logger.info("${player.name} disabled their chat")
         }
         
@@ -61,7 +64,7 @@ class ChatToggleService(private val configManager: ConfigManager) {
         val config = configManager.config.chatToggle
         
         if (!config.enableMessageToggle) {
-            player.sendMessage(miniMessage.deserialize("<red>Message toggle is currently disabled.</red>"))
+            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.message_toggle_disabled", player))
             return false
         }
         
@@ -69,11 +72,11 @@ class ChatToggleService(private val configManager: ConfigManager) {
         
         if (wasDisabled) {
             messagesDisabledPlayers.remove(player.uniqueId)
-            player.sendMessage(miniMessage.deserialize(config.messagesEnabledMessage))
+            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.messages_enabled", player))
             logger.info("${player.name} enabled their private messages")
         } else {
             messagesDisabledPlayers.add(player.uniqueId)
-            player.sendMessage(miniMessage.deserialize(config.messagesDisabledMessage))
+            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.messages_disabled", player))
             logger.info("${player.name} disabled their private messages")
         }
         
