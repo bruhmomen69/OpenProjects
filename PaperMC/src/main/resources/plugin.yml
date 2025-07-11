@@ -1,0 +1,5 @@
+name: PaperMC
+version: '1.0-SNAPSHOT'
+main: lol.mcplugs.minimessagechatplugin.paper.PaperMC
+api-version: '1.13'
+load: STARTUP
