@@ -6,6 +6,11 @@ author: MCPlugs
 description: A highly configurable kyori adventure (minimessage) powered chat formatting plugin
 website: https://github.com/mcplugs/minimessage-chat-plugin
 load: STARTUP
+libraries:
+  - org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0
+  - org.spongepowered:configurate-hocon:4.1.2
+  - io.github.revxrsal:lamp.common:4.0.0-rc.12
+  - io.github.revxrsal:lamp.bukkit:4.0.0-rc.12
 
 commands:
   chatplugin:

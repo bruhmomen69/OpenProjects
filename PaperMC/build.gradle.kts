@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     // Kyori Adventure
     compileOnly("net.kyori:adventure-api:4.23.0")
@@ -30,15 +30,15 @@ dependencies {
     compileOnly("net.kyori:adventure-text-minimessage:4.23.0")
 
     // Configurate
-    implementation("org.spongepowered:configurate-hocon:4.1.2")
+    compileOnly("org.spongepowered:configurate-hocon:4.1.2")
 
     // Lamp
-    implementation("io.github.revxrsal:lamp.common:4.0.0-rc.12")
-    implementation("io.github.revxrsal:lamp.bukkit:4.0.0-rc.12")
+    compileOnly("io.github.revxrsal:lamp.common:4.0.0-rc.12")
+    compileOnly("io.github.revxrsal:lamp.bukkit:4.0.0-rc.12")
 
-    // Logging
-    implementation("org.slf4j:slf4j-api:2.0.7")
-    implementation("org.slf4j:slf4j-simple:2.0.7")
+    // Logging (provided by the server)
+    compileOnly("org.slf4j:slf4j-api:2.0.7")
+    compileOnly("org.slf4j:slf4j-simple:2.0.7")
 
     // PlaceholderAPI integration (optional)
     compileOnly("me.clip:placeholderapi:2.11.6")
