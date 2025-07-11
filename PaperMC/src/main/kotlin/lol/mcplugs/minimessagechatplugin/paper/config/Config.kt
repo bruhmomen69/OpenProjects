@@ -14,8 +14,17 @@ data class Config(
     @field:Comment("Permission configuration for format selection and feature access control")
     val permissions: PermissionConfig = PermissionConfig(),
     
-    @field:Comment("Feature toggles and message configuration for chat, join/leave, death, and other server messages")
-    val features: FeatureConfig = FeatureConfig(),
+    @field:Comment("Chat message configuration and features")
+    val chat: ChatConfig = ChatConfig(),
+    
+    @field:Comment("Join and leave message configuration")
+    val joinLeave: JoinLeaveConfig = JoinLeaveConfig(),
+    
+    @field:Comment("Death message configuration")
+    val death: DeathConfig = DeathConfig(),
+    
+    @field:Comment("Advancement message configuration")
+    val advancement: AdvancementConfig = AdvancementConfig(),
     
     @field:Comment("Private messaging system configuration including formats, cooldowns, and permissions")
     val privateMessages: PrivateMessageConfig = PrivateMessageConfig(),
@@ -154,16 +163,15 @@ data class PermissionConfig(
 )
 
 @ConfigSerializable
-data class FeatureConfig(
-    // === CHAT MESSAGE FEATURES ===
+data class ChatConfig(
     @field:Comment("Enable custom chat message formatting. When false, chat messages use vanilla formatting.")
-    val enableChatFormatting: Boolean = true,
+    val enableFormatting: Boolean = true,
     
     @field:Comment("Allow players to use color codes in chat (requires colorPermission).")
     val enableColorCodes: Boolean = true,
     
     @field:Comment("Allow players to use text formatting like bold, italic, etc. (requires formattingPermission).")
-    val enableFormatting: Boolean = true,
+    val enableTextFormatting: Boolean = true,
     
     @field:Comment("Enable automatic URL detection and clickable links in chat (requires urlPermission).")
     val enableUrls: Boolean = true,
@@ -172,35 +180,71 @@ data class FeatureConfig(
     val enableMentions: Boolean = true,
     
     @field:Comment("Enable chat cooldown system to prevent spam.")
-    val enableChatCooldown: Boolean = false,
+    val enableCooldown: Boolean = false,
     
-    @field:Comment("Cooldown time in seconds between chat messages (only applies when enableChatCooldown is true).")
-    val chatCooldownSeconds: Int = 3,
+    @field:Comment("Cooldown time in seconds between chat messages (only applies when enableCooldown is true).")
+    val cooldownSeconds: Int = 3,
     
-    // === JOIN MESSAGES ===
+    @field:Comment("Enable chat message logging to console for moderation purposes.")
+    val enableLogging: Boolean = true,
+    
+    @field:Comment("Enable chat filter system (placeholder for future implementation).")
+    val enableFilter: Boolean = false
+)
+
+@ConfigSerializable
+data class JoinLeaveConfig(
     @field:Comment("Enable custom join messages. When false, no join messages are sent.")
-    val enableJoinMessages: Boolean = true,
+    val enableJoin: Boolean = true,
     
     @field:Comment("Custom join message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_join>, <max_players>, <original_message>, etc. Set to empty string to disable join messages entirely.")
     val joinMessage: String = "<green>+ <yellow><player_name></yellow> joined the server</green>",
     
-    // === LEAVE MESSAGES ===
+    @field:Comment("Enable hover messages for join announcements")
+    val enableJoinHover: Boolean = true,
+    
+    @field:Comment("Hover message format for join messages. Supports placeholders: <player_name>, <display_name>, <ping>, <world>, <x>, <y>, <z>")
+    val joinHoverMessage: String = """
+        <gradient:yellow:gold><b>Welcome <player_name>!</b></gradient>
+        <gray>Joined at: <time></gray>
+        <gray>Ping: <ping>ms</gray>
+        <gray>Location: <x>, <y>, <z></gray>
+        <gray>Click to send a message</gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for join messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val joinClickAction: String = "suggest_command:/msg <player_name> ",
+    
     @field:Comment("Enable custom leave messages. When false, no leave messages are sent.")
-    val enableLeaveMessages: Boolean = true,
+    val enableLeave: Boolean = true,
     
     @field:Comment("Custom leave message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_leave>, <max_players>, <original_message>, etc. Set to empty string to disable leave messages entirely.")
     val leaveMessage: String = "<red>- <yellow><player_name></yellow> left the server</red>",
     
-    // === DEATH MESSAGES ===
+    @field:Comment("Enable hover messages for leave announcements")
+    val enableLeaveHover: Boolean = true,
+    
+    @field:Comment("Hover message format for leave messages. Supports placeholders: <player_name>, <display_name>, <world>, <x>, <y>, <z>")
+    val leaveHoverMessage: String = """
+        <gradient:yellow:gold><b><player_name> left the game</b></gradient>
+        <gray>Last seen: <time></gray>
+        <gray>Location: <x>, <y>, <z></gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for leave messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val leaveClickAction: String = "suggest_command:/msg <player_name> "
+)
+
+@ConfigSerializable
+data class DeathConfig(
     @field:Comment("Enable custom death messages. When false, vanilla death messages are used.")
-    val enableDeathMessages: Boolean = true,
+    val enabled: Boolean = true,
     
     @field:Comment("Completely disable death messages. When true, no death messages are sent at all.")
-    val disableDeathMessages: Boolean = false,
+    val disabled: Boolean = false,
     
     @field:Comment("Custom death message formats mapped by death cause. Use death cause keywords or vanilla death message text as keys.")
-    val customDeathMessages: Map<String, String> = mapOf(
-        // Death cause-based messages (recommended approach)
+    val messages: Map<String, String> = mapOf(
         "DROWNING" to "<blue>💧</blue> <yellow><player_name></yellow> <gray>forgot how to swim</gray>",
         "FALL" to "<red>💥</red> <yellow><player_name></yellow> <gray>fell from a high place</gray>",
         "FIRE" to "<red>🔥</red> <yellow><player_name></yellow> <gray>went up in flames</gray>",
@@ -217,98 +261,23 @@ data class FeatureConfig(
         "HOT_FLOOR" to "<red>🔥</red> <yellow><player_name></yellow> <gray>discovered the floor was lava</gray>",
         "CRAMMING" to "<red>🤏</red> <yellow><player_name></yellow> <gray>was squished too much</gray>",
         "DRYOUT" to "<yellow>🐠</yellow> <yellow><player_name></yellow> <gray>died from dehydration</gray>",
-        
-        // Entity-based deaths
         "ENTITY_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain</gray>",
         "ENTITY_EXPLOSION" to "<red>💥</red> <yellow><player_name></yellow> <gray>was blown up</gray>",
         "PROJECTILE" to "<yellow>🏹</yellow> <yellow><player_name></yellow> <gray>was shot</gray>",
-        
-        // PvP deaths
         "PLAYER_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain in combat</gray>",
-        
-        // Void deaths
         "VOID" to "<dark_purple>🕳️</dark_purple> <yellow><player_name></yellow> <gray>fell into the void</gray>",
-        
-        // Lightning
         "LIGHTNING" to "<yellow>⚡</yellow> <yellow><player_name></yellow> <gray>was struck by lightning</gray>",
-        
-        // Suicide/kill command
         "SUICIDE" to "<dark_red>💀</dark_red> <yellow><player_name></yellow> <gray>took their own life</gray>"
     ),
     
     @field:Comment("Backup death message used when no custom death message is found for a specific death cause. Supports placeholders: <player_name>, <player_displayname>, <death_cause>, <original_message>, etc.")
-    val backupDeathMessage: String = "<gray>💀</gray> <yellow><player_name></yellow> <gray>died</gray>",
+    val defaultMessage: String = "<gray>💀</gray> <yellow><player_name></yellow> <gray>died</gray>",
     
-    // === OTHER FEATURES ===
-    @field:Comment("Enable custom advancement/achievement messages. When false, vanilla messages are used.")
-    val enableAdvancementMessages: Boolean = true,
-    
-    @field:Comment("Enable chat message logging to console for moderation purposes.")
-    val enableChatLogging: Boolean = true,
-    
-    @field:Comment("Enable chat filter system (placeholder for future implementation).")
-    val enableChatFilter: Boolean = false,
-    
-    @field:Comment("Custom advancement message formats mapped by advancement key. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
-    val customAdvancementMessages: Map<String, String> = mapOf(
-        "story/mine_stone" to "<player_name> just mined their first stone!"
-    ),
-    
-    @field:Comment("Default advancement message format when no specific format is found. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
-    val backupAdvancementMessage: String = "<gray>🎯</gray> <yellow><player_name></yellow> <gray>has made the advancement</gray> <green><advancement_name></green>",
-    
-    @field:Comment("Enable hover messages for advancement announcements")
-    val enableAdvancementHoverMessages: Boolean = true,
-    
-    @field:Comment("Hover message format for advancements. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
-    val advancementHoverMessage: String = """
-        <gradient:yellow:gold><b><advancement_name></b></gradient>
-        <gray>Type: <advancement_type></gray>
-        
-        <advancement_description>
-        
-        <gray>Click to view advancement</gray>
-    """.trimIndent(),
-    
-    @field:Comment("Click action for advancement messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
-    val advancementClickAction: String = "suggest_command:/advancement grant @s only <advancement_key>",
-    
-    // Join Message Settings
-    @field:Comment("Enable hover messages for join announcements")
-    val enableJoinHoverMessages: Boolean = true,
-    
-    @field:Comment("Hover message format for join messages. Supports placeholders: <player_name>, <display_name>, <ping>, <world>, <x>, <y>, <z>")
-    val joinHoverMessage: String = """
-        <gradient:yellow:gold><b>Welcome <player_name>!</b></gradient>
-        <gray>Joined at: <time></gray>
-        <gray>Ping: <ping>ms</gray>
-        <gray>Location: <x>, <y>, <z></gray>
-        <gray>Click to send a message</gray>
-    """.trimIndent(),
-    
-    @field:Comment("Click action for join messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
-    val joinClickAction: String = "suggest_command:/msg <player_name> ",
-    
-    // Leave Message Settings
-    @field:Comment("Enable hover messages for leave announcements")
-    val enableLeaveHoverMessages: Boolean = true,
-    
-    @field:Comment("Hover message format for leave messages. Supports placeholders: <player_name>, <display_name>, <world>, <x>, <y>, <z>")
-    val leaveHoverMessage: String = """
-        <gradient:yellow:gold><b><player_name> left the game</b></gradient>
-        <gray>Last seen: <time></gray>
-        <gray>Location: <x>, <y>, <z></gray>
-    """.trimIndent(),
-    
-    @field:Comment("Click action for leave messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
-    val leaveClickAction: String = "suggest_command:/msg <player_name> ",
-    
-    // Death Message Settings
     @field:Comment("Enable hover messages for death announcements")
-    val enableDeathHoverMessages: Boolean = true,
+    val enableHover: Boolean = true,
     
     @field:Comment("Hover message format for death messages. Supports placeholders: <player_name>, <death_cause>, <death_message>, <world>, <x>, <y>, <z>")
-    val deathHoverMessage: String = """
+    val hoverMessage: String = """
         <gradient:red:dark_red><b>Death Details</b></gradient>
         <gray>Player: <player_name></gray>
         <gray>Cause: <death_cause></gray>
@@ -319,7 +288,37 @@ data class FeatureConfig(
     """.trimIndent(),
     
     @field:Comment("Click action for death messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
-    val deathClickAction: String = "suggest_command:/tp <x> <y> <z>"
+    val clickAction: String = "suggest_command:/tp <x> <y> <z>"
+)
+
+@ConfigSerializable
+data class AdvancementConfig(
+    @field:Comment("Enable custom advancement/achievement messages. When false, vanilla messages are used.")
+    val enabled: Boolean = true,
+    
+    @field:Comment("Enable hover messages for advancement announcements")
+    val enableHover: Boolean = true,
+    
+    @field:Comment("Custom advancement message formats mapped by advancement key. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
+    val messages: Map<String, String> = mapOf(
+        "story/mine_stone" to "<player_name> just mined their first stone!"
+    ),
+    
+    @field:Comment("Default advancement message format when no specific format is found. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
+    val defaultMessage: String = "<gray>🎯</gray> <yellow><player_name></yellow> <gray>has made the advancement</gray> <green><advancement_name></green>",
+    
+    @field:Comment("Hover message format for advancements. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
+    val hoverMessage: String = """
+        <gradient:yellow:gold><b><advancement_name></b></gradient>
+        <gray>Type: <advancement_type></gray>
+        
+        <advancement_description>
+        
+        <gray>Click to view advancement</gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for advancement messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val clickAction: String = "suggest_command:/advancement grant @s only <advancement_key>"
 )
 
 @ConfigSerializable
