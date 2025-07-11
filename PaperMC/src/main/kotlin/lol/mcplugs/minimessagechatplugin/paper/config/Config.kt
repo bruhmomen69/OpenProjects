@@ -255,7 +255,23 @@ data class FeatureConfig(
     ),
     
     @field:Comment("Default advancement message format when no specific format is found. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
-    val backupAdvancementMessage: String = "<gray>🎯</gray> <yellow><player_name></yellow> <gray>has made the advancement</gray> <green><advancement_name></green>"
+    val backupAdvancementMessage: String = "<gray>🎯</gray> <yellow><player_name></yellow> <gray>has made the advancement</gray> <green><advancement_name></green>",
+    
+    @field:Comment("Enable hover messages for advancement announcements")
+    val enableAdvancementHoverMessages: Boolean = true,
+    
+    @field:Comment("Hover message format for advancements. Supports placeholders: <player_name>, <advancement_name>, <advancement_description>, <advancement_type>")
+    val advancementHoverMessage: String = """
+        <gradient:yellow:gold><b><advancement_name></b></gradient>
+        <gray>Type: <advancement_type></gray>
+        
+        <advancement_description>
+        
+        <gray>Click to view advancement</gray>
+    """.trimIndent(),
+    
+    @field:Comment("Click action for advancement messages. Can be 'suggest_command', 'run_command', 'open_url', or 'copy_to_clipboard'")
+    val advancementClickAction: String = "suggest_command:/advancement grant @s only <advancement_key>"
 )
 
 @ConfigSerializable
