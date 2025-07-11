@@ -181,14 +181,14 @@ data class FeatureConfig(
     @field:Comment("Enable custom join messages. When false, no join messages are sent.")
     val enableJoinMessages: Boolean = true,
     
-    @field:Comment("Custom join message format. Set to empty string to disable join messages entirely.")
+    @field:Comment("Custom join message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_join>, <max_players>, <original_message>, etc. Set to empty string to disable join messages entirely.")
     val joinMessage: String = "<green>+ <yellow><player_name></yellow> joined the server</green>",
     
     // === LEAVE MESSAGES ===
     @field:Comment("Enable custom leave messages. When false, no leave messages are sent.")
     val enableLeaveMessages: Boolean = true,
     
-    @field:Comment("Custom leave message format. Set to empty string to disable leave messages entirely.")
+    @field:Comment("Custom leave message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_leave>, <max_players>, <original_message>, etc. Set to empty string to disable leave messages entirely.")
     val leaveMessage: String = "<red>- <yellow><player_name></yellow> left the server</red>",
     
     // === DEATH MESSAGES ===
@@ -198,8 +198,46 @@ data class FeatureConfig(
     @field:Comment("Completely disable death messages. When true, no death messages are sent at all.")
     val disableDeathMessages: Boolean = false,
     
-    @field:Comment("Custom death message formats mapped by death cause. Leave empty to use vanilla death messages.")
-    val customDeathMessages: Map<String, String> = mapOf(),
+    @field:Comment("Custom death message formats mapped by death cause. Use death cause keywords or vanilla death message text as keys.")
+    val customDeathMessages: Map<String, String> = mapOf(
+        // Death cause-based messages (recommended approach)
+        "DROWNING" to "<blue>💧</blue> <yellow><player_name></yellow> <gray>forgot how to swim</gray>",
+        "FALL" to "<red>💥</red> <yellow><player_name></yellow> <gray>fell from a high place</gray>",
+        "FIRE" to "<red>🔥</red> <yellow><player_name></yellow> <gray>went up in flames</gray>",
+        "LAVA" to "<red>🌋</red> <yellow><player_name></yellow> <gray>tried to swim in lava</gray>",
+        "SUFFOCATION" to "<dark_gray>🪨</dark_gray> <yellow><player_name></yellow> <gray>suffocated in a wall</gray>",
+        "STARVATION" to "<yellow>🍖</yellow> <yellow><player_name></yellow> <gray>starved to death</gray>",
+        "POISON" to "<green>☠️</green> <yellow><player_name></yellow> <gray>was poisoned</gray>",
+        "MAGIC" to "<light_purple>✨</light_purple> <yellow><player_name></yellow> <gray>was killed by magic</gray>",
+        "WITHER" to "<dark_gray>💀</dark_gray> <yellow><player_name></yellow> <gray>withered away</gray>",
+        "FALLING_BLOCK" to "<gray>🪨</gray> <yellow><player_name></yellow> <gray>was squashed by a falling block</gray>",
+        "THORNS" to "<green>🌹</green> <yellow><player_name></yellow> <gray>was pricked to death</gray>",
+        "DRAGON_BREATH" to "<dark_purple>🐉</dark_purple> <yellow><player_name></yellow> <gray>was roasted by dragon breath</gray>",
+        "FLY_INTO_WALL" to "<gray>💨</gray> <yellow><player_name></yellow> <gray>experienced kinetic energy</gray>",
+        "HOT_FLOOR" to "<red>🔥</red> <yellow><player_name></yellow> <gray>discovered the floor was lava</gray>",
+        "CRAMMING" to "<red>🤏</red> <yellow><player_name></yellow> <gray>was squished too much</gray>",
+        "DRYOUT" to "<yellow>🐠</yellow> <yellow><player_name></yellow> <gray>died from dehydration</gray>",
+        
+        // Entity-based deaths
+        "ENTITY_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain</gray>",
+        "ENTITY_EXPLOSION" to "<red>💥</red> <yellow><player_name></yellow> <gray>was blown up</gray>",
+        "PROJECTILE" to "<yellow>🏹</yellow> <yellow><player_name></yellow> <gray>was shot</gray>",
+        
+        // PvP deaths
+        "PLAYER_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain in combat</gray>",
+        
+        // Void deaths
+        "VOID" to "<dark_purple>🕳️</dark_purple> <yellow><player_name></yellow> <gray>fell into the void</gray>",
+        
+        // Lightning
+        "LIGHTNING" to "<yellow>⚡</yellow> <yellow><player_name></yellow> <gray>was struck by lightning</gray>",
+        
+        // Suicide/kill command
+        "SUICIDE" to "<dark_red>💀</dark_red> <yellow><player_name></yellow> <gray>took their own life</gray>"
+    ),
+    
+    @field:Comment("Backup death message used when no custom death message is found for a specific death cause. Supports placeholders: <player_name>, <player_displayname>, <death_cause>, <original_message>, etc.")
+    val backupDeathMessage: String = "<gray>💀</gray> <yellow><player_name></yellow> <gray>died</gray>",
     
     // === OTHER FEATURES ===
     @field:Comment("Enable custom advancement/achievement messages. When false, vanilla messages are used.")

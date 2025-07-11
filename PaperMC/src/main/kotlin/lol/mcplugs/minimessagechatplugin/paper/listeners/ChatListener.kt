@@ -74,6 +74,8 @@ class ChatListener(
             return
         }
         
+        val player = event.player
+        val originalMessage = event.joinMessage()
         val joinMessage = configManager.config.features.joinMessage
         
         // If join message is empty, disable join messages
@@ -82,17 +84,45 @@ class ChatListener(
             return
         }
         
-        val processedMessage = joinMessage
-            .replace("{player_name}", event.player.name)
-            .replace("{player_displayname}", plainTextSerializer.serialize(event.player.displayName()))
-            .replace("{online_players}", event.player.server.onlinePlayers.size.toString())
-            .replace("{max_players}", event.player.server.maxPlayers.toString())
-        
+        // Use MessageFormattingService for consistent placeholder processing
         try {
-            event.joinMessage(miniMessage.deserialize(processedMessage))
+            val formattedMessage = messageFormattingService.formatMessage(
+                format = joinMessage,
+                player = player,
+                additionalPlaceholders = mapOf(
+                    "original_message" to (originalMessage?.let { plainTextSerializer.serialize(it) } ?: "${player.name} joined the game"),
+                    "online_players_after_join" to player.server.onlinePlayers.size.toString()
+                ),
+                processUrls = false,
+                processMentions = false,
+                allowColors = true,
+                allowFormatting = true
+            )
+            
+            event.joinMessage(formattedMessage)
+            
+            // Log the join if chat logging is enabled
+            if (configManager.config.features.enableChatLogging) {
+                logger.info("[JOIN] ${player.name} joined the server")
+            }
+            
         } catch (e: Exception) {
-            logger.warn("Failed to parse join message format: $processedMessage", e)
-            event.joinMessage(miniMessage.deserialize("<yellow>${event.player.name} joined the game</yellow>"))
+            logger.warn("Failed to parse join message format: $joinMessage", e)
+            // Fall back to a simple formatted message
+            try {
+                val fallbackMessage = messageFormattingService.formatMessage(
+                    format = "<yellow><player_name> joined the game</yellow>",
+                    player = player,
+                    processUrls = false,
+                    processMentions = false,
+                    allowColors = true,
+                    allowFormatting = true
+                )
+                event.joinMessage(fallbackMessage)
+            } catch (fallbackException: Exception) {
+                logger.error("Failed to parse fallback join message", fallbackException)
+                event.joinMessage(miniMessage.deserialize("<yellow>${player.name} joined the game</yellow>"))
+            }
         }
     }
 
@@ -106,6 +136,8 @@ class ChatListener(
             return
         }
         
+        val player = event.player
+        val originalMessage = event.quitMessage()
         val leaveMessage = configManager.config.features.leaveMessage
         
         // If leave message is empty, disable leave messages
@@ -114,17 +146,45 @@ class ChatListener(
             return
         }
         
-        val processedMessage = leaveMessage
-            .replace("{player_name}", event.player.name)
-            .replace("{player_displayname}", plainTextSerializer.serialize(event.player.displayName()))
-            .replace("{online_players}", (event.player.server.onlinePlayers.size - 1).toString())
-            .replace("{max_players}", event.player.server.maxPlayers.toString())
-        
+        // Use MessageFormattingService for consistent placeholder processing
         try {
-            event.quitMessage(miniMessage.deserialize(processedMessage))
+            val formattedMessage = messageFormattingService.formatMessage(
+                format = leaveMessage,
+                player = player,
+                additionalPlaceholders = mapOf(
+                    "original_message" to (originalMessage?.let { plainTextSerializer.serialize(it) } ?: "${player.name} left the game"),
+                    "online_players_after_leave" to (player.server.onlinePlayers.size - 1).toString()
+                ),
+                processUrls = false,
+                processMentions = false,
+                allowColors = true,
+                allowFormatting = true
+            )
+            
+            event.quitMessage(formattedMessage)
+            
+            // Log the quit if chat logging is enabled
+            if (configManager.config.features.enableChatLogging) {
+                logger.info("[QUIT] ${player.name} left the server")
+            }
+            
         } catch (e: Exception) {
-            logger.warn("Failed to parse quit message format: $processedMessage", e)
-            event.quitMessage(miniMessage.deserialize("<yellow>${event.player.name} left the game</yellow>"))
+            logger.warn("Failed to parse quit message format: $leaveMessage", e)
+            // Fall back to a simple formatted message
+            try {
+                val fallbackMessage = messageFormattingService.formatMessage(
+                    format = "<yellow><player_name> left the game</yellow>",
+                    player = player,
+                    processUrls = false,
+                    processMentions = false,
+                    allowColors = true,
+                    allowFormatting = true
+                )
+                event.quitMessage(fallbackMessage)
+            } catch (fallbackException: Exception) {
+                logger.error("Failed to parse fallback quit message", fallbackException)
+                event.quitMessage(miniMessage.deserialize("<yellow>${player.name} left the game</yellow>"))
+            }
         }
     }
 
@@ -141,29 +201,72 @@ class ChatListener(
             return // Let vanilla handle death messages
         }
         
+        val player = event.player
         val originalMessage = event.deathMessage() ?: return
-        val deathCause = plainTextSerializer.serialize(originalMessage)
-        val customMessage = configManager.config.features.customDeathMessages[deathCause]
         
-        if (customMessage != null) {
-            // If custom message is empty, disable this specific death message
-            if (customMessage.isBlank()) {
-                event.deathMessage(null)
-                return
+        // Try to get death cause from the player's last damage cause
+        val deathCause = player.lastDamageCause?.cause?.name ?: "UNKNOWN"
+        
+        // First try to find a custom message by death cause
+        var customMessage = configManager.config.features.customDeathMessages[deathCause]
+        
+        // If not found by death cause, try to find by the original vanilla message text
+        if (customMessage == null) {
+            val originalText = plainTextSerializer.serialize(originalMessage)
+            customMessage = configManager.config.features.customDeathMessages[originalText]
+        }
+        
+        // If still no custom message found, use the backup death message
+        if (customMessage == null) {
+            customMessage = configManager.config.features.backupDeathMessage
+        }
+        
+        // If custom message is empty, disable this specific death message
+        if (customMessage.isBlank()) {
+            event.deathMessage(null)
+            return
+        }
+        
+        // Use MessageFormattingService for consistent placeholder processing
+        try {
+            val formattedMessage = messageFormattingService.formatMessage(
+                format = customMessage,
+                player = player,
+                additionalPlaceholders = mapOf(
+                    "death_cause" to deathCause,
+                    "original_message" to plainTextSerializer.serialize(originalMessage)
+                ),
+                processUrls = false,
+                processMentions = false,
+                allowColors = true,
+                allowFormatting = true
+            )
+            
+            event.deathMessage(formattedMessage)
+            
+            // Log the death if chat logging is enabled
+            if (configManager.config.features.enableChatLogging) {
+                logger.info("[DEATH] ${player.name} died: $deathCause")
             }
             
-            val processedMessage = customMessage
-                .replace("{player_name}", event.player.name)
-                .replace("{player_displayname}", plainTextSerializer.serialize(event.player.displayName()))
-            
+        } catch (e: Exception) {
+            logger.warn("Failed to parse death message format: $customMessage", e)
+            // Fall back to a simple formatted message
             try {
-                event.deathMessage(miniMessage.deserialize(processedMessage))
-            } catch (e: Exception) {
-                logger.warn("Failed to parse custom death message format: $processedMessage", e)
-                // Keep original message
+                val fallbackMessage = messageFormattingService.formatMessage(
+                    format = "<gray>💀</gray> <yellow><player_name></yellow> <gray>died</gray>",
+                    player = player,
+                    processUrls = false,
+                    processMentions = false,
+                    allowColors = true,
+                    allowFormatting = true
+                )
+                event.deathMessage(fallbackMessage)
+            } catch (fallbackException: Exception) {
+                logger.error("Failed to parse fallback death message", fallbackException)
+                // Keep original vanilla message as last resort
             }
         }
-        // If no custom message is defined, keep the original vanilla message
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

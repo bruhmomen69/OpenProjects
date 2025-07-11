@@ -43,7 +43,11 @@ class MessageFormattingService(
         "max_players" to { Bukkit.getMaxPlayers().toString() },
         "time" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) },
         "date" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) },
-        "datetime" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) }
+        "datetime" to { LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) },
+        "death_cause" to { "UNKNOWN" }, // Will be overridden by additionalPlaceholders in death events
+        "original_message" to { "" }, // Will be overridden by additionalPlaceholders in various events
+        "online_players_after_join" to { Bukkit.getOnlinePlayers().size.toString() }, // Will be overridden in join events
+        "online_players_after_leave" to { (Bukkit.getOnlinePlayers().size - 1).toString() } // Will be overridden in quit events
     )
 
     /**
