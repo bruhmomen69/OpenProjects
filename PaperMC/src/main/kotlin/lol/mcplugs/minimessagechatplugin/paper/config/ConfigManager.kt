@@ -13,6 +13,8 @@ class ConfigManager(private val dataFolder: Path) {
     private val configFile = dataFolder.resolve("config.conf")
     private val loader = HoconConfigurationLoader.builder()
         .path(configFile)
+        .emitComments(true)
+        .prettyPrinting(true)
         .build()
 
     lateinit var config: Config

@@ -31,6 +31,9 @@ class PaperMC : JavaPlugin() {
             logger.severe("Failed to load configuration! Using defaults.")
         }
 
+        // Update the configuration
+        configManager.saveConfig()
+
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
