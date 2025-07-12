@@ -1,0 +1,13 @@
+name: ZealousChat
+version: 1.0.0
+main: bruh.zchat.paper.PaperMC
+api-version: 1.20.1
+load: POSTWORLD
+folia-supported: true
+loader: bruh.zchat.paper.PaperMCLoader
+dependencies:
+  server:
+    PlaceholderAPI:
+      load: AFTER
+      required: false
+      join-classpath: true
