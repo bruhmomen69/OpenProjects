@@ -17,10 +17,10 @@ softdepend:
 
 commands:
   chatplugin:
-    description: Main command for MiniMessage Chat Plugin
+    description: Main command ZealousChat
     usage: /chatplugin <subcommand>
     permission: chatplugin.admin
-    aliases: [chatformat]
+    aliases: [chatformat, zealouschat, zchat]
 
   msg:
     description: Send a private message to another player

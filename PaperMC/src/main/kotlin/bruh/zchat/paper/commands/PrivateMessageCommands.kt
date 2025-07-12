@@ -201,7 +201,7 @@ class ChatAdminCommands(
         val spyStats = socialSpyService.getSocialSpyStats()
         
         val message = """
-            <gold>===== Chat Plugin Statistics =====</gold>
+            <gold>===== ZealousChat Statistics =====</gold>
             <yellow>Chat Toggles:</yellow>
             <gray>  - Chat Disabled: ${toggleStats["chat_disabled"]}</gray>
             <gray>  - Messages Disabled: ${toggleStats["messages_disabled"]}</gray>
