@@ -5,14 +5,12 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.potion.PotionEffect
 import org.bukkit.util.io.BukkitObjectInputStream
 import org.bukkit.util.io.BukkitObjectOutputStream
 import org.slf4j.LoggerFactory
@@ -191,7 +189,7 @@ class ChatInventoryPlaceholderService(
      * Creates a non-inventory component (for pos, health)
      */
     private fun createNonInventoryComponent(player: Player, type: PlaceholderType): Component {
-        val displayText = getDisplayText(player, type)
+        val displayComponent = getDisplayComponent(player, type)
         val hoverText = getHoverText(player, type)
         
         val clickAction = when (type) {
@@ -200,9 +198,7 @@ class ChatInventoryPlaceholderService(
             else -> null
         }
         
-        val component = Component.text(displayText)
-            .color(NamedTextColor.YELLOW)
-            .hoverEvent(HoverEvent.showText(hoverText))
+        val component = displayComponent.hoverEvent(HoverEvent.showText(hoverText))
         
         return if (clickAction != null) component.clickEvent(clickAction) else component
     }
@@ -211,11 +207,10 @@ class ChatInventoryPlaceholderService(
      * Creates a clickable inventory component
      */
     private fun createInventoryComponent(player: Player, type: PlaceholderType, snapshotId: String): Component {
-        val displayText = getDisplayText(player, type)
+        val displayComponent = getDisplayComponent(player, type)
         val hoverText = getHoverText(player, type)
         
-        return Component.text(displayText)
-            .color(NamedTextColor.YELLOW)
+        return displayComponent
             .hoverEvent(HoverEvent.showText(hoverText))
             .clickEvent(ClickEvent.runCommand("/chatplugin viewinventory $snapshotId"))
     }
@@ -223,34 +218,53 @@ class ChatInventoryPlaceholderService(
     /**
      * Gets display text for any placeholder type
      */
-    private fun getDisplayText(player: Player, type: PlaceholderType): String {
+    private fun getDisplayComponent(player: Player, type: PlaceholderType): Component {
         val config = configManager.config.inventoryPlaceholders
         
         return when (type) {
             PlaceholderType.INV, PlaceholderType.ENDER, PlaceholderType.ARMOR, PlaceholderType.HAND -> {
                 val itemCount = getItemCount(player, type)
-                config.inventoryDisplayFormat
-                    .replace("{type}", type.displayName)
-                    .replace("{count}", itemCount.toString())
+                val placeholders = mapOf(
+                    "type" to type.displayName,
+                    "count" to itemCount.toString()
+                )
+                // Use MiniMessage formatting with proper placeholders
+                messageFormattingService.formatMessage(
+                    config.inventoryDisplayFormat,
+                    player,
+                    placeholders
+                )
             }
             PlaceholderType.POS -> {
                 val loc = player.location
-                config.positionDisplayFormat
-                    .replace("{x}", loc.blockX.toString())
-                    .replace("{y}", loc.blockY.toString())
-                    .replace("{z}", loc.blockZ.toString())
-                    .replace("{world}", loc.world?.name ?: "Unknown")
+                val placeholders = mapOf(
+                    "x" to loc.blockX.toString(),
+                    "y" to loc.blockY.toString(),
+                    "z" to loc.blockZ.toString(),
+                    "world" to (loc.world?.name ?: "Unknown")
+                )
+                messageFormattingService.formatMessage(
+                    config.positionDisplayFormat,
+                    player,
+                    placeholders
+                )
             }
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
                 val maxHealth = player.maxHealth.roundToInt()
                 val food = player.foodLevel
                 val saturation = player.saturation.roundToInt()
-                config.healthDisplayFormat
-                    .replace("{health}", health.toString())
-                    .replace("{max_health}", maxHealth.toString())
-                    .replace("{food}", food.toString())
-                    .replace("{saturation}", saturation.toString())
+                val placeholders = mapOf(
+                    "health" to health.toString(),
+                    "max_health" to maxHealth.toString(),
+                    "food" to food.toString(),
+                    "saturation" to saturation.toString()
+                )
+                messageFormattingService.formatMessage(
+                    config.healthDisplayFormat,
+                    player,
+                    placeholders
+                )
             }
         }
     }
@@ -264,13 +278,23 @@ class ChatInventoryPlaceholderService(
         return when (type) {
             PlaceholderType.INV, PlaceholderType.ENDER, PlaceholderType.ARMOR, PlaceholderType.HAND -> {
                 val preview = getItemPreview(player, type)
-                val hoverText = config.inventoryHoverFormat
-                    .replace("{player}", player.name)
-                    .replace("{type}", type.displayName)
-                    .replace("{preview}", preview)
-                    .replace("\\n", "\n")
-                // Parse the hover text through MiniMessage for proper formatting
-                messageFormattingService.formatMessage(hoverText, player)
+                val placeholders = mapOf(
+                    "player" to player.name,
+                    "type" to type.displayName
+                )
+                val additionalPlaceholders = mapOf(
+                    "preview" to preview
+                )
+                // Parse the hover text through MiniMessage with proper placeholders
+                messageFormattingService.formatMessageComponent(
+                    config.inventoryHoverFormat.replace("\\n", "\n"),
+                    player,
+                    additionalPlaceholders,
+                    processUrls = false,
+                    processMentions = false,
+                    allowColors = true,
+                    allowFormatting = true
+                )
             }
             PlaceholderType.POS -> {
                 val loc = player.location
@@ -279,16 +303,19 @@ class ChatInventoryPlaceholderService(
                 } catch (e: Exception) {
                     "Unknown"
                 }
-                val hoverText = config.positionHoverFormat
-                    .replace("{player}", player.name)
-                    .replace("{x}", loc.blockX.toString())
-                    .replace("{y}", loc.blockY.toString())
-                    .replace("{z}", loc.blockZ.toString())
-                    .replace("{world}", loc.world?.name ?: "Unknown")
-                    .replace("{biome}", biome)
-                    .replace("\\n", "\n")
-                // Parse the hover text through MiniMessage for proper formatting
-                messageFormattingService.formatMessage(hoverText, player)
+                val placeholders = mapOf(
+                    "player" to player.name,
+                    "x" to loc.blockX.toString(),
+                    "y" to loc.blockY.toString(),
+                    "z" to loc.blockZ.toString(),
+                    "world" to (loc.world?.name ?: "Unknown"),
+                    "biome" to biome
+                )
+                messageFormattingService.formatMessage(
+                    config.positionHoverFormat.replace("\\n", "\n"),
+                    player,
+                    placeholders
+                )
             }
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
@@ -296,16 +323,19 @@ class ChatInventoryPlaceholderService(
                 val food = player.foodLevel
                 val saturation = player.saturation.roundToInt()
                 val effects = getEffectsText(player)
-                val hoverText = config.healthHoverFormat
-                    .replace("{player}", player.name)
-                    .replace("{health}", health.toString())
-                    .replace("{max_health}", maxHealth.toString())
-                    .replace("{food}", food.toString())
-                    .replace("{saturation}", saturation.toString())
-                    .replace("{effects}", effects)
-                    .replace("\\n", "\n")
-                // Parse the hover text through MiniMessage for proper formatting
-                messageFormattingService.formatMessage(hoverText, player)
+                val placeholders = mapOf(
+                    "player" to player.name,
+                    "health" to health.toString(),
+                    "max_health" to maxHealth.toString(),
+                    "food" to food.toString(),
+                    "saturation" to saturation.toString(),
+                    "effects" to effects
+                )
+                messageFormattingService.formatMessage(
+                    config.healthHoverFormat.replace("\\n", "\n"),
+                    player,
+                    placeholders
+                )
             }
         }
     }
@@ -331,32 +361,54 @@ class ChatInventoryPlaceholderService(
     }
     
     /**
-     * Gets item preview text for hover
+     * Gets item preview component for hover
      */
-    private fun getItemPreview(player: Player, type: PlaceholderType): String {
+    private fun getItemPreview(player: Player, type: PlaceholderType): Component {
         val config = configManager.config.inventoryPlaceholders
         val items = getItemsForType(player, type)
         val nonEmptyItems = items.filterNotNull().filter { it.type != Material.AIR }.take(config.maxPreviewItems)
         
         if (nonEmptyItems.isEmpty()) {
-            return config.emptyInventoryText
+            return messageFormattingService.formatMessage(config.emptyInventoryText, player)
         }
         
-        val preview = StringBuilder()
+        val builder = Component.text()
+        var first = true
+        
         for (item in nonEmptyItems) {
+            if (!first) {
+                builder.append(Component.newline())
+            }
+            first = false
+            
             val itemName = item.type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
-            val itemText = config.itemPreviewFormat
-                .replace("{amount}", item.amount.toString())
-                .replace("{item}", itemName)
-            preview.append(itemText).append("\\n")
+            val placeholders = mapOf(
+                "amount" to item.amount.toString(),
+                "item" to itemName
+            )
+            // Use MiniMessage formatting for item preview with safe placeholders
+            val itemComponent = messageFormattingService.formatMessage(
+                config.itemPreviewFormat,
+                player,
+                placeholders
+            )
+            builder.append(itemComponent)
         }
         
         if (items.size > config.maxPreviewItems) {
-            val moreText = config.moreItemsText.replace("{count}", (items.size - config.maxPreviewItems).toString())
-            preview.append(moreText)
+            builder.append(Component.newline())
+            val placeholders = mapOf(
+                "count" to (items.size - config.maxPreviewItems).toString()
+            )
+            val moreComponent = messageFormattingService.formatMessage(
+                config.moreItemsText,
+                player,
+                placeholders
+            )
+            builder.append(moreComponent)
         }
         
-        return preview.toString().trimEnd()
+        return builder.build()
     }
     
     /**
