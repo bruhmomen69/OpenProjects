@@ -51,14 +51,15 @@ class ChatMessageListener(
                 logger.info("[CHAT] ${player.name}: $message")
             }
             
-            val formattedMessage = chatFormattingService.formatMessage(player, message)
+            // Process inventory placeholders in the raw message first
+            val messageComponent = chatInventoryPlaceholderService.processRawMessage(player, message)
             
-            // Process inventory placeholders in the formatted message
-            val finalMessage = chatInventoryPlaceholderService.processMessage(player, formattedMessage)
+            // Then apply normal chat formatting with the processed component
+            val formattedMessage = chatFormattingService.formatMessageWithComponent(player, messageComponent)
             
-            event.message(finalMessage)
+            event.message(formattedMessage)
             for (viewer in event.viewers()) {
-                viewer.sendMessage(finalMessage)
+                viewer.sendMessage(formattedMessage)
             }
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.cooldown", event.player, 

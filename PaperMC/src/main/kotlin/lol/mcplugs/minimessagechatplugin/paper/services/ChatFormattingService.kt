@@ -25,6 +25,10 @@ class ChatFormattingService(
     private val chatCooldowns = ConcurrentHashMap<UUID, Long>()
 
     fun formatMessage(player: Player, message: String): Component {
+        return formatMessageWithComponent(player, Component.text(message))
+    }
+    
+    fun formatMessageWithComponent(player: Player, messageComponent: Component): Component {
         val config = configManager.config
         
         // Check cooldown
@@ -41,22 +45,19 @@ class ChatFormattingService(
             chatCooldowns[player.uniqueId] = currentTime
         }
         
-        // Process message content using MessageFormattingService
-        val processedMessage = messageFormattingService.processMessageContent(player, message)
-        
         // Get the appropriate format
         val format = getFormatForPlayer(player)
         
         // Add hover and click actions if enabled
         val enhancedFormat = addInteractiveElements(format, player)
         
-        // Use MessageFormattingService to format the final message
-        val additionalPlaceholders = mapOf("message" to processedMessage)
+        // Use MessageFormattingService to format the final message with the component
+        val additionalPlaceholders = mapOf("message" to messageComponent)
         val allowColors = config.chat.enableColorCodes && player.hasPermission(config.permissions.colorPermission)
         val allowFormatting = config.chat.enableTextFormatting && player.hasPermission(config.permissions.formattingPermission)
         
         return try {
-            messageFormattingService.formatMessage(
+            messageFormattingService.formatMessageComponent(
                 format = enhancedFormat,
                 player = player,
                 additionalPlaceholders = additionalPlaceholders,
@@ -67,7 +68,7 @@ class ChatFormattingService(
             )
         } catch (e: Exception) {
             logger.warn("Failed to format message for player ${player.name}: $enhancedFormat", e)
-            messageFormattingService.formatMessage(
+            messageFormattingService.formatMessageComponent(
                 format = "<gray>[<player_name>]</gray> <white><message></white>",
                 player = player,
                 additionalPlaceholders = additionalPlaceholders,

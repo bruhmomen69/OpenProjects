@@ -122,7 +122,9 @@ data class PlaceholderConfig(
         Usage in chat formats:
         - Use standard PlaceholderAPI syntax: %plugin_placeholder%
         - Example: "%player_level% %vault_rank% %luckperms_prefix%"
-        - Placeholders are automatically converted to MiniMessage format
+        - Use minimessage format (not all placeholders support it)
+        - Example: <player_level> <vault_rank> <luckperms_prefix>
+        - Placeholders are automatically converted to MiniMessage formatting
         
         Supported PlaceholderAPI features:
         - All registered PlaceholderAPI expansions

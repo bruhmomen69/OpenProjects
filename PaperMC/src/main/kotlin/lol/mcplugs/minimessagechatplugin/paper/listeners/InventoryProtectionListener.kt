@@ -1,11 +1,14 @@
 package lol.mcplugs.minimessagechatplugin.paper.listeners
 
+import lol.mcplugs.minimessagechatplugin.paper.utils.ChatInventoryHolder
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryDragEvent
+import org.bukkit.event.inventory.InventoryMoveItemEvent
+import org.bukkit.event.inventory.InventoryPickupItemEvent
 
 /**
  * Listener to protect read-only inventory views created by inventory placeholders
@@ -14,10 +17,8 @@ class InventoryProtectionListener : Listener {
     
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
-        val title = event.view.title()
-        
         // Check if this is a read-only inventory view (contains player name and inventory type)
-        if (isReadOnlyInventory(title)) {
+        if (event.inventory.holder is ChatInventoryHolder || event.clickedInventory?.holder is ChatInventoryHolder) {
             event.isCancelled = true
             event.whoClicked.sendMessage(
                 Component.text("This is a read-only inventory view.")
@@ -25,7 +26,26 @@ class InventoryProtectionListener : Listener {
             )
         }
     }
-    
+
+    @EventHandler
+    fun onInventoryPickup(event: InventoryPickupItemEvent) {
+        val title = event.inventory.holder
+
+        // Check if this is a read-only inventory view (contains player name and inventory type)
+        if (title is ChatInventoryHolder) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler
+    fun onInventoryMove(event: InventoryMoveItemEvent) {
+        // Check if this is a read-only inventory view (contains player name and inventory type)
+        if (event.source.holder is ChatInventoryHolder || event.destination.holder is ChatInventoryHolder) {
+            event.isCancelled = true
+        }
+    }
+
+
     @EventHandler
     fun onInventoryDrag(event: InventoryDragEvent) {
         val title = event.view.title()
@@ -49,5 +69,12 @@ class InventoryProtectionListener : Listener {
                titleText.contains("'s Ender Chest") || 
                titleText.contains("'s Armor") || 
                titleText.contains("'s Hand")
+    }
+
+    private fun isReadOnlyInventory(titleText: String): Boolean {
+        return titleText.contains("'s Inventory") ||
+                titleText.contains("'s Ender Chest") ||
+                titleText.contains("'s Armor") ||
+                titleText.contains("'s Hand")
     }
 }

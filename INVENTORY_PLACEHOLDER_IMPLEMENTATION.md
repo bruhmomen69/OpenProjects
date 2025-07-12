@@ -4,6 +4,8 @@
 
 A new chat-specific placeholder system has been implemented to handle inventory-related placeholders in user chat messages. This system operates independently from the existing config-based placeholder system to ensure security while allowing players to share their inventories in chat.
 
+**Key Feature**: The system preserves existing chat formatting (hover/click events) by processing inventory placeholders BEFORE chat formatting, ensuring the main chat format's hover and click events apply to the entire message while inventory placeholders remain independently clickable.
+
 ## New Placeholders
 
 ### 1. `{inv}` or `[inv]` - Player Inventory
@@ -33,9 +35,11 @@ A new chat-specific placeholder system has been implemented to handle inventory-
 ## How It Works
 
 ### 1. **Chat Message Processing**
-- When a player sends a chat message, the `ChatInventoryPlaceholderService` scans for inventory placeholders
+- When a player sends a chat message, the `ChatInventoryPlaceholderService` scans for inventory placeholders in the RAW message
 - Uses regex patterns to detect `{inv}`, `[inv]`, `[ender]`, `[armor]`, and `[hand]` placeholders
-- Processes each placeholder independently and securely
+- Creates a **hybrid Component** with unparsed text segments and parsed inventory components
+- This preserves the unparsed nature of user input while adding clickable inventory elements
+- Chat formatting then applies hover/click events to the entire hybrid component
 
 ### 2. **Snapshot Creation**
 - When a placeholder is detected, the plugin creates a snapshot of the relevant inventory
