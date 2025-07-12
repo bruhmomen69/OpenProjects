@@ -6,6 +6,7 @@ import lol.mcplugs.minimessagechatplugin.paper.services.ChatCooldownException
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
 import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
+import lol.mcplugs.minimessagechatplugin.paper.services.ChatInventoryPlaceholderService
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -16,7 +17,8 @@ class ChatMessageListener(
     private val configManager: ConfigManager,
     private val chatFormattingService: ChatFormattingService,
     private val chatToggleService: ChatToggleService,
-    private val messageFormattingService: MessageFormattingService
+    private val messageFormattingService: MessageFormattingService,
+    private val chatInventoryPlaceholderService: ChatInventoryPlaceholderService
 ) : Listener {
     
     private val logger = LoggerFactory.getLogger(ChatMessageListener::class.java)
@@ -50,9 +52,13 @@ class ChatMessageListener(
             }
             
             val formattedMessage = chatFormattingService.formatMessage(player, message)
-            event.message(formattedMessage)
+            
+            // Process inventory placeholders in the formatted message
+            val finalMessage = chatInventoryPlaceholderService.processMessage(player, formattedMessage)
+            
+            event.message(finalMessage)
             for (viewer in event.viewers()) {
-                viewer.sendMessage(formattedMessage)
+                viewer.sendMessage(finalMessage)
             }
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.cooldown", event.player, 

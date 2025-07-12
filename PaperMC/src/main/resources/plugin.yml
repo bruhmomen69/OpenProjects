@@ -151,3 +151,7 @@ permissions:
   chatplugin.bypass.messagetoggle:
     description: Bypass message toggle restrictions (staff can always message)
     default: op
+  
+  chatplugin.viewinventory:
+    description: Permission to view inventory snapshots from placeholders
+    default: true

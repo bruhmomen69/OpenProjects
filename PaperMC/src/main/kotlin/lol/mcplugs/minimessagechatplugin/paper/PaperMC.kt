@@ -8,18 +8,21 @@ import lol.mcplugs.minimessagechatplugin.paper.listeners.ChatMessageListener
 import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerJoinQuitListener
 import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerDeathListener
 import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerAdvancementListener
+import lol.mcplugs.minimessagechatplugin.paper.listeners.InventoryProtectionListener
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
 import lol.mcplugs.minimessagechatplugin.paper.services.PlaceholderAPIService
 import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
 import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
 import lol.mcplugs.minimessagechatplugin.paper.services.PrivateMessageService
 import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
+import lol.mcplugs.minimessagechatplugin.paper.services.ChatInventoryPlaceholderService
 import lol.mcplugs.minimessagechatplugin.paper.commands.*
 import org.bukkit.plugin.java.JavaPlugin
 
 class PaperMC : JavaPlugin() {
     private lateinit var configManager: ConfigManager
     private lateinit var placeholderAPIService: PlaceholderAPIService
+    private lateinit var chatInventoryPlaceholderService: ChatInventoryPlaceholderService
     private lateinit var messageFormattingService: MessageFormattingService
     private lateinit var chatToggleService: ChatToggleService
     private lateinit var socialSpyService: SocialSpyService
@@ -39,6 +42,7 @@ class PaperMC : JavaPlugin() {
 
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
+        chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
         chatToggleService = ChatToggleService(configManager, messageFormattingService)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
@@ -58,15 +62,19 @@ class PaperMC : JavaPlugin() {
         lamp.register(MessageCommand(privateMessageService, messageFormattingService))
         lamp.register(ReplyCommand(privateMessageService, messageFormattingService))
         
+        // Register inventory view command
+        lamp.register(InventoryViewCommand(chatInventoryPlaceholderService))
+        
         // Register chat toggle and admin commands
         lamp.register(ChatToggleCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
         lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
 
         // Register event listeners
-        server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService), this)
+        server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService, chatInventoryPlaceholderService), this)
         server.pluginManager.registerEvents(PlayerJoinQuitListener(configManager, chatFormattingService, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerAdvancementListener(configManager, messageFormattingService), this)
+        server.pluginManager.registerEvents(InventoryProtectionListener(), this)
 
         logger.info("MiniMessageChatPlugin enabled successfully!")
         logger.info("Features enabled:")
