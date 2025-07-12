@@ -47,8 +47,10 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
         // Create inventory data directory if it doesn't exist
         try {
             Files.createDirectories(inventoryDataDir)
+
+            cleanupOldSnapshots()
         } catch (e: Exception) {
-            logger.error("Failed to create inventory snapshots directory", e)
+            logger.error("Failed to create and clean up inventory snapshots directory", e)
         }
     }
     
@@ -455,7 +457,7 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     private fun createReadOnlyInventory(snapshot: InventorySnapshot): Inventory {
         val title = "${snapshot.playerName}'s ${snapshot.type.displayName}"
         val size = when (snapshot.type) {
-            InventoryType.INV -> 54 // 6 rows for main inventory
+            InventoryType.INV -> 45 // 6 rows for main inventory
             InventoryType.ENDER -> 27 // 3 rows for ender chest
             InventoryType.ARMOR -> 9 // 1 row for armor
             InventoryType.HAND -> 9 // 1 row for hand items

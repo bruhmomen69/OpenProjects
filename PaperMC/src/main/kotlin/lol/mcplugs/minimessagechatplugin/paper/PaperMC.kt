@@ -60,8 +60,7 @@ class PaperMC : JavaPlugin() {
         
         // Register private message commands
         lamp.register(MessageCommand(privateMessageService, messageFormattingService))
-        lamp.register(ReplyCommand(privateMessageService, messageFormattingService))
-        
+
         // Register inventory view command
         lamp.register(InventoryViewCommand(chatInventoryPlaceholderService))
         

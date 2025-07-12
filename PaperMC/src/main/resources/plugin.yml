@@ -20,8 +20,8 @@ commands:
     description: Main command for MiniMessage Chat Plugin
     usage: /chatplugin <subcommand>
     permission: chatplugin.admin
-    aliases: [mcp, chatformat]
-  
+    aliases: [chatformat]
+
   msg:
     description: Send a private message to another player
     usage: /msg <player> <message>

@@ -15,12 +15,11 @@ import revxrsal.commands.annotation.Values
 /**
  * Commands for private messaging, chat toggle, and social spy functionality
  */
-@Command("msg", "message", "tell", "whisper", "w")
 class MessageCommand(
     private val privateMessageService: PrivateMessageService,
     private val messageFormattingService: MessageFormattingService
 ) {
-    
+    @Command("msg", "message", "tell", "whisper", "w")
     fun msg(actor: BukkitCommandActor, recipient: String, message: String) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
@@ -30,25 +29,18 @@ class MessageCommand(
         val player = actor.sender() as Player
         privateMessageService.sendPrivateMessage(player, recipient, message)
     }
-}
 
-@Command("reply", "r")
-class ReplyCommand(
-    private val privateMessageService: PrivateMessageService,
-    private val messageFormattingService: MessageFormattingService
-) {
-    
+    @Command("reply", "r", "respond")
     fun reply(actor: BukkitCommandActor, message: String) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
-        
+
         val player = actor.sender() as Player
         privateMessageService.replyToLastSender(player, message)
     }
 }
-
 /**
  * Chat toggle commands as subcommands of the main chatplugin command
  */
