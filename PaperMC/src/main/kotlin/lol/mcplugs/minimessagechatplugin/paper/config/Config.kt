@@ -35,6 +35,9 @@ data class Config(
     @field:Comment("Social spy system for moderators to monitor private messages and commands")
     val socialSpy: SocialSpyConfig = SocialSpyConfig(),
     
+    @field:Comment("Inventory placeholder system for sharing inventories, armor, and other player data in chat")
+    val inventoryPlaceholders: InventoryPlaceholderConfig = InventoryPlaceholderConfig(),
+    
     @field:Comment("All configurable messages used throughout the plugin. Supports MiniMessage formatting and placeholders.")
     val messages: MessagesConfig = MessagesConfig()
 )
@@ -161,7 +164,10 @@ data class PermissionConfig(
     val urlPermission: String = "chatplugin.url",
     
     @field:Comment("Permission required for players to mention other players using @username syntax.")
-    val mentionPermission: String = "chatplugin.mention"
+    val mentionPermission: String = "chatplugin.mention",
+    
+    @field:Comment("Permission required for players to use inventory placeholders in chat.")
+    val inventoryPlaceholderPermission: String = "chatplugin.inventory.placeholders"
 )
 
 @ConfigSerializable
@@ -381,6 +387,63 @@ data class ChatToggleConfig(
 )
 
 @ConfigSerializable
+data class InventoryPlaceholderConfig(
+    @field:Comment("Enable inventory placeholder system. When false, inventory placeholders are disabled entirely.")
+    val enabled: Boolean = true,
+    
+    @field:Comment("Enable {inv} and [inv] placeholders for sharing main inventory.")
+    val enableInventoryPlaceholder: Boolean = true,
+    
+    @field:Comment("Enable [ender] placeholder for sharing ender chest contents.")
+    val enableEnderPlaceholder: Boolean = true,
+    
+    @field:Comment("Enable [armor] placeholder for sharing equipped armor.")
+    val enableArmorPlaceholder: Boolean = true,
+    
+    @field:Comment("Enable [hand] placeholder for sharing items in hand.")
+    val enableHandPlaceholder: Boolean = true,
+    
+    @field:Comment("Enable [pos] placeholder for sharing current position.")
+    val enablePositionPlaceholder: Boolean = true,
+    
+    @field:Comment("Enable [health] placeholder for sharing current health and status.")
+    val enableHealthPlaceholder: Boolean = true,
+    
+    @field:Comment("Time in minutes before inventory snapshots are automatically deleted.")
+    val snapshotRetentionMinutes: Int = 60,
+    
+    @field:Comment("Display text format for inventory placeholder. Placeholders: {type}, {count}")
+    val inventoryDisplayFormat: String = "[{type}: {count} items]",
+    
+    @field:Comment("Display text format for position placeholder. Placeholders: {x}, {y}, {z}, {world}")
+    val positionDisplayFormat: String = "[Pos: {x}, {y}, {z}]",
+    
+    @field:Comment("Display text format for health placeholder. Placeholders: {health}, {max_health}, {food}, {saturation}")
+    val healthDisplayFormat: String = "[Health: {health}/{max_health} ❤]",
+    
+    @field:Comment("Hover text format for inventory placeholders. Supports \\n for newlines. Placeholders: {player}, {type}, {preview}")
+    val inventoryHoverFormat: String = "{player}'s {type}\\nClick to view\\n\\n{preview}",
+    
+    @field:Comment("Hover text format for position placeholder. Placeholders: {player}, {x}, {y}, {z}, {world}, {biome}")
+    val positionHoverFormat: String = "{player}'s Location\\nWorld: {world}\\nBiome: {biome}\\nCoordinates: {x}, {y}, {z}\\nClick to get directions",
+    
+    @field:Comment("Hover text format for health placeholder. Placeholders: {player}, {health}, {max_health}, {food}, {saturation}, {effects}")
+    val healthHoverFormat: String = "{player}'s Status\\nHealth: {health}/{max_health} ❤\\nFood: {food}/20 🍖\\nSaturation: {saturation}\\n{effects}",
+    
+    @field:Comment("Text shown when an inventory is empty.")
+    val emptyInventoryText: String = "Empty",
+    
+    @field:Comment("Text shown for item preview in hover. Placeholders: {amount}, {item}")
+    val itemPreviewFormat: String = "• {amount}x {item}",
+    
+    @field:Comment("Text shown when there are more items than can be displayed in preview.")
+    val moreItemsText: String = "... and {count} more",
+    
+    @field:Comment("Maximum number of items to show in hover preview.")
+    val maxPreviewItems: Int = 5
+)
+
+@ConfigSerializable
 data class SocialSpyConfig(
     @field:Comment("Enable social spy system for moderators to monitor private messages.")
     val enableSocialSpy: Boolean = true,
@@ -426,6 +489,9 @@ data class MessagesConfig(
     
     @field:Comment("Social spy system messages")
     val socialSpy: SocialSpyMessagesConfig = SocialSpyMessagesConfig(),
+    
+    @field:Comment("Inventory placeholder system messages")
+    val inventoryPlaceholders: InventoryPlaceholderMessagesConfig = InventoryPlaceholderMessagesConfig(),
     
     @field:Comment("Error and system messages")
     val system: SystemMessagesConfig = SystemMessagesConfig()
@@ -531,6 +597,36 @@ data class SocialSpyMessagesConfig(
     
     @field:Comment("Message shown when social spy is disabled")
     val disabled: String = "<red>Social spy disabled! You will no longer see private messages.</red>"
+)
+
+@ConfigSerializable
+data class InventoryPlaceholderMessagesConfig(
+    @field:Comment("Message shown when a player doesn't have permission to use inventory placeholders.")
+    val noPermission: String = "<red>You don't have permission to use inventory placeholders!</red>",
+    
+    @field:Comment("Message shown when inventory placeholders are disabled in config.")
+    val disabled: String = "<red>Inventory placeholders are currently disabled!</red>",
+    
+    @field:Comment("Message shown when a specific placeholder type is disabled.")
+    val placeholderDisabled: String = "<red>The {type} placeholder is currently disabled!</red>",
+    
+    @field:Comment("Message shown when an inventory snapshot fails to load.")
+    val snapshotNotFound: String = "<red>Inventory snapshot not found or expired.</red>",
+    
+    @field:Comment("Message shown when failing to create an inventory snapshot.")
+    val snapshotCreationFailed: String = "<red>Failed to create inventory snapshot.</red>",
+    
+    @field:Comment("Message shown when failing to open an inventory view.")
+    val viewFailed: String = "<red>Failed to open inventory view.</red>",
+    
+    @field:Comment("Message shown when trying to interact with a read-only inventory.")
+    val readOnlyInventory: String = "<yellow>This is a read-only inventory view.</yellow>",
+    
+    @field:Comment("Message shown when position data is unavailable.")
+    val positionUnavailable: String = "<red>Position data unavailable.</red>",
+    
+    @field:Comment("Message shown when health data is unavailable.")
+    val healthUnavailable: String = "<red>Health data unavailable.</red>"
 )
 
 @ConfigSerializable

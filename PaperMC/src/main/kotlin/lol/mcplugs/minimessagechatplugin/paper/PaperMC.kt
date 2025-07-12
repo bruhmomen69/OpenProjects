@@ -42,8 +42,8 @@ class PaperMC : JavaPlugin() {
 
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
-        chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
+        chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this, configManager, messageFormattingService)
         chatToggleService = ChatToggleService(configManager, messageFormattingService)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
         privateMessageService = PrivateMessageService(configManager, messageFormattingService, chatToggleService, socialSpyService)

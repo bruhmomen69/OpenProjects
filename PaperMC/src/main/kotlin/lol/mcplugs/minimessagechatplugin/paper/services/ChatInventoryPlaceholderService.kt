@@ -1,56 +1,55 @@
 package lol.mcplugs.minimessagechatplugin.paper.services
 
-import lol.mcplugs.minimessagechatplugin.paper.utils.ChatInventoryHolder
+import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.format.NamedTextColor
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
-import org.bukkit.block.Smoker
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.util.io.BukkitObjectInputStream
-import org.bukkit.util.io.BukkitObjectOutputStream
+import org.bukkit.potion.PotionEffect
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
-import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
+import kotlin.math.roundToInt
 
 /**
  * Service for processing inventory placeholders in chat messages.
- * This handles user input placeholders like {inv}, [inv], [ender], [armor], [hand]
+ * This handles user input placeholders like {inv}, [inv], [ender], [armor], [hand], [pos], [health]
  */
-class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
+class ChatInventoryPlaceholderService(
+    private val plugin: JavaPlugin,
+    private val configManager: ConfigManager,
+    private val messageFormattingService: MessageFormattingService
+) {
     private val logger = LoggerFactory.getLogger(ChatInventoryPlaceholderService::class.java)
     private val inventoryDataDir: Path = plugin.dataFolder.toPath().resolve("inventory_snapshots")
-    // Use legacy because it includes some basic formatting vs no formatting.
-    private val plainTextSerializer = LegacyComponentSerializer.legacySection()
+    private val plainTextSerializer = PlainTextComponentSerializer.plainText()
     
     // Patterns for different placeholder formats
     private val inventoryPatterns = mapOf(
         "inv" to listOf(Pattern.compile("\\{inv\\}"), Pattern.compile("\\[inv\\]")),
         "ender" to listOf(Pattern.compile("\\[ender\\]")),
         "armor" to listOf(Pattern.compile("\\[armor\\]")),
-        "hand" to listOf(Pattern.compile("\\[hand\\]"))
+        "hand" to listOf(Pattern.compile("\\[hand\\]")),
+        "pos" to listOf(Pattern.compile("\\[pos\\]")),
+        "health" to listOf(Pattern.compile("\\[health\\]"))
     )
     
     init {
         // Create inventory data directory if it doesn't exist
         try {
             Files.createDirectories(inventoryDataDir)
-
-            cleanupOldSnapshots()
         } catch (e: Exception) {
-            logger.error("Failed to create and clean up inventory snapshots directory", e)
+            logger.error("Failed to create inventory snapshots directory", e)
         }
     }
     
@@ -59,9 +58,29 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
      * This creates a hybrid component with unparsed text and parsed inventory components
      */
     fun processRawMessage(player: Player, message: String): Component {
+        val config = configManager.config.inventoryPlaceholders
+        
+        // Check if inventory placeholders are enabled
+        if (!config.enabled) {
+            return Component.text(message)
+        }
+        
+        // Check if player has permission
+        if (!player.hasPermission(configManager.config.permissions.inventoryPlaceholderPermission)) {
+            // Check if message contains placeholders and send error message
+            if (containsInventoryPlaceholders(message)) {
+                player.sendMessage(
+                    messageFormattingService.formatMessage(
+                        configManager.config.messages.inventoryPlaceholders.noPermission,
+                        player
+                    )
+                )
+            }
+            return Component.text(message)
+        }
+        
         // Check if message contains any inventory placeholders
         if (!containsInventoryPlaceholders(message)) {
-            // Return unparsed text component for normal processing
             return Component.text(message)
         }
         
@@ -69,10 +88,9 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
             createHybridComponent(player, message)
         } catch (e: Exception) {
             logger.warn("Failed to process inventory placeholders for player ${player.name}", e)
-            Component.text(message) // Return original message as unparsed text if processing fails
+            Component.text(message)
         }
     }
-    
     
     /**
      * Checks if a message contains any inventory placeholders
@@ -101,13 +119,27 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
                     val placeholder = matcher.group()
                     
                     try {
-                        val snapshotId = saveInventorySnapshot(player, InventoryType.valueOf(type.uppercase()))
-                        val component = createInventoryComponent(player, InventoryType.valueOf(type.uppercase()), snapshotId)
+                        val placeholderType = PlaceholderType.valueOf(type.uppercase())
+                        
+                        // Check if this specific placeholder type is enabled
+                        if (!isPlaceholderTypeEnabled(placeholderType)) {
+                            val errorMsg = configManager.config.messages.inventoryPlaceholders.placeholderDisabled
+                                .replace("{type}", placeholderType.displayName)
+                            val errorComponent = Component.text("[$type: disabled]").color(NamedTextColor.RED)
+                            replacements.add(PlaceholderReplacement(start, end, placeholder, errorComponent))
+                            continue
+                        }
+                        
+                        val component = if (placeholderType in listOf(PlaceholderType.POS, PlaceholderType.HEALTH)) {
+                            createNonInventoryComponent(player, placeholderType)
+                        } else {
+                            val snapshotId = saveInventorySnapshot(player, placeholderType)
+                            createInventoryComponent(player, placeholderType, snapshotId)
+                        }
                         
                         replacements.add(PlaceholderReplacement(start, end, placeholder, component))
                     } catch (e: Exception) {
-                        logger.warn("Failed to create inventory component for placeholder $placeholder", e)
-                        // Add error component instead
+                        logger.warn("Failed to create component for placeholder $placeholder", e)
                         val errorComponent = Component.text("[$type: error]").color(NamedTextColor.RED)
                         replacements.add(PlaceholderReplacement(start, end, placeholder, errorComponent))
                     }
@@ -125,7 +157,7 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
                 builder.append(Component.text(messageText.substring(currentIndex, replacement.start)))
             }
             
-            // Add the parsed inventory component
+            // Add the parsed component
             builder.append(replacement.component)
             
             currentIndex = replacement.end
@@ -139,15 +171,47 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
         return builder.build()
     }
     
+    /**
+     * Checks if a specific placeholder type is enabled in config
+     */
+    private fun isPlaceholderTypeEnabled(type: PlaceholderType): Boolean {
+        val config = configManager.config.inventoryPlaceholders
+        return when (type) {
+            PlaceholderType.INV -> config.enableInventoryPlaceholder
+            PlaceholderType.ENDER -> config.enableEnderPlaceholder
+            PlaceholderType.ARMOR -> config.enableArmorPlaceholder
+            PlaceholderType.HAND -> config.enableHandPlaceholder
+            PlaceholderType.POS -> config.enablePositionPlaceholder
+            PlaceholderType.HEALTH -> config.enableHealthPlaceholder
+        }
+    }
     
-    
+    /**
+     * Creates a non-inventory component (for pos, health)
+     */
+    private fun createNonInventoryComponent(player: Player, type: PlaceholderType): Component {
+        val displayText = getDisplayText(player, type)
+        val hoverText = getHoverText(player, type)
+        
+        val clickAction = when (type) {
+            PlaceholderType.POS -> ClickEvent.suggestCommand("/tp ${player.location.blockX} ${player.location.blockY} ${player.location.blockZ}")
+            PlaceholderType.HEALTH -> ClickEvent.suggestCommand("/effect give ${player.name} ")
+            else -> null
+        }
+        
+        val component = Component.text(displayText)
+            .color(NamedTextColor.YELLOW)
+            .hoverEvent(HoverEvent.showText(hoverText))
+        
+        return if (clickAction != null) component.clickEvent(clickAction) else component
+    }
     
     /**
      * Creates a clickable inventory component
      */
-    private fun createInventoryComponent(player: Player, type: InventoryType, snapshotId: String): Component {
-        val displayText = getInventoryDisplayText(player, type)
-        val hoverText = getInventoryHoverText(player, type)
+    private fun createInventoryComponent(player: Player, type: PlaceholderType, snapshotId: String): Component {
+        val displayText = getDisplayText(player, type)
+        val hoverText = getHoverText(player, type)
         
         return Component.text(displayText)
             .color(NamedTextColor.YELLOW)
@@ -156,15 +220,181 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     }
     
     /**
+     * Gets display text for any placeholder type
+     */
+    private fun getDisplayText(player: Player, type: PlaceholderType): String {
+        val config = configManager.config.inventoryPlaceholders
+        
+        return when (type) {
+            PlaceholderType.INV, PlaceholderType.ENDER, PlaceholderType.ARMOR, PlaceholderType.HAND -> {
+                val itemCount = getItemCount(player, type)
+                config.inventoryDisplayFormat
+                    .replace("{type}", type.displayName)
+                    .replace("{count}", itemCount.toString())
+            }
+            PlaceholderType.POS -> {
+                val loc = player.location
+                config.positionDisplayFormat
+                    .replace("{x}", loc.blockX.toString())
+                    .replace("{y}", loc.blockY.toString())
+                    .replace("{z}", loc.blockZ.toString())
+                    .replace("{world}", loc.world?.name ?: "Unknown")
+            }
+            PlaceholderType.HEALTH -> {
+                val health = player.health.roundToInt()
+                val maxHealth = player.maxHealth.roundToInt()
+                val food = player.foodLevel
+                val saturation = player.saturation.roundToInt()
+                config.healthDisplayFormat
+                    .replace("{health}", health.toString())
+                    .replace("{max_health}", maxHealth.toString())
+                    .replace("{food}", food.toString())
+                    .replace("{saturation}", saturation.toString())
+            }
+        }
+    }
+    
+    /**
+     * Gets hover text for any placeholder type
+     */
+    private fun getHoverText(player: Player, type: PlaceholderType): Component {
+        val config = configManager.config.inventoryPlaceholders
+        
+        return when (type) {
+            PlaceholderType.INV, PlaceholderType.ENDER, PlaceholderType.ARMOR, PlaceholderType.HAND -> {
+                val preview = getItemPreview(player, type)
+                val hoverText = config.inventoryHoverFormat
+                    .replace("{player}", player.name)
+                    .replace("{type}", type.displayName)
+                    .replace("{preview}", preview)
+                    .replace("\\n", "\n")
+                Component.text(hoverText)
+            }
+            PlaceholderType.POS -> {
+                val loc = player.location
+                val biome = try {
+                    loc.world?.getBiome(loc)?.toString()?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Unknown"
+                } catch (e: Exception) {
+                    "Unknown"
+                }
+                val hoverText = config.positionHoverFormat
+                    .replace("{player}", player.name)
+                    .replace("{x}", loc.blockX.toString())
+                    .replace("{y}", loc.blockY.toString())
+                    .replace("{z}", loc.blockZ.toString())
+                    .replace("{world}", loc.world?.name ?: "Unknown")
+                    .replace("{biome}", biome)
+                    .replace("\\n", "\n")
+                Component.text(hoverText)
+            }
+            PlaceholderType.HEALTH -> {
+                val health = player.health.roundToInt()
+                val maxHealth = player.maxHealth.roundToInt()
+                val food = player.foodLevel
+                val saturation = player.saturation.roundToInt()
+                val effects = getEffectsText(player)
+                val hoverText = config.healthHoverFormat
+                    .replace("{player}", player.name)
+                    .replace("{health}", health.toString())
+                    .replace("{max_health}", maxHealth.toString())
+                    .replace("{food}", food.toString())
+                    .replace("{saturation}", saturation.toString())
+                    .replace("{effects}", effects)
+                    .replace("\\n", "\n")
+                Component.text(hoverText)
+            }
+        }
+    }
+    
+    /**
+     * Gets item count for inventory types
+     */
+    private fun getItemCount(player: Player, type: PlaceholderType): Int {
+        return when (type) {
+            PlaceholderType.INV -> player.inventory.contents.count { it != null && it.type != Material.AIR }
+            PlaceholderType.ENDER -> player.enderChest.contents.count { it != null && it.type != Material.AIR }
+            PlaceholderType.ARMOR -> player.inventory.armorContents.count { it != null && it.type != Material.AIR }
+            PlaceholderType.HAND -> {
+                val mainHand = player.inventory.itemInMainHand
+                val offHand = player.inventory.itemInOffHand
+                var count = 0
+                if (mainHand != null && mainHand.type != Material.AIR) count++
+                if (offHand != null && offHand.type != Material.AIR) count++
+                count
+            }
+            else -> 0
+        }
+    }
+    
+    /**
+     * Gets item preview text for hover
+     */
+    private fun getItemPreview(player: Player, type: PlaceholderType): String {
+        val config = configManager.config.inventoryPlaceholders
+        val items = getItemsForType(player, type)
+        val nonEmptyItems = items.filterNotNull().filter { it.type != Material.AIR }.take(config.maxPreviewItems)
+        
+        if (nonEmptyItems.isEmpty()) {
+            return config.emptyInventoryText
+        }
+        
+        val preview = StringBuilder()
+        for (item in nonEmptyItems) {
+            val itemName = item.type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+            val itemText = config.itemPreviewFormat
+                .replace("{amount}", item.amount.toString())
+                .replace("{item}", itemName)
+            preview.append(itemText).append("\\n")
+        }
+        
+        if (items.size > config.maxPreviewItems) {
+            val moreText = config.moreItemsText.replace("{count}", (items.size - config.maxPreviewItems).toString())
+            preview.append(moreText)
+        }
+        
+        return preview.toString().trimEnd()
+    }
+    
+    /**
+     * Gets effects text for health hover
+     */
+    private fun getEffectsText(player: Player): String {
+        val effects = player.activePotionEffects
+        if (effects.isEmpty()) {
+            return "No active effects"
+        }
+        
+        return effects.joinToString("\\n") { effect ->
+            val name = effect.type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+            val level = if (effect.amplifier > 0) " ${effect.amplifier + 1}" else ""
+            val duration = "${effect.duration / 20}s"
+            "$name$level ($duration)"
+        }
+    }
+    
+    /**
+     * Gets items for the specified inventory type
+     */
+    private fun getItemsForType(player: Player, type: PlaceholderType): Array<ItemStack?> {
+        return when (type) {
+            PlaceholderType.INV -> player.inventory.contents
+            PlaceholderType.ENDER -> player.enderChest.contents
+            PlaceholderType.ARMOR -> player.inventory.armorContents
+            PlaceholderType.HAND -> arrayOf(player.inventory.itemInMainHand, player.inventory.itemInOffHand)
+            else -> emptyArray()
+        }
+    }
+    
+    /**
      * Saves an inventory snapshot to disk and returns the snapshot ID
      */
-    private fun saveInventorySnapshot(player: Player, type: InventoryType): String {
+    private fun saveInventorySnapshot(player: Player, type: PlaceholderType): String {
         val snapshotId = "${player.uniqueId}_${type.name.lowercase()}_${System.currentTimeMillis()}"
         val snapshotFile = inventoryDataDir.resolve("$snapshotId.dat")
         
         try {
             FileOutputStream(snapshotFile.toFile()).use { fos ->
-                BukkitObjectOutputStream(fos).use { oos ->
+                ObjectOutputStream(fos).use { oos ->
                     val snapshot = InventorySnapshot(
                         playerId = player.uniqueId,
                         playerName = player.name,
@@ -184,84 +414,24 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     }
     
     /**
-     * Gets items for the specified inventory type
-     */
-    private fun getItemsForType(player: Player, type: InventoryType): Array<ItemStack?> {
-        return when (type) {
-            InventoryType.INV -> player.inventory.contents
-            InventoryType.ENDER -> player.enderChest.contents
-            InventoryType.ARMOR -> player.inventory.armorContents
-            InventoryType.HAND -> arrayOf(player.inventory.itemInMainHand, player.inventory.itemInOffHand)
-        }
-    }
-    
-    /**
-     * Gets display text for inventory placeholder
-     */
-    private fun getInventoryDisplayText(player: Player, type: InventoryType): String {
-        val itemCount = when (type) {
-            InventoryType.INV -> player.inventory.contents.count { it != null && it.type != Material.AIR }
-            InventoryType.ENDER -> player.enderChest.contents.count { it != null && it.type != Material.AIR }
-            InventoryType.ARMOR -> player.inventory.armorContents.count { it != null && it.type != Material.AIR }
-            InventoryType.HAND -> {
-                val mainHand = player.inventory.itemInMainHand
-                val offHand = player.inventory.itemInOffHand
-                var count = 0
-                if (mainHand != null && mainHand.type != Material.AIR) count++
-                if (offHand != null && offHand.type != Material.AIR) count++
-                count
-            }
-        }
-        
-        return "[${type.displayName}: $itemCount ${if (itemCount == 1) "item" else "items"}]"
-    }
-    
-    /**
-     * Gets hover text for inventory placeholder
-     */
-    private fun getInventoryHoverText(player: Player, type: InventoryType): Component {
-        val items = getItemsForType(player, type)
-        val builder = Component.text()
-            .append(Component.text("${player.name}'s ${type.displayName}").color(NamedTextColor.GOLD))
-            .append(Component.newline())
-            .append(Component.text("Click to view").color(NamedTextColor.GRAY))
-            .append(Component.newline())
-            .append(Component.newline())
-        
-        // Show first few items as preview
-        val nonEmptyItems = items.filterNotNull().filter { it.type != Material.AIR }.take(5)
-        if (nonEmptyItems.isNotEmpty()) {
-            builder.append(Component.text("Preview:").color(NamedTextColor.YELLOW))
-            for (item in nonEmptyItems) {
-                builder.append(Component.newline())
-                    .append(Component.text("• ").color(NamedTextColor.GRAY))
-                    .append(Component.text("${item.amount}x ${item.type.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }}").color(NamedTextColor.WHITE))
-            }
-            if (items.size > 5) {
-                builder.append(Component.newline())
-                    .append(Component.text("... and ${items.size - 5} more").color(NamedTextColor.GRAY))
-            }
-        } else {
-            builder.append(Component.text("Empty").color(NamedTextColor.GRAY))
-        }
-        
-        return builder.build()
-    }
-    
-    /**
      * Loads and displays an inventory snapshot to a player
      */
     fun viewInventorySnapshot(viewer: Player, snapshotId: String): Boolean {
         val snapshotFile = inventoryDataDir.resolve("$snapshotId.dat")
         
         if (!Files.exists(snapshotFile)) {
-            viewer.sendMessage(Component.text("Inventory snapshot not found or expired.").color(NamedTextColor.RED))
+            viewer.sendMessage(
+                messageFormattingService.formatMessage(
+                    configManager.config.messages.inventoryPlaceholders.snapshotNotFound,
+                    viewer
+                )
+            )
             return false
         }
         
         try {
             FileInputStream(snapshotFile.toFile()).use { fis ->
-                BukkitObjectInputStream(fis).use { ois ->
+                ObjectInputStream(fis).use { ois ->
                     val snapshot = ois.readObject() as InventorySnapshot
                     
                     // Create a read-only inventory view
@@ -276,7 +446,12 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
             }
         } catch (e: Exception) {
             logger.error("Failed to load inventory snapshot $snapshotId", e)
-            viewer.sendMessage(Component.text("Failed to load inventory snapshot.").color(NamedTextColor.RED))
+            viewer.sendMessage(
+                messageFormattingService.formatMessage(
+                    configManager.config.messages.inventoryPlaceholders.viewFailed,
+                    viewer
+                )
+            )
             return false
         }
     }
@@ -287,38 +462,32 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     private fun createReadOnlyInventory(snapshot: InventorySnapshot): Inventory {
         val title = "${snapshot.playerName}'s ${snapshot.type.displayName}"
         val size = when (snapshot.type) {
-            InventoryType.INV -> 45 // 6 rows for main inventory
-            InventoryType.ENDER -> 27 // 3 rows for ender chest
-            InventoryType.ARMOR -> 9 // 1 row for armor
-            InventoryType.HAND -> 9 // 1 row for hand items
+            PlaceholderType.INV -> 54 // 6 rows for main inventory
+            PlaceholderType.ENDER -> 27 // 3 rows for ender chest
+            PlaceholderType.ARMOR -> 9 // 1 row for armor
+            PlaceholderType.HAND -> 9 // 1 row for hand items
+            else -> 9
         }
         
-        val inventory = AtomicReference<Inventory>(null)
-
-        inventory.set(Bukkit.createInventory(object : ChatInventoryHolder {
-            override fun getInventory(): Inventory {
-                return inventory.get()
-            }
-        }, size, Component.text(title)))
-
-        val inv = inventory.get()
-
+        val inventory = Bukkit.createInventory(null, size, Component.text(title))
+        
         // Add items to inventory
         for (i in snapshot.items.indices) {
-            if (i < inv.size && snapshot.items[i] != null) {
-                inv.setItem(i, snapshot.items[i])
+            if (i < inventory.size && snapshot.items[i] != null) {
+                inventory.setItem(i, snapshot.items[i])
             }
         }
         
-        return inv
+        return inventory
     }
     
     /**
-     * Cleans up old inventory snapshots (older than 1 hour)
+     * Cleans up old inventory snapshots
      */
     private fun cleanupOldSnapshots() {
         try {
-            val cutoffTime = System.currentTimeMillis() - (60 * 60 * 1000) // 1 hour ago
+            val config = configManager.config.inventoryPlaceholders
+            val cutoffTime = System.currentTimeMillis() - (config.snapshotRetentionMinutes * 60 * 1000L)
             
             Files.list(inventoryDataDir).use { stream ->
                 stream.filter { it.toString().endsWith(".dat") }
@@ -337,13 +506,15 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     }
     
     /**
-     * Represents different types of inventories
+     * Represents different types of placeholders
      */
-    enum class InventoryType(val displayName: String) {
+    enum class PlaceholderType(val displayName: String) {
         INV("Inventory"),
         ENDER("Ender Chest"),
         ARMOR("Armor"),
-        HAND("Hand")
+        HAND("Hand"),
+        POS("Position"),
+        HEALTH("Health")
     }
     
     /**
@@ -362,7 +533,7 @@ class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     data class InventorySnapshot(
         val playerId: UUID,
         val playerName: String,
-        val type: InventoryType,
+        val type: PlaceholderType,
         val items: Array<ItemStack?>,
         val timestamp: Long
     ) : Serializable {

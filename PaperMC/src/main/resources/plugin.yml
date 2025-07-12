@@ -155,3 +155,7 @@ permissions:
   chatplugin.viewinventory:
     description: Permission to view inventory snapshots from placeholders
     default: true
+  
+  chatplugin.inventory.placeholders:
+    description: Permission to use inventory placeholders in chat
+    default: true
