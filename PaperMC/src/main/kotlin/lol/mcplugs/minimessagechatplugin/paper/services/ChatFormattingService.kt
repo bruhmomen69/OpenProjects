@@ -57,7 +57,7 @@ class ChatFormattingService(
         val allowFormatting = config.chat.enableTextFormatting && player.hasPermission(config.permissions.formattingPermission)
         
         return try {
-            messageFormattingService.formatMessageComponent(
+            val formattedMessage = messageFormattingService.formatMessageComponent(
                 format = enhancedFormat,
                 player = player,
                 additionalPlaceholders = additionalPlaceholders,
@@ -66,6 +66,13 @@ class ChatFormattingService(
                 allowColors = allowColors,
                 allowFormatting = allowFormatting
             )
+            
+            // Apply entire message hover/click if enabled
+            if (config.chatFormat.applyInteractiveToEntireMessage) {
+                applyEntireMessageInteractive(formattedMessage, player)
+            } else {
+                formattedMessage
+            }
         } catch (e: Exception) {
             logger.warn("Failed to format message for player ${player.name}: $enhancedFormat", e)
             messageFormattingService.formatMessageComponent(
@@ -240,6 +247,52 @@ class ChatFormattingService(
     
     fun clearAllCooldowns() {
         chatCooldowns.clear()
+    }
+    
+    /**
+     * Applies hover and click events to the entire message while preserving inventory placeholder interactions
+     */
+    private fun applyEntireMessageInteractive(message: Component, player: Player): Component {
+        val config = configManager.config.chatFormat
+        
+        // Get player rank for hover/click configuration
+        val playerRank = getPlayerRank(player)
+        val hoverMessage = config.hoverMessages[playerRank] ?: config.hoverMessages["default"]
+        val clickAction = config.clickActions[playerRank] ?: config.clickActions["default"]
+        
+        // If no hover or click is configured, return original message
+        if (hoverMessage == null && clickAction == null) {
+            return message
+        }
+        
+        // Create the interactive wrapper
+        var wrappedMessage = message
+        
+        // Add hover event if configured
+        if (config.enableHoverMessages && hoverMessage != null) {
+            val processedHover = hoverMessage.replace("{player_name}", player.name)
+            val hoverComponent = messageFormattingService.formatMessage(processedHover, player)
+            wrappedMessage = wrappedMessage.hoverEvent(HoverEvent.showText(hoverComponent))
+        }
+        
+        // Add click event if configured
+        if (config.enableClickActions && clickAction != null) {
+            val processedClick = clickAction.replace("{player_name}", player.name)
+            val clickEvent = when {
+                processedClick.startsWith("suggest_command:") -> 
+                    ClickEvent.suggestCommand(processedClick.removePrefix("suggest_command:"))
+                processedClick.startsWith("run_command:") -> 
+                    ClickEvent.runCommand(processedClick.removePrefix("run_command:"))
+                processedClick.startsWith("open_url:") -> 
+                    ClickEvent.openUrl(processedClick.removePrefix("open_url:"))
+                processedClick.startsWith("copy_to_clipboard:") -> 
+                    ClickEvent.copyToClipboard(processedClick.removePrefix("copy_to_clipboard:"))
+                else -> ClickEvent.suggestCommand(processedClick) // Default to suggest_command
+            }
+            wrappedMessage = wrappedMessage.clickEvent(clickEvent)
+        }
+        
+        return wrappedMessage
     }
 }
 

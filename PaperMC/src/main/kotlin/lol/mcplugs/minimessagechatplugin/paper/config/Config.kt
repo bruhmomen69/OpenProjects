@@ -98,6 +98,9 @@ data class ChatFormatConfig(
     @field:Comment("Enable click actions when players click on names in chat. Actions are defined in clickActions map.")
     val enableClickActions: Boolean = true,
     
+    @field:Comment("Apply hover and click events to the entire chat message instead of just the player name. When enabled, the entire message becomes interactive while preserving inventory placeholder interactions.")
+    val applyInteractiveToEntireMessage: Boolean = false,
+    
     @field:Comment("Custom click actions for player names, mapped by rank/group. Supports: suggest_command, run_command, open_url, copy_to_clipboard")
     val clickActions: Map<String, String> = mapOf(
         "default" to "suggest_command:/msg <player_name> "

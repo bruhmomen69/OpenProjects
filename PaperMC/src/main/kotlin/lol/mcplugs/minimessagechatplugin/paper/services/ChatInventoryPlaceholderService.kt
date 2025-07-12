@@ -13,6 +13,8 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.potion.PotionEffect
+import org.bukkit.util.io.BukkitObjectInputStream
+import org.bukkit.util.io.BukkitObjectOutputStream
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.Files
@@ -393,7 +395,7 @@ class ChatInventoryPlaceholderService(
         
         try {
             FileOutputStream(snapshotFile.toFile()).use { fos ->
-                ObjectOutputStream(fos).use { oos ->
+                BukkitObjectOutputStream(fos).use { oos ->
                     val snapshot = InventorySnapshot(
                         playerId = player.uniqueId,
                         playerName = player.name,
@@ -430,7 +432,7 @@ class ChatInventoryPlaceholderService(
         
         try {
             FileInputStream(snapshotFile.toFile()).use { fis ->
-                ObjectInputStream(fis).use { ois ->
+                BukkitObjectInputStream(fis).use { ois ->
                     val snapshot = ois.readObject() as InventorySnapshot
                     
                     // Create a read-only inventory view

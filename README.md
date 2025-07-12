@@ -91,6 +91,20 @@ Result: "Check out my loot [Inventory: 23 items] and meet me at [Pos: 100, 64, -
 
 All placeholders are clickable and show detailed hover information. Inventory placeholders open read-only views of the shared inventories. Each placeholder type can be individually enabled/disabled and requires the `chatplugin.inventory.placeholders` permission.
 
+### 🎯 **Enhanced Chat Interactivity**
+The plugin now supports applying hover and click events to entire chat messages while preserving individual inventory placeholder interactions:
+
+- **Player Name Interaction** (default): Hover/click events apply only to player names
+- **Entire Message Interaction** (optional): Hover/click events apply to the entire message
+- **Smart Preservation**: Inventory placeholders maintain their own hover/click functionality regardless of the setting
+- **Configurable**: Toggle via `chatFormat.applyInteractiveToEntireMessage` in config
+
+**Example with entire message interaction enabled:**
+```
+Player: "Check my loot {inv} at [pos]!"
+Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [Pos: 100, 64, -200] retain their specific interactions
+```
+
 ### 🛠️ **Admin Commands** (All Permission-Protected)
 - `/chatplugin reload` - Reload configuration (`chatplugin.admin.reload`)
 - `/chatplugin info` - View plugin status (`chatplugin.admin.info`)

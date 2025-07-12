@@ -16,6 +16,7 @@ The MiniMessage Chat Plugin is a production-ready, feature-rich chat enhancement
 - **World-Specific Formatting**: Different chat styles for different worlds/gamemodes
 - **MiniMessage Integration**: Full support for colors, gradients, hover effects, and click actions
 - **Interactive Elements**: Admin-configurable hover messages and click actions for enhanced player engagement
+- **Flexible Interaction Scope**: Choose between player name-only or entire message hover/click events
 
 **Business Value**: Enhances server branding and player experience while maintaining professional appearance and reducing administrative overhead.
 
