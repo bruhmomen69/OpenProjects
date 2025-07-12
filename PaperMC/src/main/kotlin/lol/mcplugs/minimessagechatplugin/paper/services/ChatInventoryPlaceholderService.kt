@@ -269,7 +269,8 @@ class ChatInventoryPlaceholderService(
                     .replace("{type}", type.displayName)
                     .replace("{preview}", preview)
                     .replace("\\n", "\n")
-                Component.text(hoverText)
+                // Parse the hover text through MiniMessage for proper formatting
+                messageFormattingService.formatMessage(hoverText, player)
             }
             PlaceholderType.POS -> {
                 val loc = player.location
@@ -286,7 +287,8 @@ class ChatInventoryPlaceholderService(
                     .replace("{world}", loc.world?.name ?: "Unknown")
                     .replace("{biome}", biome)
                     .replace("\\n", "\n")
-                Component.text(hoverText)
+                // Parse the hover text through MiniMessage for proper formatting
+                messageFormattingService.formatMessage(hoverText, player)
             }
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
@@ -302,7 +304,8 @@ class ChatInventoryPlaceholderService(
                     .replace("{saturation}", saturation.toString())
                     .replace("{effects}", effects)
                     .replace("\\n", "\n")
-                Component.text(hoverText)
+                // Parse the hover text through MiniMessage for proper formatting
+                messageFormattingService.formatMessage(hoverText, player)
             }
         }
     }

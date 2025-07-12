@@ -115,7 +115,12 @@ class MessageFormattingService(
             }
             
             val combinedResolver = TagResolver.resolver(baseTagResolver, placeholderResolver)
-            miniMessage.deserialize(newProcessedFormat, combinedResolver)
+            val result = miniMessage.deserialize(newProcessedFormat, combinedResolver)
+            
+            // Debug logging to help identify parsing issues
+            logger.debug("Formatted message - Input: '$format' -> Processed: '$newProcessedFormat' -> Result: '$result'")
+            
+            result
         } catch (e: Exception) {
             logger.warn("Failed to parse message format: $newProcessedFormat", e)
             miniMessage.deserialize("<gray>$newProcessedFormat</gray>")

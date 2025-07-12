@@ -192,15 +192,24 @@ class ChatFormattingService(
                 // Process click action with basic placeholder replacement
                 val processedClick = clickAction.replace("{player_name}", player.name)
                 
+                // Parse the click action to get the proper MiniMessage format
+                val clickTag = when {
+                    processedClick.startsWith("suggest_command:") -> "click:suggest_command:'${processedClick.removePrefix("suggest_command:")}'"
+                    processedClick.startsWith("run_command:") -> "click:run_command:'${processedClick.removePrefix("run_command:")}'"
+                    processedClick.startsWith("open_url:") -> "click:open_url:'${processedClick.removePrefix("open_url:")}'"
+                    processedClick.startsWith("copy_to_clipboard:") -> "click:copy_to_clipboard:'${processedClick.removePrefix("copy_to_clipboard:")}'"
+                    else -> "click:suggest_command:'$processedClick'" // Default to suggest_command
+                }
+                
                 // Wrap player_name placeholder with click action
                 if (result.contains("<hover:")) {
                     // If hover is already present, add click inside hover
-                    result = result.replace("<hover:show_text:'", "<click:$processedClick><hover:show_text:'")
+                    result = result.replace("<hover:show_text:'", "<$clickTag><hover:show_text:'")
                     result = result.replace("</hover>", "</hover></click>")
                 } else {
                     // Add click action directly
                     result = result.replace("<player_name>", 
-                        "<click:$processedClick><player_name></click>")
+                        "<$clickTag><player_name></click>")
                 }
             }
         }
