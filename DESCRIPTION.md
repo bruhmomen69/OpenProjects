@@ -84,6 +84,10 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
   - Permission: `chatplugin.status`
 
 ### Administrator Controls
+- `/zealouschat admin clear <type>` — Clear various chat-related data
+  - Permission: `chatplugin.admin`
+  - Parameters:
+    - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), or `all` (clears all data)
 - `/zealouschat admin toggle chat <player> <true|false>` — Force toggle public chat for a player
   - Permission: `chatplugin.admin`
   - Parameters:
