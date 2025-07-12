@@ -415,32 +415,32 @@ data class InventoryPlaceholderConfig(
     @field:Comment("Time in minutes before inventory snapshots are automatically deleted.")
     val snapshotRetentionMinutes: Int = 60,
     
-    @field:Comment("Display text format for inventory placeholder. Placeholders: {type}, {count}")
-    val inventoryDisplayFormat: String = "[{type}: {count} items]",
+    @field:Comment("Display text format for inventory placeholder. Placeholders: <type>, <count>. Supports MiniMessage formatting.")
+    val inventoryDisplayFormat: String = "<yellow>[<type>: <count> items]</yellow>",
     
-    @field:Comment("Display text format for position placeholder. Placeholders: {x}, {y}, {z}, {world}")
-    val positionDisplayFormat: String = "[Pos: {x}, {y}, {z}]",
+    @field:Comment("Display text format for position placeholder. Placeholders: <x>, <y>, <z>, <world>. Supports MiniMessage formatting.")
+    val positionDisplayFormat: String = "<green>[Pos: <x>, <y>, <z>]</green>",
     
-    @field:Comment("Display text format for health placeholder. Placeholders: {health}, {max_health}, {food}, {saturation}")
-    val healthDisplayFormat: String = "<gradient:red:dark_red>[<gradient:white:light_gray>{health}/{max_health} ❤</gradient>]</gradient>",
+    @field:Comment("Display text format for health placeholder. Placeholders: <health>, <max_health>, <food>, <saturation>. Supports MiniMessage formatting.")
+    val healthDisplayFormat: String = "<gradient:red:dark_red>[<gradient:white:light_gray><health>/<max_health> ❤</gradient>]</gradient>",
     
-    @field:Comment("Hover text format for inventory placeholders. Supports \\n for newlines. Placeholders: {player}, {type}, {preview}")
-    val inventoryHoverFormat: String = "<gradient:gold:yellow><b>{player}'s {type}</b></gradient>\n<gradient:gray:dark_gray>Click to view</gradient>\n\n{preview}",
+    @field:Comment("Hover text format for inventory placeholders. Supports \\n for newlines. Placeholders: <player>, <type>, <preview>. Supports MiniMessage formatting.")
+    val inventoryHoverFormat: String = "<gradient:gold:yellow><b><player>'s <type></b></gradient>\n<gradient:gray:dark_gray>Click to view</gradient>\n\n<preview>",
     
-    @field:Comment("Hover text format for position placeholder. Placeholders: {player}, {x}, {y}, {z}, {world}, {biome}")
-    val positionHoverFormat: String = "<gradient:yellow:gold><b>{player}'s Location</b></gradient>\n<gradient:gray:dark_gray>World: <gradient:aqua:light_purple>{world}</gradient></gradient>\n<gradient:gray:dark_gray>Biome: <gradient:green:dark_green>{biome}</gradient></gradient>\n<gradient:gray:dark_gray>Coordinates: <gradient:white:light_gray>{x}, {y}, {z}</gradient></gradient>\n<gradient:gray:dark_gray>Click to get directions</gradient>",
+    @field:Comment("Hover text format for position placeholder. Placeholders: <player>, <x>, <y>, <z>, <world>, <biome>. Supports MiniMessage formatting.")
+    val positionHoverFormat: String = "<gradient:yellow:gold><b><player>'s Location</b></gradient>\n<gradient:gray:dark_gray>World: <gradient:aqua:light_purple><world></gradient></gradient>\n<gradient:gray:dark_gray>Biome: <gradient:green:dark_green><biome></gradient></gradient>\n<gradient:gray:dark_gray>Coordinates: <gradient:white:light_gray><x>, <y>, <z></gradient></gradient>\n<gradient:gray:dark_gray>Click to get directions</gradient>",
     
-    @field:Comment("Hover text format for health placeholder. Placeholders: {player}, {health}, {max_health}, {food}, {saturation}, {effects}")
-    val healthHoverFormat: String = "<gradient:yellow:gold><b>{player}'s Status</b></gradient>\n<gradient:red:dark_red>❤ <gradient:white:light_gray>{health}/{max_health}</gradient> Health</gradient>\n<gradient:gold:yellow>🍖 <gradient:white:light_gray>{food}/20</gradient> Food</gradient>\n<gradient:yellow:gold>⚡ <gradient:white:light_gray>{saturation}</gradient> Saturation</gradient>\n{effects}",
+    @field:Comment("Hover text format for health placeholder. Placeholders: <player>, <health>, <max_health>, <food>, <saturation>, <effects>. Supports MiniMessage formatting.")
+    val healthHoverFormat: String = "<gradient:yellow:gold><b><player>'s Status</b></gradient>\n<gradient:red:dark_red>❤ <gradient:white:light_gray><health>/<max_health></gradient> Health</gradient>\n<gradient:gold:yellow>🍖 <gradient:white:light_gray><food>/20</gradient> Food</gradient>\n<gradient:yellow:gold>⚡ <gradient:white:light_gray><saturation></gradient> Saturation</gradient>\n<effects>",
     
-    @field:Comment("Text shown when an inventory is empty.")
+    @field:Comment("Text shown when an inventory is empty. Supports MiniMessage formatting.")
     val emptyInventoryText: String = "<gradient:gray:dark_gray>Empty</gradient>",
     
-    @field:Comment("Text shown for item preview in hover. Placeholders: {amount}, {item}")
-    val itemPreviewFormat: String = "<gradient:gray:dark_gray>•</gradient> <gradient:white:light_gray>{amount}x {item}</gradient>",
+    @field:Comment("Text shown for item preview in hover. Placeholders: <amount>, <item>. Supports MiniMessage formatting.")
+    val itemPreviewFormat: String = "<gradient:gray:dark_gray>•</gradient> <gradient:white:light_gray><amount>x <item></gradient>",
     
-    @field:Comment("Text shown when there are more items than can be displayed in preview.")
-    val moreItemsText: String = "<gradient:gray:dark_gray>... and <gradient:white:light_gray>{count}</gradient> more</gradient>",
+    @field:Comment("Text shown when there are more items than can be displayed in preview. Placeholders: <count>. Supports MiniMessage formatting.")
+    val moreItemsText: String = "<gradient:gray:dark_gray>... and <gradient:white:light_gray><count></gradient> more</gradient>",
     
     @field:Comment("Maximum number of items to show in hover preview.")
     val maxPreviewItems: Int = 5
