@@ -86,6 +86,31 @@ class MessageFormattingService(
         allowColors: Boolean = true,
         allowFormatting: Boolean = true
     ): Component {
+        return formatMessageComponent(
+            format = format,
+            player = player,
+            stringPlaceholders = emptyMap(),
+            componentPlaceholders = additionalPlaceholders,
+            processUrls = processUrls,
+            processMentions = processMentions,
+            allowColors = allowColors,
+            allowFormatting = allowFormatting
+        )
+    }
+
+    /**
+     * Format a message with both string and component placeholders
+     */
+    fun formatMessageComponent(
+        format: String,
+        player: Player? = null,
+        stringPlaceholders: Map<String, String> = emptyMap(),
+        componentPlaceholders: Map<String, Component> = emptyMap(),
+        processUrls: Boolean = true,
+        processMentions: Boolean = true,
+        allowColors: Boolean = true,
+        allowFormatting: Boolean = true
+    ): Component {
         var processedFormat = format
         
         // Convert legacy placeholders to MiniMessage format
@@ -104,7 +129,7 @@ class MessageFormattingService(
         }
         
         // Create TagResolver with all placeholders
-        val (placeholderResolver, newProcessedFormat) = createPlaceholderResolver(player, additionalPlaceholders, processedFormat)
+        val (placeholderResolver, newProcessedFormat) = createPlaceholderResolver(player, stringPlaceholders, componentPlaceholders, processedFormat)
         
         // Parse with MiniMessage using proper TagResolver
         return try {
@@ -152,14 +177,20 @@ class MessageFormattingService(
      */
     private fun createPlaceholderResolver(
         player: Player?, 
-        additionalPlaceholders: Map<String, Component>,
+        stringPlaceholders: Map<String, String>,
+        componentPlaceholders: Map<String, Component>,
         format: String
     ): Pair<TagResolver, String> {
         var mutFormat = format
         val resolvers = mutableListOf<TagResolver>()
         
-        // Add additional placeholders first (highest priority)
-        for ((placeholder, value) in additionalPlaceholders) {
+        // Add string placeholders first (highest priority)
+        for ((placeholder, value) in stringPlaceholders) {
+            resolvers.add(Placeholder.unparsed(placeholder, value))
+        }
+        
+        // Add component placeholders
+        for ((placeholder, value) in componentPlaceholders) {
             resolvers.add(Placeholder.component(placeholder, value))
         }
         

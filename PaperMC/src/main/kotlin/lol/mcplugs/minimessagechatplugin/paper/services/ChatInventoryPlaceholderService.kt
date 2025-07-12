@@ -278,18 +278,19 @@ class ChatInventoryPlaceholderService(
         return when (type) {
             PlaceholderType.INV, PlaceholderType.ENDER, PlaceholderType.ARMOR, PlaceholderType.HAND -> {
                 val preview = getItemPreview(player, type)
-                val placeholders = mapOf(
+                val stringPlaceholders = mapOf(
                     "player" to player.name,
                     "type" to type.displayName
                 )
-                val additionalPlaceholders = mapOf(
+                val componentPlaceholders = mapOf(
                     "preview" to preview
                 )
                 // Parse the hover text through MiniMessage with proper placeholders
                 messageFormattingService.formatMessageComponent(
                     config.inventoryHoverFormat.replace("\\n", "\n"),
                     player,
-                    additionalPlaceholders,
+                    stringPlaceholders,
+                    componentPlaceholders,
                     processUrls = false,
                     processMentions = false,
                     allowColors = true,
