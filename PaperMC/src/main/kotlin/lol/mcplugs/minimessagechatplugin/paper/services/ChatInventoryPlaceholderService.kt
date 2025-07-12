@@ -32,8 +32,7 @@ class ChatInventoryPlaceholderService(
 ) {
     private val logger = LoggerFactory.getLogger(ChatInventoryPlaceholderService::class.java)
     private val inventoryDataDir: Path = plugin.dataFolder.toPath().resolve("inventory_snapshots")
-    private val plainTextSerializer = PlainTextComponentSerializer.plainText()
-    
+
     // Patterns for different placeholder formats
     private val inventoryPatterns = mapOf(
         "inv" to listOf(Pattern.compile("\\{inv\\}"), Pattern.compile("\\[inv\\]")),
