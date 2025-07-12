@@ -1,9 +1,9 @@
-package lol.mcplugs.minimessagechatplugin.paper.listeners
+package bruh.zchat.paper.listeners
 
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.utils.MessageEnhancer
+import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.services.ChatFormattingService
+import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.utils.MessageEnhancer
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler

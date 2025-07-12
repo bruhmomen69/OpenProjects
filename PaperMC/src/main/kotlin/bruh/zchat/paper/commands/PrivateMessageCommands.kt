@@ -1,15 +1,14 @@
-package lol.mcplugs.minimessagechatplugin.paper.commands
+package bruh.zchat.paper.commands
 
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
-import lol.mcplugs.minimessagechatplugin.paper.services.PrivateMessageService
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
-import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
-import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
+import bruh.zchat.paper.services.PrivateMessageService
+import bruh.zchat.paper.services.ChatToggleService
+import bruh.zchat.paper.services.SocialSpyService
+import bruh.zchat.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
-import revxrsal.commands.annotation.Switch
 import revxrsal.commands.annotation.Values
 
 /**
@@ -44,7 +43,7 @@ class MessageCommand(
 /**
  * Chat toggle commands as subcommands of the main chatplugin command
  */
-@Command("chatplugin toggle", "chattoggle", "ct", "chatstatus")
+@Command("chatplugin toggle", "zealouschat toggle", "zchat toggle", "chattoggle", "ct", "chatstatus")
 class ChatToggleCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
@@ -118,7 +117,7 @@ class ChatToggleCommands(
 /**
  * Admin commands for managing chat features
  */
-@Command("chatplugin admin")
+@Command("chatplugin admin", "zealouschat admin", "zchat admin")
 class ChatAdminCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,

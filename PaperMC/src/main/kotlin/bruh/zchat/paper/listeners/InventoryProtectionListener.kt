@@ -1,6 +1,6 @@
-package lol.mcplugs.minimessagechatplugin.paper.listeners
+package bruh.zchat.paper.listeners
 
-import lol.mcplugs.minimessagechatplugin.paper.utils.ChatInventoryHolder
+import bruh.zchat.paper.utils.ChatInventoryHolder
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.event.EventHandler

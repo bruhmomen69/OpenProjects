@@ -1,6 +1,6 @@
-package lol.mcplugs.minimessagechatplugin.paper.services
+package bruh.zchat.paper.services
 
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
+import bruh.zchat.paper.config.ConfigManager
 import me.clip.placeholderapi.PlaceholderAPI
 import net.kyori.adventure.text.minimessage.Context
 import net.kyori.adventure.text.minimessage.tag.Tag
@@ -11,11 +11,6 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
-import java.text.NumberFormat
-import java.util.*
-import java.util.function.BiFunction
 import java.util.regex.Pattern
 
 /**

@@ -1,12 +1,12 @@
-package lol.mcplugs.minimessagechatplugin.paper.listeners
+package bruh.zchat.paper.listeners
 
 import io.papermc.paper.event.player.AsyncChatEvent
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatCooldownException
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
-import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatInventoryPlaceholderService
+import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.services.ChatCooldownException
+import bruh.zchat.paper.services.ChatFormattingService
+import bruh.zchat.paper.services.ChatToggleService
+import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.services.ChatInventoryPlaceholderService
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority

@@ -1,6 +1,6 @@
-package lol.mcplugs.minimessagechatplugin.paper.services
+package bruh.zchat.paper.services
 
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
+import bruh.zchat.paper.config.ConfigManager
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent

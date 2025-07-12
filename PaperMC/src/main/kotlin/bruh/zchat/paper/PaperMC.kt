@@ -1,22 +1,21 @@
-package lol.mcplugs.minimessagechatplugin.paper
+package bruh.zchat.paper
 
+import bruh.zchat.paper.commands.*
 import revxrsal.commands.Lamp
 import revxrsal.commands.bukkit.BukkitLamp
-import lol.mcplugs.minimessagechatplugin.paper.commands.ChatPluginCommands
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
-import lol.mcplugs.minimessagechatplugin.paper.listeners.ChatMessageListener
-import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerJoinQuitListener
-import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerDeathListener
-import lol.mcplugs.minimessagechatplugin.paper.listeners.PlayerAdvancementListener
-import lol.mcplugs.minimessagechatplugin.paper.listeners.InventoryProtectionListener
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.services.PlaceholderAPIService
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatToggleService
-import lol.mcplugs.minimessagechatplugin.paper.services.SocialSpyService
-import lol.mcplugs.minimessagechatplugin.paper.services.PrivateMessageService
-import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatInventoryPlaceholderService
-import lol.mcplugs.minimessagechatplugin.paper.commands.*
+import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.listeners.ChatMessageListener
+import bruh.zchat.paper.listeners.PlayerJoinQuitListener
+import bruh.zchat.paper.listeners.PlayerDeathListener
+import bruh.zchat.paper.listeners.PlayerAdvancementListener
+import bruh.zchat.paper.listeners.InventoryProtectionListener
+import bruh.zchat.paper.services.ChatFormattingService
+import bruh.zchat.paper.services.PlaceholderAPIService
+import bruh.zchat.paper.services.ChatToggleService
+import bruh.zchat.paper.services.SocialSpyService
+import bruh.zchat.paper.services.PrivateMessageService
+import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.services.ChatInventoryPlaceholderService
 import org.bukkit.plugin.java.JavaPlugin
 
 class PaperMC : JavaPlugin() {
@@ -75,7 +74,7 @@ class PaperMC : JavaPlugin() {
         server.pluginManager.registerEvents(PlayerAdvancementListener(configManager, messageFormattingService), this)
         server.pluginManager.registerEvents(InventoryProtectionListener(), this)
 
-        logger.info("MiniMessageChatPlugin enabled successfully!")
+        logger.info("ZealousChat enabled successfully!")
         logger.info("Features enabled:")
         logger.info("  - Chat formatting: ${configManager.config.chat.enableFormatting}")
         logger.info("  - Colors: ${configManager.config.chat.enableColorCodes}")
@@ -104,6 +103,6 @@ class PaperMC : JavaPlugin() {
             configManager.saveConfig()
         }
         
-        logger.info("MiniMessageChatPlugin disabled!")
+        logger.info("ZealousChat disabled!")
     }
 }

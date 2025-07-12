@@ -1,4 +1,4 @@
-package lol.mcplugs.minimessagechatplugin.paper.config
+package bruh.zchat.paper.config
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
@@ -7,37 +7,37 @@ import org.spongepowered.configurate.objectmapping.meta.Comment
 data class Config(
     @field:Comment("Chat formatting configuration including rank-based formats, world formats, and interactive elements")
     val chatFormat: ChatFormatConfig = ChatFormatConfig(),
-    
+
     @field:Comment("Placeholder configuration for built-in placeholders, custom placeholders, and PlaceholderAPI integration")
     val placeholders: PlaceholderConfig = PlaceholderConfig(),
-    
+
     @field:Comment("Permission configuration for format selection and feature access control")
     val permissions: PermissionConfig = PermissionConfig(),
-    
+
     @field:Comment("Chat message configuration and features")
     val chat: ChatConfig = ChatConfig(),
-    
+
     @field:Comment("Join and leave message configuration")
     val joinLeave: JoinLeaveConfig = JoinLeaveConfig(),
-    
+
     @field:Comment("Death message configuration")
     val death: DeathConfig = DeathConfig(),
-    
+
     @field:Comment("Advancement message configuration")
     val advancement: AdvancementConfig = AdvancementConfig(),
-    
+
     @field:Comment("Private messaging system configuration including formats, cooldowns, and permissions")
     val privateMessages: PrivateMessageConfig = PrivateMessageConfig(),
-    
+
     @field:Comment("Chat toggle system allowing players to disable chat and private messages")
     val chatToggle: ChatToggleConfig = ChatToggleConfig(),
-    
+
     @field:Comment("Social spy system for moderators to monitor private messages and commands")
     val socialSpy: SocialSpyConfig = SocialSpyConfig(),
-    
+
     @field:Comment("Inventory placeholder system for sharing inventories, armor, and other player data in chat")
     val inventoryPlaceholders: InventoryPlaceholderConfig = InventoryPlaceholderConfig(),
-    
+
     @field:Comment("All configurable messages used throughout the plugin. Supports MiniMessage formatting and placeholders.")
     val messages: MessagesConfig = MessagesConfig()
 )
@@ -480,22 +480,22 @@ data class SocialSpyConfig(
 data class MessagesConfig(
     @field:Comment("Command-related messages")
     val commands: CommandMessagesConfig = CommandMessagesConfig(),
-    
+
     @field:Comment("Private messaging system messages")
     val privateMessages: PrivateMessageMessagesConfig = PrivateMessageMessagesConfig(),
-    
+
     @field:Comment("Chat system messages")
     val chat: ChatMessagesConfig = ChatMessagesConfig(),
-    
+
     @field:Comment("Chat toggle system messages")
     val chatToggle: ChatToggleMessagesConfig = ChatToggleMessagesConfig(),
-    
+
     @field:Comment("Social spy system messages")
     val socialSpy: SocialSpyMessagesConfig = SocialSpyMessagesConfig(),
-    
+
     @field:Comment("Inventory placeholder system messages")
     val inventoryPlaceholders: InventoryPlaceholderMessagesConfig = InventoryPlaceholderMessagesConfig(),
-    
+
     @field:Comment("Error and system messages")
     val system: SystemMessagesConfig = SystemMessagesConfig()
 )

@@ -1,16 +1,16 @@
-package lol.mcplugs.minimessagechatplugin.paper.commands
+package bruh.zchat.paper.commands
 
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatFormattingService
-import lol.mcplugs.minimessagechatplugin.paper.services.MessageFormattingService
+import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.services.ChatFormattingService
+import bruh.zchat.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
 import revxrsal.commands.bukkit.annotation.CommandPermission
 
-@Command("chatplugin")
+@Command("chatplugin", "zealouschat", "zchat")
 class ChatPluginCommands(
     private val configManager: ConfigManager,
     private val chatFormattingService: ChatFormattingService,
@@ -34,7 +34,7 @@ class ChatPluginCommands(
     fun info(actor: BukkitCommandActor) {
         val config = configManager.config
         val message = """
-            <gold>===== ChatPlugin Info =====</gold>
+            <gold>===== ZealousChat Info =====</gold>
             <yellow>Default Format:</yellow> <gray>${config.chatFormat.defaultFormat}</gray>
             <yellow>Group Formats Enabled:</yellow> <gray>${config.chatFormat.enableGroupFormats}</gray>
             <yellow>World Formats Enabled:</yellow> <gray>${config.chatFormat.enableWorldFormats}</gray>
@@ -68,7 +68,7 @@ class ChatPluginCommands(
         actor.reply(formattedMessage)
     }
 
-    @Command("chatplugin format")
+    @Command("chatplugin format", "zealouschat format", "zchat format")
     class FormatCommands(
         private val configManager: ConfigManager
     ) {
@@ -152,7 +152,7 @@ class ChatPluginCommands(
         }
     }
 
-    @Command("chatplugin toggle")
+    @Command("chatplugin toggle", "zealouschat toggle", "zchat toggle")
     class ToggleCommands(
         private val configManager: ConfigManager
     ) {

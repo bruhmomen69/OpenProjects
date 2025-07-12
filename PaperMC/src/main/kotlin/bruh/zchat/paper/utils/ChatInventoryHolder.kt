@@ -1,4 +1,4 @@
-package lol.mcplugs.minimessagechatplugin.paper.utils
+package bruh.zchat.paper.utils
 
 import org.bukkit.inventory.InventoryHolder
 

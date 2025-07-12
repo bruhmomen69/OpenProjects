@@ -1,6 +1,7 @@
-package lol.mcplugs.minimessagechatplugin.paper.services
+package bruh.zchat.paper.services
 
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
+import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.config.MessagesConfig
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
@@ -325,7 +326,7 @@ class MessageFormattingService(
     /**
      * Helper to get message by key from config
      */
-    private fun getMessageByKey(messages: lol.mcplugs.minimessagechatplugin.paper.config.MessagesConfig, key: String): String? {
+    private fun getMessageByKey(messages: MessagesConfig, key: String): String? {
         return when (key) {
             // Command messages
             "commands.player_only" -> messages.commands.playerOnly

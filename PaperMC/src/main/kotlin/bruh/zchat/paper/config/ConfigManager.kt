@@ -1,4 +1,4 @@
-package lol.mcplugs.minimessagechatplugin.paper.config
+package bruh.zchat.paper.config
 
 import org.slf4j.LoggerFactory
 import org.spongepowered.configurate.ConfigurationNode

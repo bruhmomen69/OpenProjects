@@ -1,6 +1,6 @@
-package lol.mcplugs.minimessagechatplugin.paper.commands
+package bruh.zchat.paper.commands
 
-import lol.mcplugs.minimessagechatplugin.paper.services.ChatInventoryPlaceholderService
+import bruh.zchat.paper.services.ChatInventoryPlaceholderService
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.entity.Player
@@ -11,7 +11,7 @@ import revxrsal.commands.bukkit.annotation.CommandPermission
 /**
  * Command for viewing inventory snapshots created by inventory placeholders
  */
-@Command("chatplugin")
+@Command("chatplugin", "zealouschat", "zchat")
 @CommandPermission("chatplugin.admin")
 class InventoryViewCommand(
     private val chatInventoryPlaceholderService: ChatInventoryPlaceholderService

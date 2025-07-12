@@ -1,21 +1,14 @@
-package lol.mcplugs.minimessagechatplugin.paper.services
+package bruh.zchat.paper.services
 
-import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
+import bruh.zchat.paper.config.ChatFormatConfig
+import bruh.zchat.paper.config.ConfigManager
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
-import net.kyori.adventure.text.minimessage.MiniMessage
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
-import net.kyori.adventure.text.minimessage.tag.standard.StandardTags
-import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.regex.Pattern
 
 class ChatFormattingService(
     private val configManager: ConfigManager,
@@ -120,7 +113,7 @@ class ChatFormattingService(
         return config.defaultFormat
     }
     
-    private fun findPermissionBasedFormat(player: Player, config: lol.mcplugs.minimessagechatplugin.paper.config.ChatFormatConfig): String? {
+    private fun findPermissionBasedFormat(player: Player, config: ChatFormatConfig): String? {
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
             for (rank in config.rankedFormatPriority) {
