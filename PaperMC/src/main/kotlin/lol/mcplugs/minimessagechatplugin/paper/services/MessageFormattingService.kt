@@ -26,7 +26,7 @@ class MessageFormattingService(
     private val miniMessage = MiniMessage.miniMessage()
     private val urlPattern = Pattern.compile("https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+")
     private val mentionPattern = Pattern.compile("@(\\w+)")
-    private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
+    private val legacySerializer = LegacyComponentSerializer.legacySection()
 
     // Built-in placeholder resolvers
     private val builtinPlaceholders = mapOf<String, (Player?) -> String>(
@@ -104,7 +104,7 @@ class MessageFormattingService(
         }
         
         // Create TagResolver with all placeholders
-        val placeholderResolver = createPlaceholderResolver(player, additionalPlaceholders, processedFormat)
+        val (placeholderResolver, newProcessedFormat) = createPlaceholderResolver(player, additionalPlaceholders, processedFormat)
         
         // Parse with MiniMessage using proper TagResolver
         return try {
@@ -115,10 +115,10 @@ class MessageFormattingService(
             }
             
             val combinedResolver = TagResolver.resolver(baseTagResolver, placeholderResolver)
-            miniMessage.deserialize(processedFormat, combinedResolver)
+            miniMessage.deserialize(newProcessedFormat, combinedResolver)
         } catch (e: Exception) {
-            logger.warn("Failed to parse message format: $processedFormat", e)
-            miniMessage.deserialize("<gray>$processedFormat</gray>")
+            logger.warn("Failed to parse message format: $newProcessedFormat", e)
+            miniMessage.deserialize("<gray>$newProcessedFormat</gray>")
         }
     }
 
@@ -149,7 +149,8 @@ class MessageFormattingService(
         player: Player?, 
         additionalPlaceholders: Map<String, Component>,
         format: String
-    ): TagResolver {
+    ): Pair<TagResolver, String> {
+        var mutFormat = format
         val resolvers = mutableListOf<TagResolver>()
         
         // Add additional placeholders first (highest priority)
@@ -171,11 +172,12 @@ class MessageFormattingService(
         
         // Add PlaceholderAPI support if enabled
         if (player != null && placeholderAPIService.isEnabled()) {
-            val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(player, format)
-            resolvers.add(placeholderAPIResolver)
+            val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(player, mutFormat)
+            resolvers.add(placeholderAPIResolver.first)
+            mutFormat = placeholderAPIResolver.second
         }
         
-        return TagResolver.resolver(resolvers)
+        return Pair(TagResolver.resolver(resolvers), mutFormat)
     }
 
     /**

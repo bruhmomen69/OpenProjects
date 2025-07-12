@@ -185,8 +185,8 @@ data class ChatConfig(
     @field:Comment("Cooldown time in seconds between chat messages (only applies when enableCooldown is true).")
     val cooldownSeconds: Int = 3,
     
-    @field:Comment("Enable chat message logging to console for moderation purposes.")
-    val enableLogging: Boolean = true,
+    @field:Comment("Enable extra chat message logging to console for moderation purposes.")
+    val enableLogging: Boolean = false,
     
     @field:Comment("Enable chat filter system (placeholder for future implementation).")
     val enableFilter: Boolean = false

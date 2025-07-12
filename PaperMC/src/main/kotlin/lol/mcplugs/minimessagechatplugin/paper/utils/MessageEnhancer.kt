@@ -23,7 +23,7 @@ class MessageEnhancer(
         .ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.MEDIUM)
         .withZone(ZoneId.systemDefault())
 
-    private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
+    private val legacySerializer = LegacyComponentSerializer.legacySection()
 
     /**
      * Enhances a message with hover and click actions based on the message type.

@@ -12,6 +12,9 @@ libraries:
   - io.github.revxrsal:lamp.common:4.0.0-rc.12
   - io.github.revxrsal:lamp.bukkit:4.0.0-rc.12
 
+softdepend:
+  - PlaceholderAPI
+
 commands:
   chatplugin:
     description: Main command for MiniMessage Chat Plugin

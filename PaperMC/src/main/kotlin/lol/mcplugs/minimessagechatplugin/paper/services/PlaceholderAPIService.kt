@@ -1,11 +1,21 @@
 package lol.mcplugs.minimessagechatplugin.paper.services
 
 import lol.mcplugs.minimessagechatplugin.paper.config.ConfigManager
+import me.clip.placeholderapi.PlaceholderAPI
+import net.kyori.adventure.text.minimessage.Context
+import net.kyori.adventure.text.minimessage.tag.Tag
+import net.kyori.adventure.text.minimessage.tag.resolver.ArgumentQueue
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.text.NumberFormat
+import java.util.*
+import java.util.function.BiFunction
 import java.util.regex.Pattern
 
 /**
@@ -15,7 +25,8 @@ import java.util.regex.Pattern
 class PlaceholderAPIService(private val configManager: ConfigManager) {
     private val logger = LoggerFactory.getLogger(PlaceholderAPIService::class.java)
     private var placeholderAPIAvailable = false
-    private val placeholderPattern = Pattern.compile("%([^%]+)%")
+    private val modernPlaceholderPattern = Pattern.compile("<([^<>]+)>")
+    private val legacySerializer = LegacyComponentSerializer.legacySection()
     
     init {
         checkPlaceholderAPIAvailability()
@@ -27,7 +38,7 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
     private fun checkPlaceholderAPIAvailability() {
         placeholderAPIAvailable = try {
             Class.forName("me.clip.placeholderapi.PlaceholderAPI")
-            Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")
+            Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null
         } catch (e: ClassNotFoundException) {
             false
         }
@@ -50,23 +61,29 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
      * Create a TagResolver for PlaceholderAPI placeholders
      * This bridges PlaceholderAPI's %placeholder% format to MiniMessage's <placeholder> format
      */
-    fun createPlaceholderAPIResolver(player: Player, text: String): TagResolver {
+    fun createPlaceholderAPIResolver(player: Player, text: String): Pair<TagResolver, String> {
         if (!isEnabled()) {
-            return TagResolver.empty()
+            logger.debug("PlaceholderAPI integration is disabled")
+            return Pair(TagResolver.empty(), text)
         }
         
         val resolvers = mutableListOf<TagResolver>()
         
         try {
             // Find all PlaceholderAPI placeholders in the text
-            val matcher = placeholderPattern.matcher(text)
+            val matcher2 = modernPlaceholderPattern.matcher(text)
             val foundPlaceholders = mutableSetOf<String>()
-            
-            while (matcher.find()) {
-                val placeholder = matcher.group(1)
+
+            while (matcher2.find()) {
+                val placeholder = matcher2.group(1)
+                logger.debug("Found modern PlaceholderAPI placeholder '$placeholder' for player ${player.name}: ```${matcher2.groupCount()}```")
                 foundPlaceholders.add(placeholder)
             }
-            
+
+            if (foundPlaceholders.isEmpty()) {
+                logger.debug("No PlaceholderAPI placeholders found for player ${player.name} ($text)")
+            }
+
             // Process each unique placeholder
             for (placeholder in foundPlaceholders) {
                 val result = processPlaceholderAPI(player, "%$placeholder%")
@@ -78,8 +95,18 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
         } catch (e: Exception) {
             logger.warn("Error processing PlaceholderAPI placeholders for player ${player.name}", e)
         }
+
+        resolvers.add(TagResolver.resolver(
+            "papi"
+        ) { argumentQueue: ArgumentQueue, context: Context ->
+            val rawStr = argumentQueue.pop()
+            val papiStr = "%$rawStr%"
+            val result = processPlaceholderAPI(player, papiStr)
+
+            Tag.inserting(legacySerializer.deserialize(result))
+        })
         
-        return TagResolver.resolver(resolvers)
+        return Pair(TagResolver.resolver(resolvers), processPlaceholderAPI(player, text))
     }
     
     /**
@@ -88,9 +115,7 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
     private fun processPlaceholderAPI(player: Player, placeholder: String): String {
         return try {
             // Use reflection to call PlaceholderAPI.setPlaceholders safely
-            val placeholderAPIClass = Class.forName("me.clip.placeholderapi.PlaceholderAPI")
-            val setPlaceholdersMethod = placeholderAPIClass.getMethod("setPlaceholders", Player::class.java, String::class.java)
-            setPlaceholdersMethod.invoke(null, player, placeholder) as String
+            PlaceholderAPI.setPlaceholders(player, placeholder)
         } catch (e: Exception) {
             logger.debug("Failed to process PlaceholderAPI placeholder '$placeholder' for player ${player.name}: ${e.message}")
             placeholder // Return original if processing fails
