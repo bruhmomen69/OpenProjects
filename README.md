@@ -26,6 +26,7 @@ This plugin provides comprehensive chat formatting capabilities with rank-based 
   - ✅ Death messages (toggleable)
   - ✅ Advancement messages (toggleable)
 - **Built-in Placeholder System** with 15+ placeholders (player info, server info, time/date)
+- **Inventory Placeholder System** with clickable inventory sharing ({inv}, [ender], [armor], [hand], [pos], [health])
 - **Custom Placeholder Support** for server-specific values
 - **PlaceholderAPI Integration Ready** for external plugin compatibility
 
@@ -70,6 +71,25 @@ This plugin provides comprehensive chat formatting capabilities with rank-based 
 - `/chatplugin toggle messages` - Toggle private messages on/off
 - `/chatplugin toggle socialspy` - Toggle social spy (moderators only)
 - `/chatplugin status` - View current chat status
+- `/chatplugin viewinventory <snapshotId>` - View shared inventory snapshots
+
+### 📦 **Inventory Placeholder System**
+Players can share their inventories, equipment, and status in chat using special placeholders:
+
+- **`{inv}` or `[inv]`** - Share main inventory with click-to-view functionality
+- **`[ender]`** - Share ender chest contents  
+- **`[armor]`** - Share equipped armor and tools
+- **`[hand]`** - Share items currently in hands
+- **`[pos]`** - Share current position with world and biome info
+- **`[health]`** - Share health, food, and active potion effects
+
+**Example Usage:**
+```
+Player: "Check out my loot {inv} and meet me at [pos]!"
+Result: "Check out my loot [Inventory: 23 items] and meet me at [Pos: 100, 64, -200]!"
+```
+
+All placeholders are clickable and show detailed hover information. Inventory placeholders open read-only views of the shared inventories. Each placeholder type can be individually enabled/disabled and requires the `chatplugin.inventory.placeholders` permission.
 
 ### 🛠️ **Admin Commands** (All Permission-Protected)
 - `/chatplugin reload` - Reload configuration (`chatplugin.admin.reload`)
@@ -235,6 +255,8 @@ chatplugin.toggle.messages   # Toggle own private messages
 chatplugin.status           # View own chat status
 chatplugin.color            # Use colors in chat
 chatplugin.formatting       # Use text formatting
+chatplugin.inventory.placeholders # Use inventory placeholders in chat
+chatplugin.viewinventory    # View inventory snapshots
 
 # Staff permissions
 chatplugin.admin            # All admin commands
