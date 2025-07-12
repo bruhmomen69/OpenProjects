@@ -45,7 +45,7 @@ data class Config(
 @ConfigSerializable
 data class ChatFormatConfig(
     @field:Comment("Default chat format used when no group or world format applies. Supports MiniMessage syntax and placeholders.")
-    val defaultFormat: String = "<gray>[<white><player_name></white>]</gray> <gray><message></gray>",
+    val defaultFormat: String = "<gray>[<gradient:white:aqua><player_name></gradient>]</gray> <gray><message></gray>",
     
     @field:Comment("Group-based chat formats mapped by group/rank name. Higher priority groups should be listed first in rankedFormatPriority.")
     val groupFormats: Map<String, String> = mapOf(
@@ -209,7 +209,7 @@ data class JoinLeaveConfig(
     val enableJoin: Boolean = true,
     
     @field:Comment("Custom join message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_join>, <max_players>, <original_message>, etc. Set to empty string to disable join messages entirely.")
-    val joinMessage: String = "<green>+ <yellow><player_name></yellow> joined the server</green>",
+    val joinMessage: String = "<gradient:green:lime>+ <gradient:yellow:gold><player_name></gradient> joined the server</gradient>",
     
     @field:Comment("Enable hover messages for join announcements")
     val enableJoinHover: Boolean = true,
@@ -230,7 +230,7 @@ data class JoinLeaveConfig(
     val enableLeave: Boolean = true,
     
     @field:Comment("Custom leave message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_leave>, <max_players>, <original_message>, etc. Set to empty string to disable leave messages entirely.")
-    val leaveMessage: String = "<red>- <yellow><player_name></yellow> left the server</red>",
+    val leaveMessage: String = "<gradient:red:dark_red>- <gradient:yellow:gold><player_name></gradient> left the server</gradient>",
     
     @field:Comment("Enable hover messages for leave announcements")
     val enableLeaveHover: Boolean = true,
@@ -422,25 +422,25 @@ data class InventoryPlaceholderConfig(
     val positionDisplayFormat: String = "[Pos: {x}, {y}, {z}]",
     
     @field:Comment("Display text format for health placeholder. Placeholders: {health}, {max_health}, {food}, {saturation}")
-    val healthDisplayFormat: String = "[Health: {health}/{max_health} ❤]",
+    val healthDisplayFormat: String = "<gradient:red:dark_red>[<gradient:white:light_gray>{health}/{max_health} ❤</gradient>]</gradient>",
     
     @field:Comment("Hover text format for inventory placeholders. Supports \\n for newlines. Placeholders: {player}, {type}, {preview}")
-    val inventoryHoverFormat: String = "{player}'s {type}\\nClick to view\\n\\n{preview}",
+    val inventoryHoverFormat: String = "<gradient:gold:yellow><b>{player}'s {type}</b></gradient>\n<gradient:gray:dark_gray>Click to view</gradient>\n\n{preview}",
     
     @field:Comment("Hover text format for position placeholder. Placeholders: {player}, {x}, {y}, {z}, {world}, {biome}")
-    val positionHoverFormat: String = "{player}'s Location\\nWorld: {world}\\nBiome: {biome}\\nCoordinates: {x}, {y}, {z}\\nClick to get directions",
+    val positionHoverFormat: String = "<gradient:yellow:gold><b>{player}'s Location</b></gradient>\n<gradient:gray:dark_gray>World: <gradient:aqua:light_purple>{world}</gradient></gradient>\n<gradient:gray:dark_gray>Biome: <gradient:green:dark_green>{biome}</gradient></gradient>\n<gradient:gray:dark_gray>Coordinates: <gradient:white:light_gray>{x}, {y}, {z}</gradient></gradient>\n<gradient:gray:dark_gray>Click to get directions</gradient>",
     
     @field:Comment("Hover text format for health placeholder. Placeholders: {player}, {health}, {max_health}, {food}, {saturation}, {effects}")
-    val healthHoverFormat: String = "{player}'s Status\\nHealth: {health}/{max_health} ❤\\nFood: {food}/20 🍖\\nSaturation: {saturation}\\n{effects}",
+    val healthHoverFormat: String = "<gradient:yellow:gold><b>{player}'s Status</b></gradient>\n<gradient:red:dark_red>❤ <gradient:white:light_gray>{health}/{max_health}</gradient> Health</gradient>\n<gradient:gold:yellow>🍖 <gradient:white:light_gray>{food}/20</gradient> Food</gradient>\n<gradient:yellow:gold>⚡ <gradient:white:light_gray>{saturation}</gradient> Saturation</gradient>\n{effects}",
     
     @field:Comment("Text shown when an inventory is empty.")
-    val emptyInventoryText: String = "Empty",
+    val emptyInventoryText: String = "<gradient:gray:dark_gray>Empty</gradient>",
     
     @field:Comment("Text shown for item preview in hover. Placeholders: {amount}, {item}")
-    val itemPreviewFormat: String = "• {amount}x {item}",
+    val itemPreviewFormat: String = "<gradient:gray:dark_gray>•</gradient> <gradient:white:light_gray>{amount}x {item}</gradient>",
     
     @field:Comment("Text shown when there are more items than can be displayed in preview.")
-    val moreItemsText: String = "... and {count} more",
+    val moreItemsText: String = "<gradient:gray:dark_gray>... and <gradient:white:light_gray>{count}</gradient> more</gradient>",
     
     @field:Comment("Maximum number of items to show in hover preview.")
     val maxPreviewItems: Int = 5
