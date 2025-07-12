@@ -28,6 +28,7 @@ import java.util.regex.Pattern
 class ChatInventoryPlaceholderService(private val plugin: JavaPlugin) {
     private val logger = LoggerFactory.getLogger(ChatInventoryPlaceholderService::class.java)
     private val inventoryDataDir: Path = plugin.dataFolder.toPath().resolve("inventory_snapshots")
+    // Use legacy because it includes some basic formatting vs no formatting.
     private val plainTextSerializer = LegacyComponentSerializer.legacySection()
     
     // Patterns for different placeholder formats
