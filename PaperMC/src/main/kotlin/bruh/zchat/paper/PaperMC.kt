@@ -16,6 +16,7 @@ import bruh.zchat.paper.services.SocialSpyService
 import bruh.zchat.paper.services.PrivateMessageService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.services.ChatInventoryPlaceholderService
+import bruh.zchat.paper.services.BlockService
 import org.bukkit.plugin.java.JavaPlugin
 
 class PaperMC : JavaPlugin() {
@@ -25,6 +26,7 @@ class PaperMC : JavaPlugin() {
     private lateinit var messageFormattingService: MessageFormattingService
     private lateinit var chatToggleService: ChatToggleService
     private lateinit var socialSpyService: SocialSpyService
+    private lateinit var blockService: BlockService
     private lateinit var privateMessageService: PrivateMessageService
     private lateinit var chatFormattingService: ChatFormattingService
     private lateinit var lamp: Lamp<*>
@@ -45,8 +47,12 @@ class PaperMC : JavaPlugin() {
         chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this, configManager, messageFormattingService)
         chatToggleService = ChatToggleService(configManager, messageFormattingService)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
-        privateMessageService = PrivateMessageService(configManager, messageFormattingService, chatToggleService, socialSpyService)
+        blockService = BlockService(configManager, messageFormattingService, socialSpyService, dataFolder.toPath())
+        privateMessageService = PrivateMessageService(configManager, messageFormattingService, chatToggleService, socialSpyService, blockService)
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
+        
+        // Load persisted data
+        blockService.loadBlocks()
 
         // Initialize command framework
         lamp = BukkitLamp.builder(this).build()
@@ -60,12 +66,15 @@ class PaperMC : JavaPlugin() {
         // Register private message commands
         lamp.register(MessageCommand(privateMessageService, messageFormattingService))
 
+        // Register block commands
+        lamp.register(MessageCommand.BlockCommand(blockService, messageFormattingService))
+
         // Register inventory view command
         lamp.register(InventoryViewCommand(chatInventoryPlaceholderService))
         
         // Register chat toggle and admin commands
         lamp.register(ChatToggleCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
-        lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
+        lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService, blockService))
 
         // Register event listeners
         server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService, chatInventoryPlaceholderService), this)
@@ -96,6 +105,11 @@ class PaperMC : JavaPlugin() {
         // Clear any cooldowns
         if (::chatFormattingService.isInitialized) {
             chatFormattingService.clearAllCooldowns()
+        }
+        
+        // Save persisted data
+        if (::blockService.isInitialized) {
+            blockService.saveBlocks()
         }
         
         // Save configuration

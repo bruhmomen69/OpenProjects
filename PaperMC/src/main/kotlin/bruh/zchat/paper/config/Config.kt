@@ -38,6 +38,9 @@ data class Config(
     @field:Comment("Inventory placeholder system for sharing inventories, armor, and other player data in chat")
     val inventoryPlaceholders: InventoryPlaceholderConfig = InventoryPlaceholderConfig(),
 
+    @field:Comment("Block system for players to block private messages from others")
+    val blocks: BlockConfig = BlockConfig(),
+    
     @field:Comment("All configurable messages used throughout the plugin. Supports MiniMessage formatting and placeholders.")
     val messages: MessagesConfig = MessagesConfig()
 )
@@ -447,6 +450,24 @@ data class InventoryPlaceholderConfig(
 )
 
 @ConfigSerializable
+data class BlockConfig(
+    @field:Comment("Enable the block system for private messages.")
+    val enableBlockSystem: Boolean = true,
+    
+    @field:Comment("Maximum number of players a user can block.")
+    val maxBlocksPerPlayer: Int = 50,
+    
+    @field:Comment("Persist block lists across server restarts.")
+    val persistBlockLists: Boolean = true,
+    
+    @field:Comment("Allow players to block themselves (typically false).")
+    val blockSelf: Boolean = false,
+    
+    @field:Comment("Log block and unblock actions to console.")
+    val logBlocks: Boolean = true
+)
+
+@ConfigSerializable
 data class SocialSpyConfig(
     @field:Comment("Enable social spy system for moderators to monitor private messages.")
     val enableSocialSpy: Boolean = true,
@@ -493,9 +514,12 @@ data class MessagesConfig(
     @field:Comment("Social spy system messages")
     val socialSpy: SocialSpyMessagesConfig = SocialSpyMessagesConfig(),
 
+    @field:Comment("Block system messages")
+    val blocks: BlockMessagesConfig = BlockMessagesConfig(),
+
     @field:Comment("Inventory placeholder system messages")
     val inventoryPlaceholders: InventoryPlaceholderMessagesConfig = InventoryPlaceholderMessagesConfig(),
-
+    
     @field:Comment("Error and system messages")
     val system: SystemMessagesConfig = SystemMessagesConfig()
 )
@@ -601,6 +625,36 @@ data class SocialSpyMessagesConfig(
     @field:Comment("Message shown when social spy is disabled")
     val disabled: String = "<red>Social spy disabled! You will no longer see private messages.</red>"
 )
+@ConfigSerializable
+data class BlockMessagesConfig(
+    @field:Comment("Message shown when block system is disabled")
+    val systemDisabled: String = "<red>Block system is currently disabled.</red>",
+    
+    @field:Comment("Message shown when a player is successfully blocked")
+    val blocked: String = "<green>You have blocked <player>. They can no longer send you private messages.</green>",
+    
+    @field:Comment("Message shown when a player is successfully unblocked")
+    val unblocked: String = "<green>You have unblocked <player>. They can now send you private messages again.</green>",
+    
+    @field:Comment("Message shown when trying to block a player who is already blocked")
+    val alreadyBlocked: String = "<red><player> is already blocked!</red>",
+    
+    @field:Comment("Message shown when trying to unblock a player who is not blocked")
+    val notBlocked: String = "<red><player> is not blocked!</red>",
+    
+    @field:Comment("Message shown when the block list is empty")
+    val blockListEmpty: String = "<yellow>Your block list is empty.</yellow>",
+    
+    @field:Comment("Message shown when displaying the block list")
+    val blockList: String = "<yellow>Blocked players: <list></yellow>",
+    
+    @field:Comment("Message shown when a blocked player tries to send a message")
+    val targetBlockedYou: String = "<red>You cannot send messages to <player> because they have blocked you.</red>",
+    
+    @field:Comment("Message shown when reaching the maximum number of blocked players")
+    val maxBlocksReached: String = "<red>You have reached the maximum number of blocked players (<max>)!</red>"
+)
+
 
 @ConfigSerializable
 data class InventoryPlaceholderMessagesConfig(

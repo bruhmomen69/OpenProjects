@@ -15,7 +15,8 @@ class PrivateMessageService(
     private val configManager: ConfigManager,
     private val messageFormattingService: MessageFormattingService,
     private val chatToggleService: ChatToggleService,
-    private val socialSpyService: SocialSpyService
+    private val socialSpyService: SocialSpyService,
+    private val blockService: BlockService? = null
 ) {
     private val logger = LoggerFactory.getLogger(PrivateMessageService::class.java)
     private val miniMessage = MiniMessage.miniMessage()
@@ -77,8 +78,18 @@ class PrivateMessageService(
         // Check if recipient has messages disabled
         if (!chatToggleService.canReceiveMessages(recipient)) {
             sender.sendMessage(messageFormattingService.getConfigMessage(
-                "private_messages.target_messages_disabled", 
-                sender, 
+                "private_messages.target_messages_disabled",
+                sender,
+                mapOf("player" to recipient.name)
+            ))
+            return false
+        }
+        
+        // Check if sender is blocked by recipient
+        if (blockService?.isBlocked(recipient, sender) == true) {
+            sender.sendMessage(messageFormattingService.getConfigMessage(
+                "blocks.target_blocked_you",
+                sender,
                 mapOf("player" to recipient.name)
             ))
             return false
@@ -175,6 +186,9 @@ class PrivateMessageService(
     fun handlePlayerQuit(player: Player) {
         lastSenders.remove(player.uniqueId)
         messageCooldowns.remove(player.uniqueId)
+        
+        // Handle player quit in block service
+        blockService?.handlePlayerQuit(player)
         
         // Remove this player as a last sender for others
         lastSenders.values.removeAll { it == player.uniqueId }

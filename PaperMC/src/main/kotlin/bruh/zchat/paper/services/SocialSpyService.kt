@@ -213,4 +213,44 @@ class SocialSpyService(
             logger.info("[COMMANDSPY] ${player.name}: $command")
         }
     }
+    
+    /**
+     * Broadcast a block/unblock action to social spy users
+     */
+    fun broadcastBlockAction(player: Player, target: Player, action: String) {
+        val config = configManager.config.socialSpy
+        
+        if (!config.enableSocialSpy || socialSpyEnabled.isEmpty()) {
+            return
+        }
+        
+        // Format the block action message
+        val actionMessage = when (action) {
+            "blocked" -> "<dark_gray>[<red>BLOCK</red>]</dark_gray> <gray>${player.name} blocked ${target.name}</gray>"
+            "unblocked" -> "<dark_gray>[<green>UNBLOCK</green>]</dark_gray> <gray>${player.name} unblocked ${target.name}</gray>"
+            else -> return
+        }
+        
+        val spyMessage = messageFormattingService.formatMessage(
+            format = actionMessage,
+            player = player,
+            processUrls = true,
+            processMentions = false,
+            allowColors = true,
+            allowFormatting = true
+        )
+        
+        // Send to all social spy users
+        for (spyPlayerUUID in socialSpyEnabled) {
+            val spyPlayer = Bukkit.getPlayer(spyPlayerUUID)
+            if (spyPlayer != null && spyPlayer.isOnline && spyPlayer.uniqueId != player.uniqueId) {
+                spyPlayer.sendMessage(spyMessage)
+            }
+        }
+        
+        // Log to console if enabled
+        if (config.logToConsole) {
+            logger.info("[BLOCKSPY] ${player.name} $action ${target.name}")
+        }
+    }
 }

@@ -7,6 +7,7 @@ import bruh.zchat.paper.services.PrivateMessageService
 import bruh.zchat.paper.services.ChatToggleService
 import bruh.zchat.paper.services.SocialSpyService
 import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.services.BlockService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Values
@@ -39,6 +40,47 @@ class MessageCommand(
         val player = actor.sender() as Player
         privateMessageService.replyToLastSender(player, message)
     }
+/**
+ * User-facing block commands
+ */
+@Command("block", "unblock", "blocklist")
+class BlockCommand(
+    private val blockService: BlockService,
+    private val messageFormattingService: MessageFormattingService
+) {
+    @Command("block")
+    fun block(actor: BukkitCommandActor, target: String) {
+        if (actor.sender() !is Player) {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        val player = actor.sender() as Player
+        blockService.blockPlayer(player, target)
+    }
+    
+    @Command("unblock")
+    fun unblock(actor: BukkitCommandActor, target: String) {
+        if (actor.sender() !is Player) {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        val player = actor.sender() as Player
+        blockService.unblockPlayer(player, target)
+    }
+    
+    @Command("blocklist")
+    fun blockList(actor: BukkitCommandActor) {
+        if (actor.sender() !is Player) {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        val player = actor.sender() as Player
+        blockService.showBlockList(player)
+    }
+}
 }
 /**
  * Chat toggle commands as subcommands of the main chatplugin command
@@ -122,7 +164,8 @@ class ChatAdminCommands(
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
     private val privateMessageService: PrivateMessageService,
-    private val messageFormattingService: MessageFormattingService
+    private val messageFormattingService: MessageFormattingService,
+    private val blockService: BlockService
 ) {
     @Subcommand("toggle chat")
     fun adminToggleChat(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
@@ -216,8 +259,41 @@ class ChatAdminCommands(
         actor.reply(MiniMessage.miniMessage().deserialize(message))
     }
     
+    @Subcommand("block")
+    fun adminBlock(actor: BukkitCommandActor, playerName: String, targetName: String) {
+        if (actor.sender() !is Player) {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        val admin = actor.sender() as Player
+        blockService.forceBlock(admin, playerName, targetName)
+    }
+    
+    @Subcommand("unblock")
+    fun adminUnblock(actor: BukkitCommandActor, playerName: String, targetName: String) {
+        if (actor.sender() !is Player) {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        val admin = actor.sender() as Player
+        blockService.forceUnblock(admin, playerName, targetName)
+    }
+    
+    @Subcommand("clearblocks")
+    fun adminClearBlocks(actor: BukkitCommandActor, playerName: String) {
+        if (actor.sender() !is Player) {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        val admin = actor.sender() as Player
+        blockService.clearBlocksByName(admin, playerName)
+    }
+    
     @Subcommand("clear")
-    fun adminClear(actor: BukkitCommandActor, @Values("toggles", "socialspy", "cooldowns", "all") type: String) {
+    fun adminClear(actor: BukkitCommandActor, @Values("toggles", "socialspy", "cooldowns", "blocks", "all") type: String) {
         when (type.lowercase()) {
             "toggles" -> {
                 chatToggleService.clearAllToggles()
@@ -231,14 +307,19 @@ class ChatAdminCommands(
                 privateMessageService.clearAllCooldowns()
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Cleared all message cooldowns!</green>"))
             }
+            "blocks" -> {
+                blockService.clearAllBlocks()
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Cleared all block lists!</green>"))
+            }
             "all" -> {
                 chatToggleService.clearAllToggles()
                 socialSpyService.clearAllSocialSpy()
                 privateMessageService.clearAllCooldowns()
+                blockService.clearAllBlocks()
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Cleared all chat data!</green>"))
             }
             else -> {
-                actor.reply(MiniMessage.miniMessage().deserialize("<red>Usage: /chatplugin admin clear <toggles|socialspy|cooldowns|all></red>"))
+                actor.reply(MiniMessage.miniMessage().deserialize("<red>Usage: /chatplugin admin clear <toggles|socialspy|cooldowns|blocks|all></red>"))
             }
         }
     }
