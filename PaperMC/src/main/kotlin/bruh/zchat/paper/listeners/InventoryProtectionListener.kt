@@ -18,7 +18,8 @@ class InventoryProtectionListener : Listener {
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
         // Check if this is a read-only inventory view (contains player name and inventory type)
-        if (event.inventory.holder is ChatInventoryHolder || event.clickedInventory?.holder is ChatInventoryHolder) {
+        if (event.inventory.holder is ChatInventoryHolder || event.clickedInventory?.holder is ChatInventoryHolder ||
+            isReadOnlyInventory(event.view.title())) {
             event.isCancelled = true
             event.whoClicked.sendMessage(
                 Component.text("This is a read-only inventory view.")
@@ -51,7 +52,7 @@ class InventoryProtectionListener : Listener {
         val title = event.view.title()
         
         // Check if this is a read-only inventory view
-        if (isReadOnlyInventory(title)) {
+        if (isReadOnlyInventory(title) || event.inventory.holder is ChatInventoryHolder) {
             event.isCancelled = true
             event.whoClicked.sendMessage(
                 Component.text("This is a read-only inventory view.")

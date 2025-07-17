@@ -11,8 +11,8 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.util.io.BukkitObjectInputStream
-import org.bukkit.util.io.BukkitObjectOutputStream
+import bruh.zchat.paper.utils.streaming.BukkitObjectInputStream
+import bruh.zchat.paper.utils.streaming.BukkitObjectOutputStream
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.Files

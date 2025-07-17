@@ -3,6 +3,7 @@ package bruh.zchat.paper.services
 import bruh.zchat.paper.config.ConfigManager
 import me.clip.placeholderapi.PlaceholderAPI
 import net.kyori.adventure.text.minimessage.Context
+import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.Tag
 import net.kyori.adventure.text.minimessage.tag.resolver.ArgumentQueue
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
@@ -22,11 +23,12 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
     private var placeholderAPIAvailable = false
     private val modernPlaceholderPattern = Pattern.compile("<([^<>]+)>")
     private val legacySerializer = LegacyComponentSerializer.legacySection()
-    
+    private val legacyAmpersandSerializer = LegacyComponentSerializer.legacyAmpersand()
+
     init {
         checkPlaceholderAPIAvailability()
     }
-    
+
     /**
      * Check if PlaceholderAPI is available and enabled
      */
@@ -37,21 +39,21 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
         } catch (e: ClassNotFoundException) {
             false
         }
-        
+
         if (placeholderAPIAvailable) {
             logger.info("PlaceholderAPI detected and enabled - external placeholders will be processed")
         } else {
             logger.info("PlaceholderAPI not found - only built-in placeholders will be available")
         }
     }
-    
+
     /**
      * Check if PlaceholderAPI integration is enabled and available
      */
     fun isEnabled(): Boolean {
         return configManager.config.placeholders.enablePlaceholderAPI && placeholderAPIAvailable
     }
-    
+
     /**
      * Create a TagResolver for PlaceholderAPI placeholders
      * This bridges PlaceholderAPI's %placeholder% format to MiniMessage's <placeholder> format
@@ -61,9 +63,9 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
             logger.debug("PlaceholderAPI integration is disabled")
             return Pair(TagResolver.empty(), text)
         }
-        
+
         val resolvers = mutableListOf<TagResolver>()
-        
+
         try {
             // Find all PlaceholderAPI placeholders in the text
             val matcher2 = modernPlaceholderPattern.matcher(text)
@@ -83,27 +85,34 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
             for (placeholder in foundPlaceholders) {
                 val result = processPlaceholderAPI(player, "%$placeholder%")
                 if (result != "%$placeholder%") { // Only add if placeholder was actually resolved
-                    resolvers.add(Placeholder.unparsed(placeholder, result))
+                    resolvers.add(
+                        Placeholder.parsed(
+                            placeholder, MiniMessage.miniMessage().serializeOr(
+                                legacyAmpersandSerializer.deserialize(result), result
+                            )!!
+                        )
+                    )
                 }
             }
-            
+
         } catch (e: Exception) {
             logger.warn("Error processing PlaceholderAPI placeholders for player ${player.name}", e)
         }
 
-        resolvers.add(TagResolver.resolver(
-            "papi"
-        ) { argumentQueue: ArgumentQueue, context: Context ->
-            val rawStr = argumentQueue.pop()
-            val papiStr = "%$rawStr%"
-            val result = processPlaceholderAPI(player, papiStr)
+        resolvers.add(
+            TagResolver.resolver(
+                "papi"
+            ) { argumentQueue: ArgumentQueue, context: Context ->
+                val rawStr = argumentQueue.pop()
+                val papiStr = "%$rawStr%"
+                val result = processPlaceholderAPI(player, papiStr)
 
-            Tag.inserting(legacySerializer.deserialize(result))
-        })
-        
+                Tag.inserting(legacySerializer.deserialize(result))
+            })
+
         return Pair(TagResolver.resolver(resolvers), processPlaceholderAPI(player, text))
     }
-    
+
     /**
      * Process a single PlaceholderAPI placeholder
      */
@@ -116,7 +125,7 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
             placeholder // Return original if processing fails
         }
     }
-    
+
     /**
      * Process a text string with PlaceholderAPI placeholders
      * This is a fallback method for direct string processing
@@ -125,17 +134,18 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
         if (!isEnabled()) {
             return text
         }
-        
+
         return try {
             val placeholderAPIClass = Class.forName("me.clip.placeholderapi.PlaceholderAPI")
-            val setPlaceholdersMethod = placeholderAPIClass.getMethod("setPlaceholders", Player::class.java, String::class.java)
+            val setPlaceholdersMethod =
+                placeholderAPIClass.getMethod("setPlaceholders", Player::class.java, String::class.java)
             setPlaceholdersMethod.invoke(null, player, text) as String
         } catch (e: Exception) {
             logger.warn("Error processing PlaceholderAPI text for player ${player.name}", e)
             text
         }
     }
-    
+
     /**
      * Get available PlaceholderAPI placeholders (for debugging/info purposes)
      */
@@ -143,7 +153,7 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
         if (!isEnabled()) {
             return emptyList()
         }
-        
+
         return try {
             val placeholderAPIClass = Class.forName("me.clip.placeholderapi.PlaceholderAPI")
             val getRegisteredIdentifiersMethod = placeholderAPIClass.getMethod("getRegisteredIdentifiers")
@@ -154,7 +164,7 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
             emptyList()
         }
     }
-    
+
     /**
      * Reload PlaceholderAPI service (called when config is reloaded)
      */
