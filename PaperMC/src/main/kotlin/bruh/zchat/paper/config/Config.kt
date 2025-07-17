@@ -275,10 +275,10 @@ data class DeathConfig(
         "HOT_FLOOR" to "<red>🔥</red> <yellow><player_name></yellow> <gray>discovered the floor was lava</gray>",
         "CRAMMING" to "<red>🤏</red> <yellow><player_name></yellow> <gray>was squished too much</gray>",
         "DRYOUT" to "<yellow>🐠</yellow> <yellow><player_name></yellow> <gray>died from dehydration</gray>",
-        "ENTITY_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain</gray>",
+        "ENTITY_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain by <death_attacker></gray>",
         "ENTITY_EXPLOSION" to "<red>💥</red> <yellow><player_name></yellow> <gray>was blown up</gray>",
         "PROJECTILE" to "<yellow>🏹</yellow> <yellow><player_name></yellow> <gray>was shot</gray>",
-        "PLAYER_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain in combat</gray>",
+        "PLAYER_ATTACK" to "<red>⚔️</red> <yellow><player_name></yellow> <gray>was slain by <death_attacker></gray>",
         "VOID" to "<dark_purple>🕳️</dark_purple> <yellow><player_name></yellow> <gray>fell into the void</gray>",
         "LIGHTNING" to "<yellow>⚡</yellow> <yellow><player_name></yellow> <gray>was struck by lightning</gray>",
         "SUICIDE" to "<dark_red>💀</dark_red> <yellow><player_name></yellow> <gray>took their own life</gray>"

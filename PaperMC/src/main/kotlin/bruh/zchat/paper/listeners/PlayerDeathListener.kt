@@ -3,6 +3,8 @@ package bruh.zchat.paper.listeners
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.utils.MessageEnhancer
+import bruh.zchat.paper.utils.legacySerial
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -14,11 +16,12 @@ class PlayerDeathListener(
     private val configManager: ConfigManager,
     private val messageFormattingService: MessageFormattingService
 ) : Listener {
-    
+
     private val messageEnhancer = MessageEnhancer(configManager, messageFormattingService)
-    
+
     private val logger = LoggerFactory.getLogger(PlayerDeathListener::class.java)
     private val plainTextSerializer = PlainTextComponentSerializer.plainText()
+    private val legacyComponentSerializer = LegacyComponentSerializer.legacySection()
 
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onPlayerDeath(event: PlayerDeathEvent) {
@@ -27,67 +30,72 @@ class PlayerDeathListener(
             event.deathMessage(null)
             return
         }
-        
+
         // Check if custom death messages are enabled
         if (!configManager.config.death.enabled) {
             return // Let vanilla handle death messages
         }
-        
+
         val player = event.player
         val originalMessage = event.deathMessage() ?: return
-        
+
         // Try to get death cause from the player's last damage cause
         val deathCause = player.lastDamageCause?.cause?.name ?: "UNKNOWN"
-        
+        val attacker = event.damageSource.causingEntity?.name() ?: event.damageSource.directEntity?.name()
+        ?: event.damageSource.causingEntity?.type?.name?.legacySerial() ?: event.damageSource.directEntity?.type?.name?.legacySerial()
+        ?: legacyComponentSerializer.deserialize(player.lastDamageCause?.cause?.name ?: "UNKNOWN")
+
         // First try to find a custom message by death cause
         var customMessage = configManager.config.death.messages[deathCause]
-        
+
         // If not found by death cause, try to find by the original vanilla message text
         if (customMessage == null) {
             val originalText = plainTextSerializer.serialize(originalMessage)
             customMessage = configManager.config.death.messages[originalText]
         }
-        
+
         // If still no custom message found, use the backup death message
         if (customMessage == null) {
             customMessage = configManager.config.death.defaultMessage
         }
-        
+
         // If custom message is empty, disable this specific death message
         if (customMessage.isBlank()) {
             event.deathMessage(null)
             return
         }
-        
+
         // Use MessageFormattingService for consistent placeholder processing
         try {
             val location = player.location
             val worldName = location.world?.name ?: "unknown"
-            
-            val baseMessage = messageFormattingService.formatMessage(
+
+            val baseMessage = messageFormattingService.formatMessageComponent(
                 format = customMessage,
                 player = player,
                 additionalPlaceholders = mapOf(
-                    "death_cause" to deathCause,
-                    "death_message" to plainTextSerializer.serialize(originalMessage),
-                    "original_message" to plainTextSerializer.serialize(originalMessage),
-                    "world" to worldName,
-                    "x" to location.blockX.toString(),
-                    "y" to location.blockY.toString(),
-                    "z" to location.blockZ.toString()
+                    "death_attacker" to attacker,
+                    "death_cause" to legacyComponentSerializer.deserialize(deathCause),
+                    "death_message" to originalMessage,
+                    "original_message" to originalMessage,
+                    "world" to legacyComponentSerializer.deserialize(worldName),
+                    "x" to plainTextSerializer.deserialize(location.blockX.toString()),
+                    "y" to plainTextSerializer.deserialize(location.blockY.toString()),
+                    "z" to plainTextSerializer.deserialize(location.blockZ.toString())
                 ),
                 processUrls = false,
                 processMentions = false,
                 allowColors = true,
                 allowFormatting = true
             )
-            
+
             // Enhance the message with hover and click actions
             val enhancedMessage = messageEnhancer.enhanceMessage(
                 message = baseMessage,
                 player = player,
                 messageType = MessageEnhancer.MessageType.DEATH,
                 additionalPlaceholders = mapOf(
+                    "death_attacker" to legacyComponentSerializer.serialize(attacker),
                     "death_cause" to deathCause,
                     "death_message" to plainTextSerializer.serialize(originalMessage),
                     "world" to worldName,
@@ -96,14 +104,14 @@ class PlayerDeathListener(
                     "z" to location.blockZ.toString()
                 )
             )
-            
+
             event.deathMessage(enhancedMessage)
-            
+
             // Log the death if chat logging is enabled
             if (configManager.config.chat.enableLogging) {
                 logger.info("[DEATH] ${player.name} died: $deathCause at $worldName ${location.blockX}, ${location.blockY}, ${location.blockZ}")
             }
-            
+
         } catch (e: Exception) {
             logger.warn("Failed to parse death message format: $customMessage", e)
             // Fall back to a simple formatted message
@@ -116,7 +124,7 @@ class PlayerDeathListener(
                     allowColors = true,
                     allowFormatting = true
                 )
-                
+
                 val fallbackEnhanced = messageEnhancer.enhanceMessage(
                     message = fallbackBase,
                     player = player,
