@@ -451,8 +451,8 @@ data class InventoryPlaceholderConfig(
 
 @ConfigSerializable
 data class BlockConfig(
-    @field:Comment("Enable the block system for private messages.")
-    val enableBlockSystem: Boolean = true,
+    @field:Comment("Enable the block system for private messages. Does not support inter server sync, use an external plugin for that.")
+    val enableBlockSystem: Boolean = false,
     
     @field:Comment("Maximum number of players a user can block.")
     val maxBlocksPerPlayer: Int = 50,
