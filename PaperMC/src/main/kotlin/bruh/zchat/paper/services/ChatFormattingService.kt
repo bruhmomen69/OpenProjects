@@ -20,35 +20,60 @@ class ChatFormattingService(
     fun formatMessage(player: Player, message: String): Component {
         return formatMessageWithComponent(player, Component.text(message))
     }
-    
-    fun formatMessageWithComponent(player: Player, messageComponent: Component): Component {
+
+    /**
+     * Returns if the message should be sent.
+     * Throws [ChatCooldownException] if the player is on cooldown
+     */
+    fun applyCooldown(player: Player) {
         val config = configManager.config
-        
+
         // Check cooldown
         if (config.chat.enableCooldown && !player.hasPermission("chatplugin.bypass.cooldown")) {
             val lastMessage = chatCooldowns[player.uniqueId] ?: 0
             val cooldownTime = config.chat.cooldownSeconds * 1000L
             val currentTime = System.currentTimeMillis()
-            
+
             if (currentTime - lastMessage < cooldownTime) {
                 val remainingTime = (cooldownTime - (currentTime - lastMessage)) / 1000.0
-                throw ChatCooldownException("You must wait ${String.format("%.1f", remainingTime)} seconds before sending another message!")
+                throw ChatCooldownException(
+                    "You must wait ${
+                        String.format(
+                            "%.1f",
+                            remainingTime
+                        )
+                    } seconds before sending another message!"
+                )
             }
-            
+
             chatCooldowns[player.uniqueId] = currentTime
         }
-        
+    }
+
+    @JvmOverloads
+    fun formatMessageWithComponent(
+        player: Player,
+        messageComponent: Component,
+        applyCooldown: Boolean = true
+    ): Component {
+        val config = configManager.config
+
+        if (applyCooldown) {
+            applyCooldown(player)
+        }
+
         // Get the appropriate format
         val format = getFormatForPlayer(player)
-        
+
         // Add hover and click actions if enabled
         val enhancedFormat = addInteractiveElements(format, player)
-        
+
         // Use MessageFormattingService to format the final message with the component
         val additionalPlaceholders = mapOf("message" to messageComponent)
         val allowColors = config.chat.enableColorCodes && player.hasPermission(config.permissions.colorPermission)
-        val allowFormatting = config.chat.enableTextFormatting && player.hasPermission(config.permissions.formattingPermission)
-        
+        val allowFormatting =
+            config.chat.enableTextFormatting && player.hasPermission(config.permissions.formattingPermission)
+
         return try {
             val formattedMessage = messageFormattingService.formatMessageComponent(
                 format = enhancedFormat,
@@ -59,7 +84,7 @@ class ChatFormattingService(
                 allowColors = allowColors,
                 allowFormatting = allowFormatting
             )
-            
+
             // Apply entire message hover/click if enabled
             if (config.chatFormat.applyInteractiveToEntireMessage) {
                 applyEntireMessageInteractive(formattedMessage, player)
@@ -79,10 +104,10 @@ class ChatFormattingService(
             )
         }
     }
-    
+
     private fun getFormatForPlayer(player: Player): String {
         val config = configManager.config.chatFormat
-        
+
         // Check format priority
         for (priority in config.formatPriority) {
             when (priority) {
@@ -92,27 +117,30 @@ class ChatFormattingService(
                         if (permissionFormat != null) return permissionFormat
                     }
                 }
+
                 "world" -> {
                     if (config.enableWorldFormats) {
                         val worldFormat = config.worldFormats[player.world.name]
                         if (worldFormat != null) return worldFormat
                     }
                 }
+
                 "group" -> {
                     if (config.enableGroupFormats) {
                         val groupFormat = findGroupFormat(player, config.groupFormats)
                         if (groupFormat != null) return groupFormat
                     }
                 }
+
                 "default" -> {
                     return config.defaultFormat
                 }
             }
         }
-        
+
         return config.defaultFormat
     }
-    
+
     private fun findPermissionBasedFormat(player: Player, config: ChatFormatConfig): String? {
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
@@ -122,7 +150,7 @@ class ChatFormattingService(
                 }
             }
         }
-        
+
         // Check for specific format permissions
         val formatPrefix = configManager.config.permissions.formatPermissionPrefix
         for ((group, format) in config.groupFormats) {
@@ -130,13 +158,13 @@ class ChatFormattingService(
                 return format
             }
         }
-        
+
         return null
     }
-    
+
     private fun findGroupFormat(player: Player, groupFormats: Map<String, String>): String? {
         val config = configManager.config.chatFormat
-        
+
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
             for (rank in config.rankedFormatPriority) {
@@ -145,55 +173,67 @@ class ChatFormattingService(
                 }
             }
         }
-        
+
         // Fallback to checking group names directly
         for ((group, format) in groupFormats) {
             if (player.hasPermission("group.$group") || player.hasPermission(group)) {
                 return format
             }
         }
-        
+
         return null
     }
-    
-    
+
+
     private fun addInteractiveElements(format: String, player: Player): String {
         val config = configManager.config.chatFormat
         var result = format
-        
+
         // Add hover messages if enabled
         if (config.enableHoverMessages) {
             val playerRank = getPlayerRank(player)
             val hoverMessage = config.hoverMessages[playerRank] ?: config.hoverMessages["default"]
-            
+
             if (hoverMessage != null) {
                 // Process hover message with basic placeholder replacement
                 val processedHover = hoverMessage.replace("{player_name}", player.name)
-                
+
                 // Wrap player_name placeholder with hover
-                result = result.replace("<player_name>", 
-                    "<hover:show_text:'$processedHover'><player_name></hover>")
+                result = result.replace(
+                    "<player_name>",
+                    "<hover:show_text:'$processedHover'><player_name></hover>"
+                )
             }
         }
-        
+
         // Add click actions if enabled
         if (config.enableClickActions) {
             val playerRank = getPlayerRank(player)
             val clickAction = config.clickActions[playerRank] ?: config.clickActions["default"]
-            
+
             if (clickAction != null) {
                 // Process click action with basic placeholder replacement
                 val processedClick = clickAction.replace("{player_name}", player.name)
-                
+
                 // Parse the click action to get the proper MiniMessage format
                 val clickTag = when {
-                    processedClick.startsWith("suggest_command:") -> "click:suggest_command:'${processedClick.removePrefix("suggest_command:")}'"
+                    processedClick.startsWith("suggest_command:") -> "click:suggest_command:'${
+                        processedClick.removePrefix(
+                            "suggest_command:"
+                        )
+                    }'"
+
                     processedClick.startsWith("run_command:") -> "click:run_command:'${processedClick.removePrefix("run_command:")}'"
                     processedClick.startsWith("open_url:") -> "click:open_url:'${processedClick.removePrefix("open_url:")}'"
-                    processedClick.startsWith("copy_to_clipboard:") -> "click:copy_to_clipboard:'${processedClick.removePrefix("copy_to_clipboard:")}'"
+                    processedClick.startsWith("copy_to_clipboard:") -> "click:copy_to_clipboard:'${
+                        processedClick.removePrefix(
+                            "copy_to_clipboard:"
+                        )
+                    }'"
+
                     else -> "click:suggest_command:'$processedClick'" // Default to suggest_command
                 }
-                
+
                 // Wrap player_name placeholder with click action
                 if (result.contains("<hover:")) {
                     // If hover is already present, add click inside hover
@@ -201,99 +241,107 @@ class ChatFormattingService(
                     result = result.replace("</hover>", "</hover></click>")
                 } else {
                     // Add click action directly
-                    result = result.replace("<player_name>", 
-                        "<$clickTag><player_name></click>")
+                    result = result.replace(
+                        "<player_name>",
+                        "<$clickTag><player_name></click>"
+                    )
                 }
             }
         }
-        
+
         return result
     }
-    
+
     private fun getPlayerRank(player: Player): String {
         val config = configManager.config.chatFormat
-        
+
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
             for (rank in config.rankedFormatPriority) {
                 if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank") ||
-                    player.hasPermission("group.$rank") || 
-                    player.hasPermission(rank)) {
+                    player.hasPermission("group.$rank") ||
+                    player.hasPermission(rank)
+                ) {
                     return rank
                 }
             }
         }
-        
+
         // Check other group formats
         for ((group, _) in config.groupFormats) {
             if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$group") ||
-                player.hasPermission("group.$group") || 
-                player.hasPermission(group)) {
+                player.hasPermission("group.$group") ||
+                player.hasPermission(group)
+            ) {
                 return group
             }
         }
-        
+
         return "default"
     }
-    
-    
+
+
     fun reloadPlaceholders() {
         // Reload MessageFormattingService
         messageFormattingService.reload()
         logger.info("Placeholder cache cleared and MessageFormattingService reloaded")
     }
-    
+
     fun clearCooldown(player: Player) {
         chatCooldowns.remove(player.uniqueId)
     }
-    
+
     fun clearAllCooldowns() {
         chatCooldowns.clear()
     }
-    
+
     /**
      * Applies hover and click events to the entire message while preserving inventory placeholder interactions
      */
     private fun applyEntireMessageInteractive(message: Component, player: Player): Component {
         val config = configManager.config.chatFormat
-        
+
         // Get player rank for hover/click configuration
         val playerRank = getPlayerRank(player)
         val hoverMessage = config.hoverMessages[playerRank] ?: config.hoverMessages["default"]
         val clickAction = config.clickActions[playerRank] ?: config.clickActions["default"]
-        
+
         // If no hover or click is configured, return original message
         if (hoverMessage == null && clickAction == null) {
             return message
         }
-        
+
         // Create the interactive wrapper
         var wrappedMessage = message
-        
+
         // Add hover event if configured
         if (config.enableHoverMessages && hoverMessage != null) {
             val processedHover = hoverMessage.replace("{player_name}", player.name)
             val hoverComponent = messageFormattingService.formatMessage(processedHover, player)
             wrappedMessage = wrappedMessage.hoverEvent(HoverEvent.showText(hoverComponent))
         }
-        
+
         // Add click event if configured
         if (config.enableClickActions && clickAction != null) {
             val processedClick = clickAction.replace("{player_name}", player.name)
             val clickEvent = when {
-                processedClick.startsWith("suggest_command:") -> 
+                processedClick.startsWith("suggest_command:") ->
                     ClickEvent.suggestCommand(processedClick.removePrefix("suggest_command:"))
-                processedClick.startsWith("run_command:") -> 
+
+                processedClick.startsWith("run_command:") ->
                     ClickEvent.runCommand(processedClick.removePrefix("run_command:"))
-                processedClick.startsWith("open_url:") -> 
+
+                processedClick.startsWith("open_url:") ->
                     ClickEvent.openUrl(processedClick.removePrefix("open_url:"))
-                processedClick.startsWith("copy_to_clipboard:") -> 
+
+                processedClick.startsWith("copy_to_clipboard:") ->
                     ClickEvent.copyToClipboard(processedClick.removePrefix("copy_to_clipboard:"))
+
                 else -> ClickEvent.suggestCommand(processedClick) // Default to suggest_command
             }
             wrappedMessage = wrappedMessage.clickEvent(clickEvent)
         }
-        
+
         return wrappedMessage
     }
 }

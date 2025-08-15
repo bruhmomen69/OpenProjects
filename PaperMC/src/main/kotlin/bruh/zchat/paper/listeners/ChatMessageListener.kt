@@ -11,6 +11,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
+import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.slf4j.LoggerFactory
 
 class ChatMessageListener(
@@ -24,49 +25,69 @@ class ChatMessageListener(
     private val logger = LoggerFactory.getLogger(ChatMessageListener::class.java)
     private val plainTextSerializer = PlainTextComponentSerializer.plainText()
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    fun onAsyncChat(event: AsyncChatEvent) {
-        if (event.isCancelled) return
-        
-        // Check if chat formatting is enabled
-        if (!configManager.config.chat.enableFormatting) {
-            return // Let vanilla handle the chat
-        }
-        
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    fun onAsyncChatEarly(event: AsyncChatEvent) {
         // Check if player can send chat messages
         if (!chatToggleService.canSendChat(event.player)) {
             event.isCancelled = true
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.disabled_self", event.player))
             return
         }
+    }
 
-        event.isCancelled = true
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onAsyncChatLate(event: AsyncChatEvent) {
+        // Check if chat formatting is enabled
+        if (!configManager.config.chat.enableFormatting) {
+            return // Let vanilla handle the chat
+        }
 
         try {
             val player = event.player
-            val message = plainTextSerializer.serialize(event.message())
-            
+
+            // Apply cooldowns
+            if (!configManager.config.chat.cacheFormats) {
+                chatFormattingService.applyCooldown(player)
+            }
+
             // Log the chat message if enabled
             if (configManager.config.chat.enableLogging) {
+                val message = plainTextSerializer.serialize(event.message())
                 logger.info("[CHAT] ${player.name}: $message")
             }
-            
-            // Process inventory placeholders in the raw message first
-            val messageComponent = chatInventoryPlaceholderService.processRawMessage(player, message)
-            
-            // Then apply normal chat formatting with the processed component
-            val formattedMessage = chatFormattingService.formatMessageWithComponent(player, messageComponent)
-            
-            event.message(formattedMessage)
-            for (viewer in event.viewers()) {
-                viewer.sendMessage(formattedMessage)
+
+            if (configManager.config.chat.cacheFormats) {
+                val plainMessage = plainTextSerializer.serialize(event.message())
+                // Process inventory placeholders in the raw message first
+                val messageComponent = chatInventoryPlaceholderService.processRawMessage(player, plainMessage)
+
+                // Then apply normal chat formatting with the processed component
+                val formattedMessage = chatFormattingService.formatMessageWithComponent(player, messageComponent)
+
+                // Apply a renderer that just returns the pre-formatted message
+                event.renderer { source, sourceDisplayName, message, viewer ->
+                    formattedMessage
+                }
+            } else {
+                event.renderer { source, sourceDisplayName, message, viewer ->
+                    val plainMessage = plainTextSerializer.serialize(event.message())
+                    // Process inventory placeholders in the raw message first
+                    val messageComponent = chatInventoryPlaceholderService.processRawMessage(source, plainMessage)
+
+                    // Then apply normal chat formatting with the processed component
+                    val formattedMessage =
+                        chatFormattingService.formatMessageWithComponent(source, messageComponent, false)
+                    formattedMessage
+                }
             }
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.cooldown", event.player, 
                 mapOf("time" to e.message!!.substringAfter("wait ").substringBefore(" seconds"))))
+            event.isCancelled = true
         } catch (e: Exception) {
             logger.error("Error formatting chat message for player ${event.player.name}", e)
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.formatting_error", event.player))
+            event.isCancelled = true
         }
     }
 }

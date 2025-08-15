@@ -202,8 +202,9 @@ data class ChatConfig(
     @field:Comment("Enable extra chat message logging to console for moderation purposes.")
     val enableLogging: Boolean = false,
     
-    @field:Comment("Enable chat filter system (placeholder for future implementation).")
-    val enableFilter: Boolean = false
+    @field:Comment("Cache chat formats for major performance improvements. Breaks compatibility with certain plugins.\n" +
+            "If you have compatibility issues, please disable this option.")
+    val cacheFormats: Boolean = true
 )
 
 @ConfigSerializable
@@ -212,7 +213,7 @@ data class JoinLeaveConfig(
     val enableJoin: Boolean = true,
     
     @field:Comment("Custom join message format. Supports placeholders: <player_name>, <player_displayname>, <online_players>, <online_players_after_join>, <max_players>, <original_message>, etc. Set to empty string to disable join messages entirely.")
-    val joinMessage: String = "<gradient:green:lime>+ <gradient:yellow:gold><player_name></gradient> joined the server</gradient>",
+    val joinMessage: String = "<gradient:dark_green:green>+ <gradient:yellow:gold><player_name></gradient> joined the server</gradient>",
     
     @field:Comment("Enable hover messages for join announcements")
     val enableJoinHover: Boolean = true,

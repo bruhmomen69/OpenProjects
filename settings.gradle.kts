@@ -22,6 +22,6 @@ plugins {
 include(":app")
 include(":utils")
 include(":PaperMC")
-include(":Sponge")
+// include(":Sponge")
 
 rootProject.name = "MiniMessageChatPlugin"

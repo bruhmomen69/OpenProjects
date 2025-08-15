@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "lol.mcplugs.minimessagechatplugin"
-version = "1.0-SNAPSHOT"
+version = "1.1.1"
 
 repositories {
     mavenCentral()
@@ -69,6 +69,9 @@ tasks.processResources {
     inputs.properties(props)
     filteringCharset = "UTF-8"
     filesMatching("plugin.yml") {
+        expand(props)
+    }
+    filesMatching("paper-plugin.yml") {
         expand(props)
     }
 }
