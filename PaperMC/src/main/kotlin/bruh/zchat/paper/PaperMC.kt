@@ -17,6 +17,8 @@ import bruh.zchat.paper.services.PrivateMessageService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.services.ChatInventoryPlaceholderService
 import bruh.zchat.paper.services.BlockService
+import bruh.zchat.paper.swearfilter.InfractionManager
+import bruh.zchat.paper.swearfilter.SwearFilterService
 import org.bukkit.plugin.java.JavaPlugin
 
 class PaperMC : JavaPlugin() {
@@ -29,6 +31,8 @@ class PaperMC : JavaPlugin() {
     private lateinit var blockService: BlockService
     private lateinit var privateMessageService: PrivateMessageService
     private lateinit var chatFormattingService: ChatFormattingService
+    private lateinit var infractionManager: InfractionManager
+    private lateinit var swearFilterService: SwearFilterService
     private lateinit var lamp: Lamp<*>
 
     override fun onEnable() {
@@ -50,6 +54,8 @@ class PaperMC : JavaPlugin() {
         blockService = BlockService(configManager, messageFormattingService, socialSpyService, dataFolder.toPath())
         privateMessageService = PrivateMessageService(configManager, messageFormattingService, chatToggleService, socialSpyService, blockService)
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
+        infractionManager = InfractionManager(this)
+        swearFilterService = SwearFilterService(this, configManager, infractionManager)
         
         // Load persisted data
         blockService.loadBlocks()
@@ -77,7 +83,7 @@ class PaperMC : JavaPlugin() {
         lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService, blockService))
 
         // Register event listeners
-        server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService, chatInventoryPlaceholderService), this)
+        server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService, chatInventoryPlaceholderService, swearFilterService), this)
         server.pluginManager.registerEvents(PlayerJoinQuitListener(configManager, chatFormattingService, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerAdvancementListener(configManager, messageFormattingService), this)
@@ -98,6 +104,7 @@ class PaperMC : JavaPlugin() {
         logger.info("  - URLs: ${configManager.config.chat.enableUrls}")
         logger.info("  - Private messages: ${configManager.config.privateMessages.enablePrivateMessages}")
         logger.info("  - Social spy: ${configManager.config.socialSpy.enableSocialSpy}")
+        logger.info("  - Swear filter: ${configManager.config.swearFilter.enabled}")
         logger.info("  - PlaceholderAPI: ${placeholderAPIService.isEnabled()}")
     }
 

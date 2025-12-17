@@ -42,7 +42,10 @@ data class Config(
     val blocks: BlockConfig = BlockConfig(),
     
     @field:Comment("All configurable messages used throughout the plugin. Supports MiniMessage formatting and placeholders.")
-    val messages: MessagesConfig = MessagesConfig()
+    val messages: MessagesConfig = MessagesConfig(),
+    
+    @field:Comment("Configurable swear filter with different filter groups, types (regex, levenshtein), and tiered punishments.")
+    val swearFilter: SwearFilterConfig = SwearFilterConfig()
 )
 
 @ConfigSerializable
@@ -700,4 +703,53 @@ data class SystemMessagesConfig(
     
     @field:Comment("Message shown for invalid usage")
     val invalidUsage: String = "<red>Usage: <usage></red>"
+)
+
+@ConfigSerializable
+data class SwearFilterConfig(
+    @field:Comment("Enable the swear filter system.")
+    val enabled: Boolean = true,
+
+    @field:Comment("A list of filter groups. Each group can have its own type, filters, and punishments.")
+    val filterGroups: List<FilterGroup> = listOf(
+        FilterGroup(
+            name = "Default Regex",
+            type = "regex",
+            distance = 3,
+            filters = listOf("(?i)badword", "(?i)anotherbadword"),
+            punishments = mapOf(
+                1 to listOf("warn {player} You are not allowed to use that word."),
+                3 to listOf("kick {player} You have been warned about your language."),
+                5 to listOf("ban {player} Banned for repeated language violations.")
+            )
+        ),
+        FilterGroup(
+            name = "Default Levenshtein",
+            type = "levenshtein",
+            distance = 2,
+            filters = listOf("swear", "curse"),
+            punishments = mapOf(
+                1 to listOf("warn {player} Please watch your language."),
+                3 to listOf("mute {player} 10m You have been muted for 10 minutes.")
+            )
+        )
+    )
+)
+
+@ConfigSerializable
+data class FilterGroup(
+    @field:Comment("The name of the filter group.")
+    val name: String = "default",
+
+    @field:Comment("The type of filter. Can be 'regex' or 'levenshtein'.")
+    val type: String = "regex",
+
+    @field:Comment("For Levenshtein type, this is the maximum distance to consider a word a match.")
+    val distance: Int = 2,
+
+    @field:Comment("The list of words or regex patterns to filter.")
+    val filters: List<String> = emptyList(),
+
+    @field:Comment("A map of infraction counts to a list of punishment commands. Use {player} for the player's name.")
+    val punishments: Map<Int, List<String>> = emptyMap()
 )

@@ -2,6 +2,7 @@ plugins {
     id("buildsrc.convention.kotlin-jvm")
     id("com.gradleup.shadow") version "8.3.0"
     id("xyz.jpenilla.run-paper") version "2.3.1"
+    alias(libs.plugins.kotlinPluginSerialization)
 }
 
 group = "lol.mcplugs.minimessagechatplugin"
@@ -44,6 +45,7 @@ dependencies {
     compileOnly("me.clip:placeholderapi:2.11.6")
 
     implementation(project(":utils"))
+    implementation(libs.kotlinxSerialization)
 }
 
 tasks {

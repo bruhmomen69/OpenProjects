@@ -7,6 +7,7 @@ import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.ChatToggleService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.services.ChatInventoryPlaceholderService
+import bruh.zchat.paper.swearfilter.SwearFilterService
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -19,7 +20,8 @@ class ChatMessageListener(
     private val chatFormattingService: ChatFormattingService,
     private val chatToggleService: ChatToggleService,
     private val messageFormattingService: MessageFormattingService,
-    private val chatInventoryPlaceholderService: ChatInventoryPlaceholderService
+    private val chatInventoryPlaceholderService: ChatInventoryPlaceholderService,
+    private val swearFilterService: SwearFilterService
 ) : Listener {
     
     private val logger = LoggerFactory.getLogger(ChatMessageListener::class.java)
@@ -31,6 +33,12 @@ class ChatMessageListener(
         if (!chatToggleService.canSendChat(event.player)) {
             event.isCancelled = true
             event.player.sendMessage(messageFormattingService.getConfigMessage("chat.disabled_self", event.player))
+            return
+        }
+
+        val plainMessage = plainTextSerializer.serialize(event.message())
+        if (swearFilterService.checkMessage(event.player, plainMessage)) {
+            event.isCancelled = true
             return
         }
     }
