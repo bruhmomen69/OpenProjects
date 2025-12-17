@@ -15,8 +15,7 @@ class ChatToggleService(
     private val messageFormattingService: MessageFormattingService
 ) {
     private val logger = LoggerFactory.getLogger(ChatToggleService::class.java)
-    private val miniMessage = MiniMessage.miniMessage()
-    
+
     // Track players who have chat disabled
     private val chatDisabledPlayers = ConcurrentHashMap.newKeySet<UUID>()
     
