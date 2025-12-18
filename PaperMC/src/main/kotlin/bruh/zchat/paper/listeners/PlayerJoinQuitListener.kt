@@ -32,7 +32,7 @@ class PlayerJoinQuitListener(
     private val miniMessage = MiniMessage.miniMessage()
     private val plainTextSerializer = PlainTextComponentSerializer.plainText()
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.NORMAL)
     fun onPlayerJoin(event: PlayerJoinEvent) {
         processJoinMessage(event)
 
@@ -109,7 +109,7 @@ class PlayerJoinQuitListener(
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.NORMAL)
     fun onPlayerQuit(event: PlayerQuitEvent) {
         // Ensure quit message is set before the event finishes
         chatFormattingService.clearCooldown(event.player)
