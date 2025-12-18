@@ -34,6 +34,11 @@ class DatabaseMaintenanceService(
             totalDeleted += blocksDeleted
             logger.info("Deleted $blocksDeleted old block records")
             
+            // Clean old messages from bus
+            val messagesDeleted = cleanupOldMessages(cutoffDate)
+            totalDeleted += messagesDeleted
+            logger.info("Deleted $messagesDeleted old message bus records")
+            
             // Optimize database
             optimizeDatabase()
             
@@ -96,6 +101,20 @@ class DatabaseMaintenanceService(
             "DELETE FROM player_blocks WHERE blocked_at < ?",
             cutoffDate
         )
+    }
+    
+    private suspend fun cleanupOldMessages(cutoffDate: Instant): Int {
+        try {
+            // Check if table exists first (it won't on SQLite if we didn't run that migration, or if config disabled)
+            // But we can just run delete and catch exception if table missing
+            return databaseService.executeUpdate(
+                "DELETE FROM message_bus WHERE created_at < ?",
+                cutoffDate
+            )
+        } catch (e: Exception) {
+            // Table might not exist or other error
+            return 0
+        }
     }
     
     private suspend fun optimizeDatabase() {

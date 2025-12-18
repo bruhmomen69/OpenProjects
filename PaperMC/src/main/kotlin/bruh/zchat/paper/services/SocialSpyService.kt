@@ -99,6 +99,52 @@ class SocialSpyService(
         }
     }
     
+    /**
+     * Broadcast a remote private message to all social spy users
+     */
+    fun broadcastRemotePrivateMessage(senderName: String, recipient: Player, message: String) {
+        val config = configManager.config.socialSpy
+        
+        if (!config.enableSocialSpy || socialSpyEnabled.isEmpty()) {
+            return
+        }
+        
+        // Don't spy on staff messages if configured (check recipient only since sender is remote/string)
+        if (config.ignoreModerators && recipient.hasPermission("zchat.socialspy")) {
+            return
+        }
+        
+        val spyMessage = messageFormattingService.formatMessage(
+            format = config.socialSpyFormat,
+            player = recipient, // Use recipient for placeholder parsing context
+            additionalPlaceholders = mapOf(
+                "sender" to senderName,
+                "recipient" to recipient.name,
+                "message" to message
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = true,
+            allowFormatting = true
+        )
+        
+        // Send to all social spy users
+        for (spyPlayerUUID in socialSpyEnabled) {
+            val spyPlayer = Bukkit.getPlayer(spyPlayerUUID)
+            if (spyPlayer != null && spyPlayer.isOnline) {
+                // Don't send spy message to the recipient
+                if (spyPlayer.uniqueId != recipient.uniqueId) {
+                    spyPlayer.sendMessage(spyMessage)
+                }
+            }
+        }
+        
+        // Log to console if enabled
+        if (config.logToConsole) {
+            logger.info("[SOCIALSPY] $senderName -> ${recipient.name}: $message")
+        }
+    }
+    
     
     /**
      * Check if a player has social spy enabled

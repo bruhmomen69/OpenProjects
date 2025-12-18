@@ -8,6 +8,7 @@ import bruh.zchat.paper.services.*
 import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.swearfilter.InfractionManager
 import bruh.zchat.paper.swearfilter.SwearFilterService
+import bruh.zchat.paper.utils.ModrinthUpdateChecker
 import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
 import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
@@ -31,10 +32,14 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var privateMessageService: PrivateMessageService
     private lateinit var chatFormattingService: ChatFormattingService
     private lateinit var alertService: AlertService
+    private lateinit var crossServerMessageBusService: CrossServerMessageBusService
     private lateinit var infractionManager: InfractionManager
     private lateinit var swearFilterService: SwearFilterService
     private lateinit var blockMigrationService: BlockMigrationService
     private lateinit var lamp: Lamp<*>
+    
+    // Server instance ID for cross-server messaging
+    val serverInstanceId = java.util.UUID.randomUUID().toString()
 
     override suspend fun onEnableAsync() {
         // Initialize configuration
@@ -45,6 +50,20 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Update the configuration
         configManager.saveConfig()
+
+        ModrinthUpdateChecker(
+            projectId = "zealouschat",
+            loader = "paper",
+            minecraftVersion = server.minecraftVersion
+        ).checkVersion { latestVersion ->
+            val currentVersion = description.version
+            if (ModrinthUpdateChecker.isNewerVersion(latestVersion, currentVersion)) {
+                logger.warning(
+                    "A newer version of ZealousChat is available on Modrinth (current=$currentVersion, latest=$latestVersion): " +
+                        "https://modrinth.com/project/zealouschat"
+                )
+            }
+        }
 
         // Initialize database
         val dbConfig = createDatabaseConfig()
@@ -75,8 +94,21 @@ class PaperMC : SuspendingJavaPlugin() {
             messageFormattingService,
             chatToggleService,
             socialSpyService,
-            blockService
+            blockService,
+            playerDataManager
         )
+        crossServerMessageBusService = CrossServerMessageBusService(
+            this,
+            configManager,
+            databaseService,
+            privateMessageService,
+            socialSpyService,
+            messageFormattingService,
+            serverInstanceId
+        )
+        // Wire up circular dependency
+        privateMessageService.crossServerMessageBusService = crossServerMessageBusService
+        
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
         infractionManager = InfractionManager(databaseService, playerDataManager)
         swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService)
@@ -84,10 +116,24 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Initialize maintenance services
         databaseMaintenanceService = DatabaseMaintenanceService(databaseService, dbConfig)
-        scheduledTaskService = ScheduledTaskService(this, databaseMaintenanceService, playerDataManager)
+        scheduledTaskService = ScheduledTaskService(this, configManager, databaseMaintenanceService, playerDataManager, crossServerMessageBusService)
         
         // Schedule maintenance tasks
         scheduledTaskService.scheduleMaintenanceTasks()
+        
+        // Schedule cross-server tasks
+        if (configManager.config.crossServerMessaging.enabled) {
+            if (databaseService.databaseType == DatabaseType.MYSQL) {
+                scheduledTaskService.scheduleCrossServerTasks(serverInstanceId)
+                logger.info("Cross-server messaging enabled with Server ID: $serverInstanceId")
+            } else {
+                logger.info("Cross-server messaging requires MySQL. Disabling crossServerMessaging.enabled in config.")
+                val newConfig = configManager.config.copy(
+                    crossServerMessaging = configManager.config.crossServerMessaging.copy(enabled = false)
+                )
+                configManager.updateConfig(newConfig)
+            }
+        }
 
         // Migrate existing data if enabled (run on async dispatcher)
         if (configManager.config.database.autoMigrate) {

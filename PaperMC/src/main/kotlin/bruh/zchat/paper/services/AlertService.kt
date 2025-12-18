@@ -136,18 +136,18 @@ class AlertService(
         
         // Create additional placeholders specific to alerts
         val alertPlaceholders = mapOf(
-            "group_name" to group.name,
-            "group_type" to group.type,
-            "infraction_count" to infractionCount.toString(),
-            "original_message" to originalMessage,
-            "filtered_message" to originalMessage // Can be enhanced later
+            "group_name" to Component.text(group.name),
+            "group_type" to Component.text(group.type),
+            "infraction_count" to Component.text(infractionCount.toString()),
+            "original_message" to Component.text(originalMessage),
+            "filtered_message" to Component.text(originalMessage) // Can be enhanced later
         )
         
         // Use existing MessageFormattingService infrastructure
         val alertComponent = messageFormattingService.formatMessageComponent(
             format = config.alertMessage,
             player = player,
-            stringPlaceholders = alertPlaceholders,
+            additionalPlaceholders = alertPlaceholders,
             processUrls = false, // Don't process URLs in alerts
             processMentions = false, // Don't process mentions in alerts
             allowColors = true,
@@ -225,16 +225,16 @@ class AlertService(
     ) {
         if (config.logToConsole) {
             val consolePlaceholders = mapOf(
-                "player_name" to player.name,
-                "group_name" to group.name,
-                "original_message" to message,
-                "time" to LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+                "player_name" to Component.text(player.name),
+                "group_name" to Component.text(group.name),
+                "original_message" to Component.text(message),
+                "time" to Component.text(LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")))
             )
             
             val consoleMessage = messageFormattingService.formatMessageComponent(
                 format = config.consoleAlertMessage,
                 player = player,
-                stringPlaceholders = consolePlaceholders,
+                additionalPlaceholders = consolePlaceholders,
                 processUrls = false,
                 processMentions = false,
                 allowColors = false, // Console doesn't need colors

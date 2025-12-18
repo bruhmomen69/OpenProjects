@@ -347,6 +347,7 @@ class MessageFormattingService(
             "private_messages.target_messages_disabled" -> messages.privateMessages.targetMessagesDisabled
             "private_messages.no_reply_target" -> messages.privateMessages.noReplyTarget
             "private_messages.reply_target_offline" -> messages.privateMessages.replyTargetOffline
+            "private_messages.delivery_failed" -> messages.privateMessages.deliveryFailed
             
             // Chat messages
             "chat.disabled_self" -> messages.chat.disabledSelf

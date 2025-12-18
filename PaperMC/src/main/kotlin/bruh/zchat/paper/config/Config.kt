@@ -48,6 +48,9 @@ data class Config(
     @field:Comment("Configurable swear filter with different filter groups, types (regex, levenshtein), and tiered punishments.")
     val swearFilter: SwearFilterConfig = SwearFilterConfig(),
     
+    @field:Comment("Cross-server messaging configuration (requires MySQL)")
+    val crossServerMessaging: CrossServerMessagingConfig = CrossServerMessagingConfig(),
+    
     @field:Comment("Database configuration for player data storage")
     val database: DatabaseConfig = DatabaseConfig()
 )
@@ -589,7 +592,10 @@ data class PrivateMessageMessagesConfig(
     val noReplyTarget: String = "<red>No one has sent you a message to reply to!</red>",
     
     @field:Comment("Message shown when reply target is no longer online")
-    val replyTargetOffline: String = "<red>The player you're trying to reply to is no longer online!</red>"
+    val replyTargetOffline: String = "<red>The player you're trying to reply to is no longer online!</red>",
+    
+    @field:Comment("Message shown when a cross-server private message could not be delivered because the recipient went offline")
+    val deliveryFailed: String = "<red>Could not deliver your message to <player> because they went offline.</red>"
 )
 
 @ConfigSerializable
@@ -865,4 +871,28 @@ data class DatabaseConfig(
     
     @field:Comment("Enable performance monitoring and logging")
     val enablePerformanceMonitoring: Boolean = false
+)
+
+@ConfigSerializable
+data class CrossServerMessagingConfig(
+    @field:Comment("Enable cross-server private messaging (requires MySQL database).")
+    val enabled: Boolean = true,
+    
+    @field:Comment("Interval in milliseconds to poll for new messages.")
+    val pollIntervalMillis: Long = 250,
+    
+    @field:Comment("Interval in seconds to update player presence heartbeat.")
+    val heartbeatIntervalSeconds: Int = 10,
+    
+    @field:Comment("Time in seconds after which a player's presence is considered stale/offline.")
+    val heartbeatTimeoutSeconds: Int = 25,
+    
+    @field:Comment("Time in seconds after which a claimed message is considered stuck and can be reclaimed.")
+    val claimTimeoutSeconds: Int = 60,
+    
+    @field:Comment("Number of messages to claim in a single poll batch.")
+    val pollBatchSize: Int = 50,
+    
+    @field:Comment("Data retention for message bus history in days.")
+    val messageRetentionDays: Int = 7
 )

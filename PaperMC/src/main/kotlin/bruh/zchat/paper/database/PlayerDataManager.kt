@@ -22,10 +22,11 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         val infractions: Map<String, Int>,
         val blockedPlayers: Set<UUID>,
         val joinTimestamp: Instant = Instant.now(), // Added for server switching detection
+        val onlineServerId: String? = null,
         var isDirty: Boolean = false
     )
     
-    suspend fun onPlayerJoin(player: Player): PlayerData = withContext(Dispatchers.IO) {
+    suspend fun onPlayerJoin(player: Player, serverInstanceId: String): PlayerData = withContext(Dispatchers.IO) {
         val now = Instant.now()
         
         try {
@@ -42,30 +43,31 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                     isOnline = true,
                     infractions = emptyMap(),
                     blockedPlayers = emptySet(),
-                    joinTimestamp = now // Initialize with current join time for existing players
+                    joinTimestamp = now, // Initialize with current join time for existing players
+                    onlineServerId = serverInstanceId
                 )
             }
 
             if (existingPlayer == null) {
                 val insertSql = when (databaseService.databaseType) {
                     DatabaseType.MYSQL -> """INSERT IGNORE INTO players
-                    (uuid, username, first_seen, last_seen, is_online)
-                    VALUES (?, ?, ?, ?, ?)"""
+                    (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)"""
                     DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
-                    (uuid, username, first_seen, last_seen, is_online)
-                    VALUES (?, ?, ?, ?, ?)"""
+                    (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)"""
                 }
 
                 databaseService.executeUpdate(
                     insertSql,
-                    player.uniqueId, player.name, now, now, true
+                    player.uniqueId, player.name, now, now, true, serverInstanceId, now
                 )
             }
             
-            // Update existing player - ensure is_online is set to TRUE
+            // Update existing player - ensure is_online is set to TRUE and update server ID
             databaseService.executeUpdate(
-                "UPDATE players SET username = ?, last_seen = ?, is_online = TRUE WHERE uuid = ?",
-                player.name, now, player.uniqueId
+                "UPDATE players SET username = ?, last_seen = ?, is_online = TRUE, online_server_id = ?, online_last_heartbeat = ? WHERE uuid = ?",
+                player.name, now, serverInstanceId, now, player.uniqueId
             )
             
             // Load infractions
@@ -92,14 +94,16 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                 isOnline = true,
                 infractions = emptyMap(),
                 blockedPlayers = emptySet(),
-                joinTimestamp = now
+                joinTimestamp = now,
+                onlineServerId = serverInstanceId
             )).copy(
                 username = player.name,
                 lastSeen = now,
                 isOnline = true,
                 infractions = infractions,
                 blockedPlayers = blockedPlayers,
-                joinTimestamp = now
+                joinTimestamp = now,
+                onlineServerId = serverInstanceId
             )
             
             onlinePlayers[player.uniqueId] = playerData
@@ -111,16 +115,16 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             // Create new player if doesn't exist
             val insertSql = when (databaseService.databaseType) {
                 DatabaseType.MYSQL -> """INSERT IGNORE INTO players
-                (uuid, username, first_seen, last_seen, is_online)
-                VALUES (?, ?, ?, ?, ?)"""
+                (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
+                VALUES (?, ?, ?, ?, ?, ?, ?)"""
                 DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
-                (uuid, username, first_seen, last_seen, is_online)
-                VALUES (?, ?, ?, ?, ?)"""
+                (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
+                VALUES (?, ?, ?, ?, ?, ?, ?)"""
             }
 
             databaseService.executeUpdate(
                 insertSql,
-                player.uniqueId, player.name, now, now, true
+                player.uniqueId, player.name, now, now, true, serverInstanceId, now
             )
             
             val playerData = PlayerData(
@@ -131,13 +135,29 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                 isOnline = true,
                 infractions = emptyMap(),
                 blockedPlayers = emptySet(),
-                joinTimestamp = now
+                joinTimestamp = now,
+                onlineServerId = serverInstanceId
             )
             
             onlinePlayers[player.uniqueId] = playerData
             
             logger.debug("Created new player data for ${player.name}")
             playerData
+        }
+    }
+
+    suspend fun getUsernameByUuid(uuid: UUID): String? = withContext(Dispatchers.IO) {
+        val cached = onlinePlayers[uuid]
+        if (cached != null) return@withContext cached.username
+
+        try {
+            return@withContext databaseService.executeQuerySingle(
+                "SELECT username FROM players WHERE uuid = ?",
+                uuid
+            ) { rs -> rs.getString("username") }
+        } catch (e: Exception) {
+            logger.error("Failed to resolve username for uuid $uuid", e)
+            null
         }
     }
     
@@ -178,8 +198,9 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                     logger.debug("Skipping is_online update for ${player.name} - likely server switch detected (timeSinceJoin: ${timeSinceJoin}s, timeSinceLastSeen: ${timeSinceLastSeen}s)")
                 } else {
                     // Normal quit - update database to set is_online = FALSE and update last_seen
+                    // Also clear presence data
                     databaseService.executeUpdate(
-                        "UPDATE players SET last_seen = ?, is_online = FALSE WHERE uuid = ?",
+                        "UPDATE players SET last_seen = ?, is_online = FALSE, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
                         now, player.uniqueId
                     )
                 }
@@ -191,7 +212,7 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             } else {
                 // Player data not in cache, still update database to ensure is_online = FALSE
                 databaseService.executeUpdate(
-                    "UPDATE players SET last_seen = ?, is_online = FALSE WHERE uuid = ?",
+                    "UPDATE players SET last_seen = ?, is_online = FALSE, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
                     now, player.uniqueId
                 )
                 logger.debug("Updated database for ${player.name} (data not in cache)")
@@ -202,7 +223,73 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         }
     }
     
-    fun getPlayerData(uuid: UUID): PlayerData? {
+    suspend fun updateHeartbeat(serverInstanceId: String) = withContext(Dispatchers.IO) {
+        val onlineUuids = onlinePlayers.keys.toList()
+        if (onlineUuids.isEmpty()) return@withContext
+        
+        try {
+            // Batch update for all online players
+            // Using a single query is more efficient than iterating
+            val placeholders = onlineUuids.joinToString(",") { "?" }
+            val sql = "UPDATE players SET online_last_heartbeat = CURRENT_TIMESTAMP WHERE online_server_id = ? AND uuid IN ($placeholders)"
+            
+            val params = mutableListOf<Any>(serverInstanceId)
+            params.addAll(onlineUuids)
+            
+            databaseService.executeUpdate(sql, *params.toTypedArray())
+        } catch (e: Exception) {
+            logger.error("Failed to update heartbeats", e)
+        }
+    }
+    
+    // NEW: Get cross-server presence
+    suspend fun getCrossServerPresence(uuid: UUID, heartbeatTimeoutSeconds: Int): String? = withContext(Dispatchers.IO) {
+        // Check local cache first
+        val cached = onlinePlayers[uuid]
+        if (cached != null) return@withContext cached.onlineServerId
+        
+        val cutoff = Instant.now().minusSeconds(heartbeatTimeoutSeconds.toLong())
+        
+        // Query database
+        try {
+            return@withContext databaseService.executeQuerySingle(
+                "SELECT online_server_id, online_last_heartbeat, is_online FROM players WHERE uuid = ?",
+                uuid
+            ) { rs ->
+                val isOnline = rs.getBoolean("is_online")
+                val serverId = rs.getString("online_server_id")
+                val lastHeartbeat = rs.getTimestamp("online_last_heartbeat")?.toInstant()
+                
+                if (isOnline && serverId != null && lastHeartbeat != null && lastHeartbeat.isAfter(cutoff)) {
+                    serverId
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to get cross-server presence for $uuid", e)
+            null
+        }
+    }
+    
+    suspend fun getUuidByUsername(username: String): UUID? = withContext(Dispatchers.IO) {
+        // Check online players first (fast path)
+        val online = onlinePlayers.values.find { it.username.equals(username, ignoreCase = true) }
+        if (online != null) return@withContext online.uuid
+        
+        // Query database
+        try {
+            return@withContext databaseService.executeQuerySingle(
+                "SELECT uuid FROM players WHERE username = ?",
+                username
+            ) { rs -> UUID.fromString(rs.getString("uuid")) }
+        } catch (e: Exception) {
+            logger.error("Failed to resolve UUID for username $username", e)
+            null
+        }
+    }
+    
+    suspend fun getPlayerData(uuid: UUID): PlayerData? {
         return onlinePlayers[uuid]
     }
     

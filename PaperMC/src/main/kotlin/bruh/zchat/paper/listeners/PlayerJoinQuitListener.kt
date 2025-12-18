@@ -43,7 +43,7 @@ class PlayerJoinQuitListener(
         // Load player data asynchronously
         plugin.launch(Dispatchers.Unconfined) {
             try {
-                val playerData = playerDataManager.onPlayerJoin(event.player)
+                val playerData = playerDataManager.onPlayerJoin(event.player, plugin.serverInstanceId)
             } catch (e: Exception) {
                 logger.error("Failed to load player data for ${event.player.name}", e)
             }

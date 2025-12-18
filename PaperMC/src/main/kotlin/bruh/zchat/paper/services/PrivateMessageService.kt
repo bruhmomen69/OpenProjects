@@ -1,11 +1,11 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
-import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
-import java.util.*
+import bruh.zchat.paper.database.PlayerDataManager
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -16,16 +16,26 @@ class PrivateMessageService(
     private val messageFormattingService: MessageFormattingService,
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
-    private val blockService: BlockService? = null
+    private val blockService: BlockService? = null,
+    private val playerDataManager: PlayerDataManager
 ) {
     private val logger = LoggerFactory.getLogger(PrivateMessageService::class.java)
-    private val miniMessage = MiniMessage.miniMessage()
+    
+    // Late-init to avoid circular dependency
+    var crossServerMessageBusService: CrossServerMessageBusService? = null
     
     // Track last message senders for reply functionality
     private val lastSenders = ConcurrentHashMap<UUID, UUID>()
     
     // Track message cooldowns
     private val messageCooldowns = ConcurrentHashMap<UUID, Long>()
+    
+    /**
+     * Set the last sender for a player (used by cross-server messaging)
+     */
+    fun setLastSender(recipientUuid: UUID, senderUuid: UUID) {
+        lastSenders[recipientUuid] = senderUuid
+    }
     
     /**
      * Send a private message from one player to another
@@ -58,17 +68,87 @@ class PrivateMessageService(
             messageCooldowns[sender.uniqueId] = currentTime
         }
         
-        // Find recipient
-        val recipient = Bukkit.getPlayer(recipientName)
-        if (recipient == null) {
-            sender.sendMessage(messageFormattingService.getConfigMessage(
-                "private_messages.player_not_found", 
-                sender, 
-                mapOf("player" to recipientName)
-            ))
-            return false
+        // Try local recipient first
+        val localRecipient = Bukkit.getPlayer(recipientName)
+        
+        if (localRecipient != null) {
+            return sendLocalPrivateMessage(sender, localRecipient, message, config)
         }
         
+        // Try cross-server recipient
+        if (configManager.config.crossServerMessaging.enabled && crossServerMessageBusService != null) {
+            // Look up UUID from name using our DB (async and safe)
+            val targetUuid = playerDataManager.getUuidByUsername(recipientName)
+            
+            if (targetUuid != null) {
+                // Check presence
+                val targetServerId = playerDataManager.getCrossServerPresence(
+                    targetUuid,
+                    configManager.config.crossServerMessaging.heartbeatTimeoutSeconds
+                )
+                
+                if (targetServerId != null) {
+                    // Check blocks (basic DB check)
+                    if (blockService?.isBlocked(targetUuid, sender.uniqueId) == true) {
+                        sender.sendMessage(messageFormattingService.getConfigMessage(
+                            "blocks.target_blocked_you",
+                            sender,
+                            mapOf("player" to recipientName)
+                        ))
+                        return false
+                    }
+
+                    // Process message content
+                    val processedMessage = messageFormattingService.processMessageContent(sender, message)
+                    
+                    // Send cross-server
+                    val success = crossServerMessageBusService!!.sendCrossServerMessage(
+                        senderUuid = sender.uniqueId,
+                        senderName = sender.name,
+                        recipientUuid = targetUuid,
+                        recipientName = recipientName,
+                        targetServerId = targetServerId,
+                        processedMessage = processedMessage,
+                        originalMessage = message
+                    )
+                    
+                    if (success) {
+                        // Show sender formatted message
+                        val senderMessage = messageFormattingService.formatMessage(
+                            format = config.senderFormat,
+                            player = sender,
+                            additionalPlaceholders = mapOf(
+                                "sender" to sender.name,
+                                "recipient" to recipientName,
+                                "message" to processedMessage
+                            ),
+                            processUrls = false,
+                            processMentions = false,
+                            allowColors = config.allowFormattingInMessages && sender.hasPermission(configManager.config.permissions.colorPermission),
+                            allowFormatting = config.allowFormattingInMessages && sender.hasPermission(configManager.config.permissions.formattingPermission)
+                        )
+                        sender.sendMessage(senderMessage)
+                        
+                        // Log
+                        if (config.enableMessageLogging) {
+                            logger.info("[MSG-CROSS] ${sender.name} -> $recipientName: $message")
+                        }
+                        return true
+                    }
+                }
+            }
+        }
+        
+        // Player not found / not online
+        sender.sendMessage(messageFormattingService.getConfigMessage(
+            "private_messages.player_not_found",
+            sender,
+            mapOf("player" to recipientName)
+        ))
+        return false
+    }
+
+    private suspend fun sendLocalPrivateMessage(sender: Player, recipient: Player, message: String, config: bruh.zchat.paper.config.PrivateMessageConfig): Boolean {
         // Check if recipient is the same as sender
         if (recipient.uniqueId == sender.uniqueId) {
             sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.self_message", sender))
@@ -156,13 +236,27 @@ class PrivateMessageService(
         }
         
         val lastSender = Bukkit.getPlayer(lastSenderUUID)
-        if (lastSender == null) {
-            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.reply_target_offline", sender))
-            lastSenders.remove(sender.uniqueId)
-            return false
+        if (lastSender != null && lastSender.isOnline) {
+            return sendPrivateMessage(sender, lastSender.name, message)
         }
-        
-        return sendPrivateMessage(sender, lastSender.name, message)
+
+        if (configManager.config.crossServerMessaging.enabled && crossServerMessageBusService != null) {
+            val serverId = playerDataManager.getCrossServerPresence(
+                lastSenderUUID,
+                configManager.config.crossServerMessaging.heartbeatTimeoutSeconds
+            )
+
+            if (serverId != null) {
+                val username = playerDataManager.getUsernameByUuid(lastSenderUUID)
+                if (username != null) {
+                    return sendPrivateMessage(sender, username, message)
+                }
+            }
+        }
+
+        sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.reply_target_offline", sender))
+        lastSenders.remove(sender.uniqueId)
+        return false
     }
     
     

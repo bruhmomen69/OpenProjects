@@ -1,5 +1,6 @@
 package bruh.zchat.paper.services
 
+import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.DatabaseMaintenanceService
 import bruh.zchat.paper.database.PlayerDataManager
 import com.github.shynixn.mccoroutine.folia.launch
@@ -12,8 +13,10 @@ import java.time.LocalDateTime
 
 class ScheduledTaskService(
     private val plugin: Plugin,
+    private val configManager: ConfigManager,
     private val databaseMaintenanceService: DatabaseMaintenanceService,
-    private val playerDataManager: PlayerDataManager
+    private val playerDataManager: PlayerDataManager,
+    private val crossServerMessageBusService: CrossServerMessageBusService
 ) {
     private val logger = LoggerFactory.getLogger(ScheduledTaskService::class.java)
     private val scheduledTasks = mutableMapOf<String, Int>()
@@ -34,8 +37,43 @@ class ScheduledTaskService(
                 }
             }
         }
-
-
+    }
+    
+    fun scheduleCrossServerTasks(serverInstanceId: String) {
+        val config = configManager.config.crossServerMessaging
+        if (!config.enabled) return
+        
+        // 1. Heartbeat task (every X seconds)
+        val heartbeatTicks = config.heartbeatIntervalSeconds * 20L
+        val heartbeatTaskId = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, Runnable {
+            plugin.launch(Dispatchers.IO) {
+                playerDataManager.updateHeartbeat(serverInstanceId)
+            }
+        }, heartbeatTicks, heartbeatTicks).taskId
+        scheduledTasks["heartbeat"] = heartbeatTaskId
+        
+        // 2. Message Bus Polling (every X ms) - Fixed 250ms per plan, but using config value as base
+        // Note: Bukkit scheduler runs in ticks (50ms). 250ms = 5 ticks.
+        // For sub-tick precision or independent timing, we could use a separate thread/timer, 
+        // but async task is fine for now. 250ms is achievable with 5 ticks.
+        val pollTicks = (config.pollIntervalMillis / 50).coerceAtLeast(1)
+        val pollTaskId = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, Runnable {
+            plugin.launch(Dispatchers.IO) {
+                crossServerMessageBusService.pollMessages()
+            }
+        }, pollTicks, pollTicks).taskId
+        scheduledTasks["message-poll"] = pollTaskId
+        
+        // 3. Reclaim stale messages (every minute or so)
+        val reclaimTicks = 60 * 20L
+        val reclaimTaskId = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, Runnable {
+            plugin.launch(Dispatchers.IO) {
+                crossServerMessageBusService.reclaimStaleMessages()
+            }
+        }, reclaimTicks, reclaimTicks).taskId
+        scheduledTasks["message-reclaim"] = reclaimTaskId
+        
+        logger.info("Scheduled cross-server tasks (Instance ID: $serverInstanceId)")
     }
 
     private fun scheduleDailyTask(name: String, hour: Int, minute: Int, task: Runnable) {
