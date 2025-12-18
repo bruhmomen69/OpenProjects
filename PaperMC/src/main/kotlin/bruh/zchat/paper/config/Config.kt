@@ -370,7 +370,7 @@ data class PrivateMessageConfig(
     val messagesDisabledMessage: String = "<red>{player} has private messages disabled!</red>",
     
     @field:Comment("Enable logging of private messages to console for moderation purposes.")
-    val enableMessageLogging: Boolean = true,
+    val enableMessageLogging: Boolean = false,
     
     @field:Comment("Allow players to use colors and formatting in private messages (requires permissions).")
     val allowFormattingInMessages: Boolean = true

@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.PaperMC
+import bruh.zchat.paper.config.AlertConfig
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.FilterGroup
 import com.github.shynixn.mccoroutine.folia.asyncDispatcher
@@ -220,7 +221,7 @@ class AlertService(
         player: Player, 
         message: String, 
         group: FilterGroup, 
-        config: bruh.zchat.paper.config.AlertConfig
+        config: AlertConfig
     ) {
         if (config.logToConsole) {
             val consolePlaceholders = mapOf(
