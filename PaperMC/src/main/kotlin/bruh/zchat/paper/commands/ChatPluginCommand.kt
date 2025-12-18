@@ -18,7 +18,7 @@ class ChatPluginCommands(
 ) {
 
     @Subcommand("reload")
-    @CommandPermission("chatplugin.admin.reload")
+    @CommandPermission("zchat.admin.reload")
     fun reload(actor: BukkitCommandActor) {
         val success = configManager.reloadConfig()
         if (success) {
@@ -30,7 +30,7 @@ class ChatPluginCommands(
     }
 
     @Subcommand("info")
-    @CommandPermission("chatplugin.admin.info")
+    @CommandPermission("zchat.admin.info")
     fun info(actor: BukkitCommandActor) {
         val config = configManager.config
         val message = """
@@ -55,7 +55,7 @@ class ChatPluginCommands(
     }
 
     @Subcommand("test")
-    @CommandPermission("chatplugin.admin.test")
+    @CommandPermission("zchat.admin.test")
     fun test(actor: BukkitCommandActor, message: String) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
@@ -73,7 +73,7 @@ class ChatPluginCommands(
         private val configManager: ConfigManager
     ) {
         @Subcommand("set default")
-        @CommandPermission("chatplugin.admin.format")
+        @CommandPermission("zchat.admin.format")
         fun setDefault(actor: BukkitCommandActor, format: String) {
             val newConfig = configManager.config.copy(
                 chatFormat = configManager.config.chatFormat.copy(
@@ -89,7 +89,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("set group")
-        @CommandPermission("chatplugin.admin.format")
+        @CommandPermission("zchat.admin.format")
         fun setGroup(actor: BukkitCommandActor, groupName: String, format: String) {
             val newGroupFormats = configManager.config.chatFormat.groupFormats.toMutableMap()
             newGroupFormats[groupName] = format
@@ -108,7 +108,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("set world")
-        @CommandPermission("chatplugin.admin.format")
+        @CommandPermission("zchat.admin.format")
         fun setWorld(actor: BukkitCommandActor, worldName: String, format: String) {
             val newWorldFormats = configManager.config.chatFormat.worldFormats.toMutableMap()
             newWorldFormats[worldName] = format
@@ -127,7 +127,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("list")
-        @CommandPermission("chatplugin.admin.format")
+        @CommandPermission("zchat.admin.format")
         fun list(actor: BukkitCommandActor) {
             val config = configManager.config.chatFormat
             val message = StringBuilder("<gold>===== Chat Formats =====</gold>\n")
@@ -158,7 +158,7 @@ class ChatPluginCommands(
     ) {
 
         @Subcommand("colors")
-        @CommandPermission("chatplugin.admin.toggle")
+        @CommandPermission("zchat.admin.toggle")
         fun toggleColors(actor: BukkitCommandActor) {
             val chatConfig = configManager.config.chat
             val newValue = !chatConfig.enableColorCodes
@@ -175,7 +175,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("formatting")
-        @CommandPermission("chatplugin.admin.toggle")
+        @CommandPermission("zchat.admin.toggle")
         fun toggleFormatting(actor: BukkitCommandActor) {
             val chatConfig = configManager.config.chat
             val newValue = !chatConfig.enableTextFormatting
@@ -192,7 +192,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("mentions")
-        @CommandPermission("chatplugin.admin.toggle")
+        @CommandPermission("zchat.admin.toggle")
         fun toggleMentions(actor: BukkitCommandActor) {
             val chatConfig = configManager.config.chat
             val newValue = !chatConfig.enableMentions
@@ -209,7 +209,7 @@ class ChatPluginCommands(
         }
 
         @Subcommand("cooldown")
-        @CommandPermission("chatplugin.admin.toggle")
+        @CommandPermission("zchat.admin.toggle")
         fun toggleCooldown(actor: BukkitCommandActor) {
             val chatConfig = configManager.config.chat
             val newValue = !chatConfig.enableCooldown

@@ -89,7 +89,7 @@ Player: "Check out my loot {inv} and meet me at [pos]!"
 Result: "Check out my loot [Inventory: 23 items] and meet me at [Pos: 100, 64, -200]!"
 ```
 
-All placeholders are clickable and show detailed hover information. Inventory placeholders open read-only views of the shared inventories. Each placeholder type can be individually enabled/disabled and requires the `chatplugin.inventory.placeholders` permission.
+All placeholders are clickable and show detailed hover information. Inventory placeholders open read-only views of the shared inventories. Each placeholder type can be individually enabled/disabled and requires the `zchat.inventory.placeholders` permission.
 
 ### 🎯 **Enhanced Chat Interactivity**
 The plugin now supports applying hover and click events to entire chat messages while preserving individual inventory placeholder interactions:
@@ -106,12 +106,12 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
 ```
 
 ### 🛠️ **Admin Commands** (All Permission-Protected)
-- `/chatplugin reload` - Reload configuration (`chatplugin.admin.reload`)
-- `/chatplugin info` - View plugin status (`chatplugin.admin.info`)
-- `/chatplugin test <message>` - Test formatting (`chatplugin.admin.test`)
-- `/chatplugin format set default/group/world <format>` - Configure formats (`chatplugin.admin.format`)
-- `/chatplugin format list` - List all formats (`chatplugin.admin.format`)
-- `/chatplugin toggle colors/formatting/mentions/cooldown` - Toggle features (`chatplugin.admin.toggle`)
+- `/chatplugin reload` - Reload configuration (`zchat.admin.reload`)
+- `/chatplugin info` - View plugin status (`zchat.admin.info`)
+- `/chatplugin test <message>` - Test formatting (`zchat.admin.test`)
+- `/chatplugin format set default/group/world <format>` - Configure formats (`zchat.admin.format`)
+- `/chatplugin format list` - List all formats (`zchat.admin.format`)
+- `/chatplugin toggle colors/formatting/mentions/cooldown` - Toggle features (`zchat.admin.toggle`)
 - `/chatplugin admin toggle chat/messages/all <player> <true/false>` - Force toggle player settings
 - `/chatplugin admin socialspy <player> <true/false>` - Manage social spy access
 - `/chatplugin admin stats` - View system statistics and active users
@@ -201,16 +201,16 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
 ### LuckPerms Commands:
 ```bash
 # Give admin format to a player
-/lp user PlayerName permission set chatplugin.format.admin true
+/lp user PlayerName permission set zchat.format.admin true
 
 # Give VIP format to a group
-/lp group vip permission set chatplugin.format.vip true
+/lp group vip permission set zchat.format.vip true
 
 # Allow colors for all players
-/lp group default permission set chatplugin.color true
+/lp group default permission set zchat.color true
 
 # Bypass cooldown for staff
-/lp group staff permission set chatplugin.bypass.cooldown true
+/lp group staff permission set zchat.bypass.cooldown true
 ```
 
 ### Group-based Permissions:
@@ -254,10 +254,10 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
 
 ## Quick Start
 1. Install the plugin
-2. Give yourself admin permissions: `/lp user YourName permission set chatplugin.admin true`
+2. Give yourself admin permissions: `/lp user YourName permission set zchat.admin true`
 3. Test the plugin: `/zchat test Hello World!`
 4. Configure formats: `/zchat format set default <red>[<white>{player_name}</white>]</red> <gray>{message}</gray>`
-5. Set up rank formats using permissions like `chatplugin.format.vip`
+5. Set up rank formats using permissions like `zchat.format.vip`
 6. Try private messaging: `/msg PlayerName Hello there!`
 7. Toggle features: `/zchat toggle chat` or `/zchat toggle socialspy`
 
@@ -266,38 +266,38 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
 ### 🔑 **Essential Permissions**
 ```bash
 # Basic user permissions (give to default group)
-chatplugin.message          # Send/receive private messages
-chatplugin.toggle.chat       # Toggle own public chat
-chatplugin.toggle.messages   # Toggle own private messages
-chatplugin.status           # View own chat status
-chatplugin.color            # Use colors in chat
-chatplugin.formatting       # Use text formatting
-chatplugin.inventory.placeholders # Use inventory placeholders in chat
-chatplugin.viewinventory    # View inventory snapshots
+zchat.message          # Send/receive private messages
+zchat.toggle.chat       # Toggle own public chat
+zchat.toggle.messages   # Toggle own private messages
+zchat.status           # View own chat status
+zchat.color            # Use colors in chat
+zchat.formatting       # Use text formatting
+zchat.inventory.placeholders # Use inventory placeholders in chat
+zchat.viewinventory    # View inventory snapshots
 
 # Staff permissions
-chatplugin.admin            # All admin commands
-chatplugin.socialspy        # Monitor private messages
-chatplugin.bypass.cooldown  # Bypass chat cooldowns
-chatplugin.bypass.chattoggle # Always able to chat
+zchat.admin            # All admin commands
+zchat.socialspy        # Monitor private messages
+zchat.bypass.cooldown  # Bypass chat cooldowns
+zchat.bypass.chattoggle # Always able to chat
 ```
 
 ### 🎨 **Rank Format Permissions**
 ```bash
 # Format-specific permissions (one per rank)
-chatplugin.format.owner     # Use owner chat format
-chatplugin.format.admin     # Use admin chat format
-chatplugin.format.moderator # Use moderator chat format
-chatplugin.format.vip       # Use VIP chat format
-chatplugin.format.premium   # Use premium chat format
+zchat.format.owner     # Use owner chat format
+zchat.format.admin     # Use admin chat format
+zchat.format.moderator # Use moderator chat format
+zchat.format.vip       # Use VIP chat format
+zchat.format.premium   # Use premium chat format
 ```
 
 ### 🛠️ **Admin Permission Examples**
 ```bash
 # LuckPerms examples for setting up permissions
-/lp group admin permission set chatplugin.admin true
-/lp group moderator permission set chatplugin.socialspy true
-/lp group vip permission set chatplugin.format.vip true
-/lp group default permission set chatplugin.message true
-/lp group default permission set chatplugin.color true
+/lp group admin permission set zchat.admin true
+/lp group moderator permission set zchat.socialspy true
+/lp group vip permission set zchat.format.vip true
+/lp group default permission set zchat.message true
+/lp group default permission set zchat.color true
 ```

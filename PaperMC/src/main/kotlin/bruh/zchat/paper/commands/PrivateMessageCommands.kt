@@ -287,7 +287,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("block")
-    @CommandPermission("chatplugin.admin.block")
+    @CommandPermission("zchat.admin.block")
     fun adminBlock(actor: BukkitCommandActor, playerName: String, targetName: String) = plugin.launch(Dispatchers.Unconfined) {
         val adminUuid = (actor.sender() as? Player)?.uniqueId ?: UUID(0L, 0L)
         val success = blockService.forceBlock(adminUuid, playerName, targetName)
@@ -300,7 +300,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("unblock")
-    @CommandPermission("chatplugin.admin.block")
+    @CommandPermission("zchat.admin.block")
     fun adminUnblock(actor: BukkitCommandActor, playerName: String, targetName: String) = plugin.launch(Dispatchers.Unconfined) {
         val adminUuid = (actor.sender() as? Player)?.uniqueId ?: UUID(0L, 0L)
         val success = blockService.forceUnblock(adminUuid, playerName, targetName)
@@ -313,7 +313,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("clearblocks")
-    @CommandPermission("chatplugin.admin.block")
+    @CommandPermission("zchat.admin.block")
     fun adminClearBlocks(actor: BukkitCommandActor, playerName: String) = plugin.launch(Dispatchers.Unconfined) {
         val success = blockService.clearBlocksByName(playerName)
         

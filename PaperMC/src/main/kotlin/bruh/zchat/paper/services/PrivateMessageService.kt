@@ -40,7 +40,7 @@ class PrivateMessageService(
         }
         
         // Check cooldown
-        if (!sender.hasPermission("chatplugin.bypass.cooldown") && config.enableMessageCooldown) {
+        if (!sender.hasPermission("zchat.bypass.cooldown") && config.enableMessageCooldown) {
             val lastMessage = messageCooldowns[sender.uniqueId] ?: 0
             val cooldownTime = config.messageCooldownSeconds * 1000L
             val currentTime = System.currentTimeMillis()

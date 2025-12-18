@@ -12,13 +12,13 @@ import revxrsal.commands.bukkit.annotation.CommandPermission
  * Command for viewing inventory snapshots created by inventory placeholders
  */
 @Command("chatplugin", "zealouschat", "zchat")
-@CommandPermission("chatplugin.admin")
+@CommandPermission("zchat.admin")
 class InventoryViewCommand(
     private val chatInventoryPlaceholderService: ChatInventoryPlaceholderService
 ) {
     
     @Subcommand("viewinventory")
-    @CommandPermission("chatplugin.viewinventory")
+    @CommandPermission("zchat.viewinventory")
     fun viewInventory(player: Player, snapshotId: String) {
         if (!chatInventoryPlaceholderService.viewInventorySnapshot(player, snapshotId)) {
             player.sendMessage(

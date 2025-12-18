@@ -366,6 +366,17 @@ class MessageFormattingService(
             "social_spy.no_permission" -> messages.socialSpy.noPermission
             "social_spy.enabled" -> messages.socialSpy.enabled
             "social_spy.disabled" -> messages.socialSpy.disabled
+
+            // Block system messages
+            "blocks.system_disabled" -> messages.blocks.systemDisabled
+            "blocks.blocked" -> messages.blocks.blocked
+            "blocks.unblocked" -> messages.blocks.unblocked
+            "blocks.already_blocked" -> messages.blocks.alreadyBlocked
+            "blocks.not_blocked" -> messages.blocks.notBlocked
+            "blocks.block_list_empty" -> messages.blocks.blockListEmpty
+            "blocks.block_list" -> messages.blocks.blockList
+            "blocks.target_blocked_you" -> messages.blocks.targetBlockedYou
+            "blocks.max_blocks_reached" -> messages.blocks.maxBlocksReached
             
             // System messages
             "system.error" -> messages.system.error

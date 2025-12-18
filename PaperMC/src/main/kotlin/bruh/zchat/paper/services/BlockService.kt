@@ -166,7 +166,7 @@ class BlockService(
         val config = configManager.config.blocks
         
         if (!config.enableBlockSystem) {
-            player.sendMessage(messageFormattingService.getConfigMessage("system.feature_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage("blocks.system_disabled", player))
             return
         }
         

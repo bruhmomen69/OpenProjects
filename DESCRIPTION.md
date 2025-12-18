@@ -24,71 +24,71 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 
 ### Plugin Core
 - `/zealouschat` (`/chatplugin`, `/chatformat`, `/zchat`) — Base command for ZealousChat
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
   - This command is not an actual command, but rather the base for all sub-commands.
 
 ### Configuration Commands
 - `/zealouschat reload` — Reload plugin configuration
-  - Permission: `chatplugin.admin.reload`
+  - Permission: `zchat.admin.reload`
 - `/zealouschat info` — Display current plugin settings and feature flags
-  - Permission: `chatplugin.admin.info`
+  - Permission: `zchat.admin.info`
 - `/zealouschat test <message>` — Preview chat formatting
-  - Permission: `chatplugin.admin.test`
+  - Permission: `zchat.admin.test`
   - Parameters:
     - `<message>`: Text to format and display
 
 ### Format Management
 - `/zealouschat format set default <format>` — Set default chat format
-  - Permission: `chatplugin.admin.format`
+  - Permission: `zchat.admin.format`
   - Parameters:
     - `<format>`: MiniMessage format string
 - `/zealouschat format set group <group> <format>` — Define group-specific format
-  - Permission: `chatplugin.admin.format`
+  - Permission: `zchat.admin.format`
   - Parameters:
     - `<group>`: Permission group name
     - `<format>`: MiniMessage format string
 - `/zealouschat format set world <world> <format>` — Define world-specific format
-  - Permission: `chatplugin.admin.format`
+  - Permission: `zchat.admin.format`
   - Parameters:
     - `<world>`: World name
     - `<format>`: MiniMessage format string
 - `/zealouschat format list` — List all current chat formats
-  - Permission: `chatplugin.admin.format`
+  - Permission: `zchat.admin.format`
 
 ### Feature Toggles
 - `/zealouschat toggle colors` — Enable/disable color codes in chat
-  - Permission: `chatplugin.admin.toggle`
+  - Permission: `zchat.admin.toggle`
 - `/zealouschat toggle formatting` — Enable/disable text formatting
-  - Permission: `chatplugin.admin.toggle`
+  - Permission: `zchat.admin.toggle`
 - `/zealouschat toggle mentions` — Enable/disable player @mentions
-  - Permission: `chatplugin.admin.toggle`
+  - Permission: `zchat.admin.toggle`
 - `/zealouschat toggle cooldown` — Enable/disable chat cooldown
-  - Permission: `chatplugin.admin.toggle`
+  - Permission: `zchat.admin.toggle`
 
 ### Private Messaging
 - `/msg <player> <message>` — Send a private message (aliases: `/message`, `/tell`, `/whisper`, `/w`)
-  - Permission: `chatplugin.message`
+  - Permission: `zchat.message`
   - Parameters:
     - `<player>`: Recipient player name
     - `<message>`: Message text
 - `/reply <message>` — Reply to the last private message sender (aliases: `/r`, `/respond`)
-  - Permission: `chatplugin.message`
+  - Permission: `zchat.message`
   - Parameters:
     - `<message>`: Reply text
 
 ### Chat & Social Spy Toggles
 - `/zealouschat toggle chat` — Toggle your public chat on/off
-  - Permission: `chatplugin.toggle.chat`
+  - Permission: `zchat.toggle.chat`
 - `/zealouschat toggle messages` — Toggle your private messages on/off
-  - Permission: `chatplugin.toggle.messages`
+  - Permission: `zchat.toggle.messages`
 - `/zealouschat toggle socialspy` — Enable/disable social spy for private messages
-  - Permission: `chatplugin.socialspy`
+  - Permission: `zchat.socialspy`
 - `/zealouschat toggle status` — View your current chat & private message status
-  - Permission: `chatplugin.status`
+  - Permission: `zchat.status`
 
 ## Swear Filter System
 
-The swear filter provides advanced profanity detection with configurable punishment tiers and database persistence.
+The swear filter provides advanced profanity detection with configurable punishment tiers, database persistence, and bypass permissions for trusted staff.
 
 ### Filter Types
 
@@ -154,50 +154,50 @@ swearFilter {
 
 ### Administrator Controls
 - `/zealouschat admin clear <type>` — Clear various chat-related data
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
   - Parameters:
     - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), `blocks` (clears all block lists), or `all` (clears all data)
 - `/zealouschat admin toggle chat <player> <true|false>` — Force toggle public chat for a player
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable chat
 - `/zealouschat admin toggle messages <player> <true|false>` — Force toggle private messages for a player
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable private messages
 - `/zealouschat admin toggle all <player> <true|false>` — Force toggle both chat & private messages
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable both
 - `/zealouschat admin socialspy <player> <true|false>` — Force toggle social spy for a player
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable social spy
 - `/zealouschat admin stats` — Display server-wide chat and private message toggle statistics
-  - Permission: `chatplugin.admin`
+  - Permission: `zchat.admin`
 - `/zealouschat admin block <player> <target>` — Force a player to block another player
-  - Permission: `chatplugin.admin.block`
+  - Permission: `zchat.admin.block`
   - Parameters:
     - `<player>`: Player who will do the blocking
     - `<target>`: Player to be blocked
 - `/zealouschat admin unblock <player> <target>` — Force a player to unblock another player
-  - Permission: `chatplugin.admin.block`
+  - Permission: `zchat.admin.block`
   - Parameters:
     - `<player>`: Player who will do the unblocking
     - `<target>`: Player to be unblocked
 - `/zealouschat admin clearblocks <player>` — Clear all blocks for a player
-  - Permission: `chatplugin.admin.block`
+  - Permission: `zchat.admin.block`
   - Parameters:
     - `<player>`: Player whose block list will be cleared
 
 ## Quick Start
 1. Drop the built jar into `plugins/` and restart.
 2. Edit `plugins/ZealousChat/config.conf` – changes can be reloaded with `/zealouschat reload`.
-3. Grant players a format permission such as `chatplugin.format.vip` or allow colours with `chatplugin.color`.
+3. Grant players a format permission such as `zchat.format.vip` or allow colours with `zchat.color`.
 
 ## Placeholders
 All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags when the plugin is present.
@@ -213,33 +213,34 @@ All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags
 
 | Node                                | Default | Description                         |
 |-------------------------------------|---------|-------------------------------------|
-| `chatplugin.*`                      | op      | Grant everything                    |
-| `chatplugin.admin`                  | op      | Access root/admin commands          |
-| `chatplugin.admin.reload`           | op      | Reload configuration                |
-| `chatplugin.admin.info`             | op      | View plugin info                    |
-| `chatplugin.admin.test`             | op      | Test formatting                     |
-| `chatplugin.admin.format`           | op      | Manage chat formats                 |
-| `chatplugin.admin.toggle`           | op      | Toggle plugin features              |
-| `chatplugin.admin.block`            | op      | Manage player block lists           |
-| `chatplugin.color`                  | true    | Use colour codes in chat            |
-| `chatplugin.formatting`             | true    | Use text formatting codes           |
-| `chatplugin.url`                    | true    | Send clickable URLs                 |
-| `chatplugin.mention`                | true    | Use @mentions                       |
-| `chatplugin.bypass.cooldown`        | op      | Bypass chat/message cooldowns       |
-| `chatplugin.format.admin`           | op      | Use **Admin** chat format           |
-| `chatplugin.format.moderator`       | false   | Use **Moderator** chat format       |
-| `chatplugin.format.vip`             | false   | Use **VIP** chat format             |
-| `chatplugin.message`                | true    | Send & receive private messages     |
-| `chatplugin.toggle`                 | true    | Parent of chat/message toggle perms |
-| `chatplugin.toggle.chat`            | true    | Toggle public chat                  |
-| `chatplugin.toggle.messages`        | true    | Toggle private messages             |
-| `chatplugin.status`                 | true    | View own chat status                |
-| `chatplugin.socialspy`              | op      | Monitor private messages            |
-| `chatplugin.commandspy`             | op      | Monitor player commands             |
-| `chatplugin.bypass.chattoggle`      | op      | Chat even when disabled             |
-| `chatplugin.bypass.messagetoggle`   | op      | PM even when disabled               |
-| `chatplugin.viewinventory`          | true    | View shared inventories             |
-| `chatplugin.inventory.placeholders` | true    | Use inventory placeholders          |
+| `zchat.*`                      | op      | Grant everything                    |
+| `zchat.admin`                  | op      | Access root/admin commands          |
+| `zchat.admin.reload`           | op      | Reload configuration                |
+| `zchat.admin.info`             | op      | View plugin info                    |
+| `zchat.admin.test`             | op      | Test formatting                     |
+| `zchat.admin.format`           | op      | Manage chat formats                 |
+| `zchat.admin.toggle`           | op      | Toggle plugin features              |
+| `zchat.admin.block`            | op      | Manage player block lists           |
+| `zchat.color`                  | true    | Use colour codes in chat            |
+| `zchat.formatting`             | true    | Use text formatting codes           |
+| `zchat.url`                    | true    | Send clickable URLs                 |
+| `zchat.mention`                | true    | Use @mentions                       |
+| `zchat.bypass.cooldown`        | op      | Bypass chat/message cooldowns       |
+| `zchat.bypass.swearfilter`     | op      | Bypass swear filter restrictions    |
+| `zchat.format.admin`           | op      | Use **Admin** chat format           |
+| `zchat.format.moderator`       | false   | Use **Moderator** chat format       |
+| `zchat.format.vip`             | false   | Use **VIP** chat format             |
+| `zchat.message`                | true    | Send & receive private messages     |
+| `zchat.toggle`                 | true    | Parent of chat/message toggle perms |
+| `zchat.toggle.chat`            | true    | Toggle public chat                  |
+| `zchat.toggle.messages`        | true    | Toggle private messages             |
+| `zchat.status`                 | true    | View own chat status                |
+| `zchat.socialspy`              | op      | Monitor private messages            |
+| `zchat.commandspy`             | op      | Monitor player commands             |
+| `zchat.bypass.chattoggle`      | op      | Chat even when disabled             |
+| `zchat.bypass.messagetoggle`   | op      | PM even when disabled               |
+| `zchat.viewinventory`          | true    | View shared inventories             |
+| `zchat.inventory.placeholders` | true    | Use inventory placeholders          |
 
 </details>
 

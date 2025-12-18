@@ -24,148 +24,153 @@ commands:
   chatplugin:
     description: Main command ZealousChat
     usage: /chatplugin <subcommand>
-    permission: chatplugin.admin
+    permission: zchat.admin
     aliases: [chatformat, zealouschat, zchat]
 
   msg:
     description: Send a private message to another player
     usage: /msg <player> <message>
-    permission: chatplugin.message
+    permission: zchat.message
     aliases: [message, tell, whisper, w]
   
   reply:
     description: Reply to the last player who sent you a message
     usage: /reply <message>
-    permission: chatplugin.message
+    permission: zchat.message
     aliases: [r]
 
 permissions:
-  chatplugin.*:
+  zchat.*:
     description: All ChatPlugin permissions
     children:
-      chatplugin.admin: true
-      chatplugin.color: true
-      chatplugin.formatting: true
-      chatplugin.url: true
-      chatplugin.mention: true
-      chatplugin.bypass.cooldown: true
+      zchat.admin: true
+      zchat.color: true
+      zchat.formatting: true
+      zchat.url: true
+      zchat.mention: true
+      zchat.bypass.cooldown: true
+      zchat.bypass.swearfilter: true
     default: op
   
-  chatplugin.admin:
+  zchat.admin:
     description: Access to admin commands
     children:
-      chatplugin.admin.reload: true
-      chatplugin.admin.info: true
-      chatplugin.admin.test: true
-      chatplugin.admin.format: true
-      chatplugin.admin.toggle: true
-      chatplugin.admin.block: true
+      zchat.admin.reload: true
+      zchat.admin.info: true
+      zchat.admin.test: true
+      zchat.admin.format: true
+      zchat.admin.toggle: true
+      zchat.admin.block: true
     default: op
   
-  chatplugin.admin.reload:
+  zchat.admin.reload:
     description: Reload plugin configuration
     default: op
   
-  chatplugin.admin.info:
+  zchat.admin.info:
     description: View plugin information
     default: op
   
-  chatplugin.admin.test:
+  zchat.admin.test:
     description: Test chat formatting
     default: op
   
-  chatplugin.admin.format:
+  zchat.admin.format:
     description: Manage chat formats
     default: op
   
-  chatplugin.admin.toggle:
+  zchat.admin.toggle:
     description: Toggle plugin features
     default: op
   
-  chatplugin.admin.block:
+  zchat.admin.block:
     description: Manage player block lists
     default: op
   
-  chatplugin.color:
+  zchat.color:
     description: Use color codes in chat
     default: true
   
-  chatplugin.formatting:
+  zchat.formatting:
     description: Use text formatting in chat
     default: true
   
-  chatplugin.url:
+  zchat.url:
     description: Post clickable URLs in chat
     default: true
   
-  chatplugin.mention:
+  zchat.mention:
     description: Mention other players in chat
     default: true
   
-  chatplugin.bypass.cooldown:
+  zchat.bypass.cooldown:
     description: Bypass chat cooldown
     default: op
   
+  zchat.bypass.swearfilter:
+    description: Bypass swear filter restrictions
+    default: op
+  
   # Format-specific permissions
-  chatplugin.format.admin:
+  zchat.format.admin:
     description: Use admin chat format
     default: op
   
-  chatplugin.format.moderator:
+  zchat.format.moderator:
     description: Use moderator chat format
     default: false
   
-  chatplugin.format.vip:
+  zchat.format.vip:
     description: Use VIP chat format
     default: false
   
   # Private messaging permissions
-  chatplugin.message:
+  zchat.message:
     description: Permission to send and receive private messages
     default: true
   
   # Chat toggle permissions
-  chatplugin.toggle:
+  zchat.toggle:
     description: All chat toggle permissions
     children:
-      chatplugin.toggle.chat: true
-      chatplugin.toggle.messages: true
+      zchat.toggle.chat: true
+      zchat.toggle.messages: true
     default: true
   
-  chatplugin.toggle.chat:
+  zchat.toggle.chat:
     description: Permission to toggle public chat on/off
     default: true
   
-  chatplugin.toggle.messages:
+  zchat.toggle.messages:
     description: Permission to toggle private messages on/off
     default: true
   
-  chatplugin.status:
+  zchat.status:
     description: Permission to view chat status
     default: true
   
   # Social spy permissions
-  chatplugin.socialspy:
+  zchat.socialspy:
     description: Permission to use social spy to monitor private messages
     default: op
   
-  chatplugin.commandspy:
+  zchat.commandspy:
     description: Permission to use command spy to monitor player commands
     default: op
   
   # Additional bypass permissions
-  chatplugin.bypass.chattoggle:
+  zchat.bypass.chattoggle:
     description: Bypass chat toggle restrictions (staff can always chat)
     default: op
   
-  chatplugin.bypass.messagetoggle:
+  zchat.bypass.messagetoggle:
     description: Bypass message toggle restrictions (staff can always message)
     default: op
   
-  chatplugin.viewinventory:
+  zchat.viewinventory:
     description: Permission to view inventory snapshots from placeholders
     default: true
   
-  chatplugin.inventory.placeholders:
+  zchat.inventory.placeholders:
     description: Permission to use inventory placeholders in chat
     default: true

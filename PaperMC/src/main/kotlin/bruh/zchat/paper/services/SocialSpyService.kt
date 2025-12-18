@@ -32,7 +32,7 @@ class SocialSpyService(
             return false
         }
         
-        if (!player.hasPermission("chatplugin.socialspy")) {
+        if (!player.hasPermission("zchat.socialspy")) {
             player.sendMessage(messageFormattingService.getConfigMessage("social_spy.no_permission", player))
             return false
         }
@@ -64,7 +64,7 @@ class SocialSpyService(
         
         // Don't spy on staff messages if configured
         if (config.ignoreModerators && 
-            (sender.hasPermission("chatplugin.socialspy") || recipient.hasPermission("chatplugin.socialspy"))) {
+            (sender.hasPermission("zchat.socialspy") || recipient.hasPermission("zchat.socialspy"))) {
             return
         }
         
@@ -120,7 +120,7 @@ class SocialSpyService(
      * Force enable social spy for a player (admin command)
      */
     fun forceEnableSocialSpy(player: Player): Boolean {
-        if (!player.hasPermission("chatplugin.socialspy")) {
+        if (!player.hasPermission("zchat.socialspy")) {
             return false
         }
         
@@ -183,7 +183,7 @@ class SocialSpyService(
         }
         
         // Don't spy on staff commands if configured
-        if (config.ignoreModerators && player.hasPermission("chatplugin.socialspy")) {
+        if (config.ignoreModerators && player.hasPermission("zchat.socialspy")) {
             return
         }
         

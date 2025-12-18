@@ -87,7 +87,7 @@ class ChatToggleService(
      */
     fun canSendChat(player: Player): Boolean {
         // Staff can always bypass chat toggle
-        if (player.hasPermission("chatplugin.bypass.chattoggle")) {
+        if (player.hasPermission("zchat.bypass.chattoggle")) {
             return true
         }
         
@@ -106,7 +106,7 @@ class ChatToggleService(
      */
     fun canSendMessages(player: Player): Boolean {
         // Staff can always bypass message toggle
-        if (player.hasPermission("chatplugin.bypass.messagetoggle")) {
+        if (player.hasPermission("zchat.bypass.messagetoggle")) {
             return true
         }
         

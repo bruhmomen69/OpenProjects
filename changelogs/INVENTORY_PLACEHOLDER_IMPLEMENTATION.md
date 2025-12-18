@@ -101,7 +101,7 @@ A new chat-specific placeholder system has been implemented to handle inventory-
 - Clear visual indication that inventories are snapshots
 
 ### 3. **Permission Control**
-- `chatplugin.viewinventory` permission controls who can view snapshots
+- `zchat.viewinventory` permission controls who can view snapshots
 - Existing chat permissions control who can use placeholders in chat
 
 ### 4. **Automatic Cleanup**
@@ -132,7 +132,7 @@ Result: "Trading my [Hand: 1 items] for your rare items!" (clickable)
 ## Configuration
 
 ### Permissions
-- `chatplugin.viewinventory` - View inventory snapshots (default: true)
+- `zchat.viewinventory` - View inventory snapshots (default: true)
 - All existing chat permissions apply for using placeholders
 
 ### File Storage
@@ -169,7 +169,7 @@ To test the functionality:
 1. **Basic Test**: Type `{inv}` in chat and verify it becomes clickable
 2. **Hover Test**: Hover over the placeholder to see item preview
 3. **Click Test**: Click to open the read-only inventory view
-4. **Permission Test**: Remove `chatplugin.viewinventory` and verify access is denied
+4. **Permission Test**: Remove `zchat.viewinventory` and verify access is denied
 5. **Multiple Types**: Test all placeholder types: `{inv}`, `[inv]`, `[ender]`, `[armor]`, `[hand]`
 
 The implementation is complete and ready for production use!

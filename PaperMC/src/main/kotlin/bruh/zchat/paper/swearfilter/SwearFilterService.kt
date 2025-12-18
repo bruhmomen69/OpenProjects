@@ -23,6 +23,11 @@ class SwearFilterService(
         if (!configManager.config.swearFilter.enabled) {
             return false
         }
+        
+        // Check bypass permission
+        if (player.hasPermission(configManager.config.permissions.swearFilterBypassPermission)) {
+            return false
+        }
 
         for (group in configManager.config.swearFilter.filterGroups) {
             if (isMatch(group, message)) {

@@ -29,7 +29,7 @@ class ChatFormattingService(
         val config = configManager.config
 
         // Check cooldown
-        if (config.chat.enableCooldown && !player.hasPermission("chatplugin.bypass.cooldown")) {
+        if (config.chat.enableCooldown && !player.hasPermission("zchat.bypass.cooldown")) {
             val lastMessage = chatCooldowns[player.uniqueId] ?: 0
             val cooldownTime = config.chat.cooldownSeconds * 1000L
             val currentTime = System.currentTimeMillis()

@@ -165,22 +165,25 @@ data class PermissionConfig(
     val usePermissionBasedFormats: Boolean = true,
     
     @field:Comment("Permission prefix for format-specific permissions. Players need '<prefix><group>' permission for group formats.")
-    val formatPermissionPrefix: String = "chatplugin.format.",
+    val formatPermissionPrefix: String = "zchat.format.",
     
     @field:Comment("Permission required for players to use color codes in chat messages.")
-    val colorPermission: String = "chatplugin.color",
+    val colorPermission: String = "zchat.color",
     
     @field:Comment("Permission required for players to use text formatting (bold, italic, etc.) in chat messages.")
-    val formattingPermission: String = "chatplugin.formatting",
+    val formattingPermission: String = "zchat.formatting",
     
     @field:Comment("Permission required for players to post clickable URLs in chat messages.")
-    val urlPermission: String = "chatplugin.url",
+    val urlPermission: String = "zchat.url",
     
     @field:Comment("Permission required for players to mention other players using @username syntax.")
-    val mentionPermission: String = "chatplugin.mention",
+    val mentionPermission: String = "zchat.mention",
     
     @field:Comment("Permission required for players to use inventory placeholders in chat.")
-    val inventoryPlaceholderPermission: String = "chatplugin.inventory.placeholders"
+    val inventoryPlaceholderPermission: String = "zchat.inventory.placeholders",
+    
+    @field:Comment("Permission required for players to bypass the swear filter.")
+    val swearFilterBypassPermission: String = "zchat.bypass.swearfilter",
 )
 
 @ConfigSerializable
@@ -480,7 +483,7 @@ data class SocialSpyConfig(
     @field:Comment("Enable social spy system for moderators to monitor private messages.")
     val enableSocialSpy: Boolean = true,
     
-    @field:Comment("Enable command spy to monitor player commands (requires chatplugin.commandspy permission).")
+    @field:Comment("Enable command spy to monitor player commands (requires zchat.commandspy permission).")
     val enableCommandSpy: Boolean = false,
     
     @field:Comment("Format for social spy messages showing private message monitoring.")
@@ -495,7 +498,7 @@ data class SocialSpyConfig(
     @field:Comment("Message shown when social spy is disabled for a moderator.")
     val socialSpyDisabledMessage: String = "<red>Social spy disabled! You will no longer see private messages.</red>",
     
-    @field:Comment("Ignore messages between moderators (players with chatplugin.socialspy permission).")
+    @field:Comment("Ignore messages between moderators (players with zchat.socialspy permission).")
     val ignoreModerators: Boolean = true,
     
     @field:Comment("Log social spy messages to console for audit purposes.")
