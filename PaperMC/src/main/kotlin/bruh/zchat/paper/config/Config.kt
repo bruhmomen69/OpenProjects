@@ -293,7 +293,35 @@ data class SwearFilterConfig(
             name = "Default Regex",
             type = "regex",
             distance = 3,
-            filters = listOf("(?i)badword", "(?i)anotherbadword"),
+            filters = listOf("(?i)\\bshit\\b", "(?i)\\bfuck\\b"),
+            punishments = mapOf(
+                1 to listOf("warn {player} You are not allowed to use that word."),
+                3 to listOf("kick {player} You have been warned about your language."),
+                5 to listOf("ban {player} Banned for repeated language violations.")
+            )
+        ),
+        FilterGroup(
+            name = "Default Levenshtein",
+            type = "levenshtein",
+            distance = 3,
+            filters = listOf("shit", "fuck"),
+            punishments = mapOf(
+                1 to listOf("warn {player} You are not allowed to use that word."),
+                3 to listOf("kick {player} You have been warned about your language."),
+                5 to listOf("ban {player} Banned for repeated language violations.")
+            )
+        ),
+        FilterGroup(
+            name = "Default Links",
+            type = "regex",
+            distance = 3,
+            filters = listOf(
+                "(?i)(?:https?://)\\S+",
+                "(?i)\\bwww\\.\\S+",
+                "(?i)\\b(?:discord\\.gg|discord(?:app)?\\.com/invite)/[A-Za-z0-9-]+\\b",
+                "(?i)\\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?:[a-z]{2,63})(?::\\d{1,5})?(?:/\\S*)?\\b",
+                "(?i)\\b(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d{1,5})?(?:/\\S*)?\\b"
+            ),
             punishments = mapOf(
                 1 to listOf("warn {player} You are not allowed to use that word."),
                 3 to listOf("kick {player} You have been warned about your language."),
