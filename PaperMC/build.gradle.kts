@@ -72,6 +72,10 @@ tasks {
 
 tasks.named<ShadowJar>("shadowJar") {
     mergeServiceFiles()
+
+    relocate("com.github.shynixn", "bruh.zchat.paper.dependencies.com.github.shynixn")
+    relocate("com.fasterxml.jackson", "bruh.zchat.paper.dependencies.com.fasterxml.jackson")
+    relocate("org.flywaydb", "bruh.zchat.paper.dependencies.org.flywaydb")
 }
 
 val targetJavaVersion = 21

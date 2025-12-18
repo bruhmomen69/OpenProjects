@@ -91,7 +91,7 @@ class MessageCommand(
     }
 }
 
-@Command("alerts", "chatplugin alerts", "zchat alerts")
+@Command("chatplugin alerts", "zchat alerts", "zealouschat alerts")
 class AlertCommands(
     private val alertService: AlertService,
     private val messageFormattingService: MessageFormattingService
