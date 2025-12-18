@@ -9,7 +9,7 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - **MiniMessage everywhere** – gradients, hex colours, hover/click events
 - **Rank, world & permission based formats** with priority system
 - **Private messaging** (`/msg`, `/reply`) with social-spy & cooldowns
-- **Cross-server private messaging** (optional, **MySQL required**) for networks running multiple servers
+- **Cross-server private messaging** (experimental, **MySQL required**) for networks running multiple servers
 - **Chat / Message toggles** per-player (with staff bypass)
 - **Inventory placeholders** `[inv]`, `[ender]`, `[armor]`, `[hand]`, `[pos]`, `[health]`
 - **URL auto-linking** & **@mentions** (configurable)
@@ -17,20 +17,20 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - **Tiered punishment system** with configurable infraction thresholds
 - **Database-backed infraction tracking** with caching for performance
 - **PlaceholderAPI bridge** (optional soft-depend)
-- **Hot-reloadable** HOCON configuration (`/zchat reload`)
+- **Hot-reloadable** plugin configurations (`/zchat reload`)
 - **Customizable Messages** for all messages used within the plugin.
 
 ## Commands
 
 ### Plugin Core
-- `/zealouschat` (`/chatplugin`, `/chatformat`, `/zchat`) — Base command for ZealousChat
+- `/zealouschat` (`/chatplugin`, `/zchat`) — Base command for ZealousChat
   - Permission: `zchat.admin`
   - This command is not an actual command, but rather the base for all sub-commands.
 
 ### Configuration Commands
-- `/zealouschat reload` — Reload plugin configuration
+- `/zealouschat reload` — Reload plugin configurations
   - Permission: `zchat.admin.reload`
-- `/zealouschat info` — Display current plugin settings and feature flags
+- `/zealouschat info` — Display current plugin settings and enabled features
   - Permission: `zchat.admin.info`
 - `/zealouschat test <message>` — Preview chat formatting
   - Permission: `zchat.admin.test`
@@ -97,6 +97,7 @@ When using a **MySQL** database, ZealousChat can deliver private messages across
 ## Swear Filter System
 
 The swear filter provides advanced profanity detection with configurable punishment tiers, database persistence, and bypass permissions for trusted staff.
+*This system is currently experimental.*
 
 ### Filter Types
 
@@ -111,39 +112,6 @@ The swear filter provides advanced profanity detection with configurable punishm
 - Configurable distance threshold (default: 2-3 characters)
 - Detects misspellings and variations of filtered words
 - Splits messages into individual words for comparison
-
-### Configuration Structure
-
-The swear filter uses filter groups with the following structure:
-
-```hocon
-swearFilter {
-    enabled = true
-    
-    filterGroups = [
-        {
-            name = "Default Regex"
-            type = "regex"
-            filters = ["(?i)badword", "(?i)anotherbadword"]
-            punishments = {
-                1 = ["warn {player} Language warning"]
-                3 = ["kick {player} Repeated language violations"]
-                5 = ["ban {player} Banned for language violations"]
-            }
-        },
-        {
-            name = "Default Levenshtein"
-            type = "levenshtein"
-            distance = 2
-            filters = ["swear", "curse"]
-            punishments = {
-                1 = ["mute {player} 5m Language violation"]
-                3 = ["mute {player} 30m Repeated violations"]
-            }
-        }
-    ]
-}
-```
 
 ### Punishment System
 
@@ -205,7 +173,8 @@ swearFilter {
 ## Quick Start
 1. Drop the built jar into `plugins/` and restart.
 2. Edit `plugins/ZealousChat/config.conf` – changes can be reloaded with `/zealouschat reload`.
-3. Grant players a format permission such as `zchat.format.vip` or allow colours with `zchat.color`.
+3. (Optional) Configure database settings in `plugins/ZealousChat/database.conf` and messages in `plugins/ZealousChat/messages.conf`.
+4. Grant players a format permission such as `zchat.format.vip` or allow colours with `zchat.color`.
 
 ## Placeholders
 All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags when the plugin is present.

@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "lol.mcplugs.minimessagechatplugin"
-version = "1.2"
+version = "1.2.1"
 
 repositories {
     mavenCentral()
