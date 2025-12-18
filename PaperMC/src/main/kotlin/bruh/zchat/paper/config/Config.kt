@@ -286,6 +286,9 @@ data class SocialSpyConfig(
 data class SwearFilterConfig(
     @field:Comment("Enable the swear filter system.")
     val enabled: Boolean = true,
+    
+    @field:Comment("Enable sending a message to players when their message is blocked.")
+    val enableBlockedMessage: Boolean = true,
 
     @field:Comment("A list of filter groups. Each group can have its own type, filters, and punishments.")
     val filterGroups: List<FilterGroup> = listOf(

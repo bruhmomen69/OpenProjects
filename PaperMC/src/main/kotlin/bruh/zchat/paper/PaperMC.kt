@@ -112,7 +112,7 @@ class PaperMC : SuspendingJavaPlugin() {
         
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
         infractionManager = InfractionManager(databaseService, playerDataManager)
-        swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService)
+        swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
         blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
 
         // Initialize maintenance services

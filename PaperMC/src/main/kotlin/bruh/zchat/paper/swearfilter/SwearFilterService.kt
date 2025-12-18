@@ -3,6 +3,8 @@ package bruh.zchat.paper.swearfilter
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.FilterGroup
+import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.utils.Levenshtein
 import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
@@ -16,7 +18,8 @@ class SwearFilterService(
     private val plugin: PaperMC,
     private val configManager: ConfigManager,
     private val infractionManager: InfractionManager,
-    private val alertService: bruh.zchat.paper.services.AlertService
+    private val alertService: AlertService,
+    private val messageFormattingService: MessageFormattingService
 ) {
     private val regexCache = ConcurrentHashMap<String, Regex>()
 
@@ -32,6 +35,17 @@ class SwearFilterService(
 
         for (group in configManager.config.swearFilter.filterGroups) {
             if (isMatch(group, message)) {
+                // Send blocked message to player if enabled
+                if (configManager.config.swearFilter.enableBlockedMessage) {
+                    plugin.launch(plugin.globalRegionDispatcher) {
+                        val blockedMessage = messageFormattingService.getConfigMessage(
+                            "swearFilter.blockedMessage", 
+                            player
+                        )
+                        player.sendMessage(blockedMessage)
+                    }
+                }
+                
                 plugin.launch(plugin.asyncDispatcher) {
                     handleInfraction(player, message, group)
                 }

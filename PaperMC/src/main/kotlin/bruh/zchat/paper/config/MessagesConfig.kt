@@ -377,7 +377,10 @@ data class SwearFilterMessages(
     val alertsDisabledPersonal: String = "<red>Swear filter alerts disabled. You will no longer receive notifications.</red>",
     
     @field:Comment("Message shown when alerts are automatically enabled on join")
-    val alertsAutoEnabled: String = ""
+    val alertsAutoEnabled: String = "",
+    
+    @field:Comment("Message shown to players when their message is blocked by the swear filter")
+    val blockedMessage: String = "<red>Your message could not be sent.</red>"
 )
 
 @ConfigSerializable
