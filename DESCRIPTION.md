@@ -15,7 +15,6 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - **Advanced swear filter** with regex and fuzzy (Levenshtein) matching
 - **Tiered punishment system** with configurable infraction thresholds
 - **Database-backed infraction tracking** with caching for performance
-- **Command framework** powered by Lamp with live `/zchat test` preview
 - **PlaceholderAPI bridge** (optional soft-depend)
 - **Hot-reloadable** HOCON configuration (`/zchat reload`)
 - **Customizable Messages** for all messages used within the plugin.
