@@ -1,28 +1,26 @@
 package bruh.zchat.paper
 
 import bruh.zchat.paper.commands.*
-import revxrsal.commands.Lamp
-import revxrsal.commands.bukkit.BukkitLamp
 import bruh.zchat.paper.config.ConfigManager
-import bruh.zchat.paper.listeners.ChatMessageListener
-import bruh.zchat.paper.listeners.PlayerJoinQuitListener
-import bruh.zchat.paper.listeners.PlayerDeathListener
-import bruh.zchat.paper.listeners.PlayerAdvancementListener
-import bruh.zchat.paper.listeners.InventoryProtectionListener
-import bruh.zchat.paper.services.ChatFormattingService
-import bruh.zchat.paper.services.PlaceholderAPIService
-import bruh.zchat.paper.services.ChatToggleService
-import bruh.zchat.paper.services.SocialSpyService
-import bruh.zchat.paper.services.PrivateMessageService
-import bruh.zchat.paper.services.MessageFormattingService
-import bruh.zchat.paper.services.ChatInventoryPlaceholderService
-import bruh.zchat.paper.services.BlockService
+import bruh.zchat.paper.database.*
+import bruh.zchat.paper.listeners.*
+import bruh.zchat.paper.services.*
 import bruh.zchat.paper.swearfilter.InfractionManager
 import bruh.zchat.paper.swearfilter.SwearFilterService
-import org.bukkit.plugin.java.JavaPlugin
+import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
+import com.github.shynixn.mccoroutine.folia.asyncDispatcher
+import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
+import com.github.shynixn.mccoroutine.folia.launch
+import kotlinx.coroutines.withContext
+import revxrsal.commands.Lamp
+import revxrsal.commands.bukkit.BukkitLamp
 
-class PaperMC : JavaPlugin() {
+class PaperMC : SuspendingJavaPlugin() {
     private lateinit var configManager: ConfigManager
+    private lateinit var databaseService: DatabaseService
+    private lateinit var playerDataManager: PlayerDataManager
+    private lateinit var databaseMaintenanceService: DatabaseMaintenanceService
+    private lateinit var scheduledTaskService: ScheduledTaskService
     private lateinit var placeholderAPIService: PlaceholderAPIService
     private lateinit var chatInventoryPlaceholderService: ChatInventoryPlaceholderService
     private lateinit var messageFormattingService: MessageFormattingService
@@ -33,9 +31,10 @@ class PaperMC : JavaPlugin() {
     private lateinit var chatFormattingService: ChatFormattingService
     private lateinit var infractionManager: InfractionManager
     private lateinit var swearFilterService: SwearFilterService
+    private lateinit var blockMigrationService: BlockMigrationService
     private lateinit var lamp: Lamp<*>
 
-    override fun onEnable() {
+    override suspend fun onEnableAsync() {
         // Initialize configuration
         configManager = ConfigManager(dataFolder.toPath())
         if (!configManager.loadConfig()) {
@@ -45,85 +44,192 @@ class PaperMC : JavaPlugin() {
         // Update the configuration
         configManager.saveConfig()
 
+        // Initialize database
+        val dbConfig = createDatabaseConfig()
+        databaseService = DatabaseService(dbConfig, this)
+        playerDataManager = PlayerDataManager(databaseService)
+
+        // Run database migrations
+        try {
+            val migrationResult = databaseService.migrate()
+            logger.info("Database migrations completed: ${migrationResult.migrationsExecuted} migrations executed")
+        } catch (e: Exception) {
+            slF4JLogger.error("Failed to run database migrations: ${e.message}", e)
+            server.pluginManager.disablePlugin(this)
+            return
+        }
+
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
         chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this, configManager, messageFormattingService)
         chatToggleService = ChatToggleService(configManager, messageFormattingService)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
-        blockService = BlockService(configManager, messageFormattingService, socialSpyService, dataFolder.toPath())
-        privateMessageService = PrivateMessageService(configManager, messageFormattingService, chatToggleService, socialSpyService, blockService)
+        blockService =
+            BlockService(configManager, messageFormattingService, socialSpyService, databaseService, playerDataManager)
+        privateMessageService = PrivateMessageService(
+            configManager,
+            messageFormattingService,
+            chatToggleService,
+            socialSpyService,
+            blockService
+        )
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
-        infractionManager = InfractionManager(this)
+        infractionManager = InfractionManager(databaseService, playerDataManager)
         swearFilterService = SwearFilterService(this, configManager, infractionManager)
+        blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
+
+        // Initialize maintenance services
+        databaseMaintenanceService = DatabaseMaintenanceService(databaseService, dbConfig)
+        scheduledTaskService = ScheduledTaskService(this, databaseMaintenanceService, playerDataManager)
         
-        // Load persisted data
-        blockService.loadBlocks()
+        // Schedule maintenance tasks
+        scheduledTaskService.scheduleMaintenanceTasks()
+
+        // Migrate existing data if enabled (run on async dispatcher)
+        if (configManager.config.database.autoMigrate) {
+            launch {
+                withContext(asyncDispatcher) {
+                    try {
+                        val migrationResult = blockMigrationService.migrateBlockData()
+                        if (migrationResult.success) {
+                            slF4JLogger.info("Block migration: ${migrationResult.message}")
+                        } else {
+                            slF4JLogger.warn("Block migration failed: ${migrationResult.message}")
+                        }
+                    } catch (e: Exception) {
+                        slF4JLogger.error("Failed to migrate block data", e)
+                    }
+                }
+            }
+        }
 
         // Initialize command framework
         lamp = BukkitLamp.builder(this).build()
-        
+
         // Register commands
         val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService)
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
-        
+
         // Register private message commands
-        lamp.register(MessageCommand(privateMessageService, messageFormattingService))
+        lamp.register(MessageCommand(privateMessageService, messageFormattingService, this))
 
         // Register block commands
-        lamp.register(MessageCommand.BlockCommand(blockService, messageFormattingService))
+        lamp.register(MessageCommand.BlockCommand(blockService, messageFormattingService, this))
 
         // Register inventory view command
         lamp.register(InventoryViewCommand(chatInventoryPlaceholderService))
-        
+
         // Register chat toggle and admin commands
-        lamp.register(ChatToggleCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService))
-        lamp.register(ChatAdminCommands(chatToggleService, socialSpyService, privateMessageService, messageFormattingService, blockService))
+        lamp.register(
+            ChatToggleCommands(
+                chatToggleService,
+                socialSpyService,
+                privateMessageService,
+                messageFormattingService
+            )
+        )
+        lamp.register(
+            ChatAdminCommands(
+                chatToggleService,
+                socialSpyService,
+                privateMessageService,
+                messageFormattingService,
+                blockService,
+                this
+            )
+        )
 
         // Register event listeners
-        server.pluginManager.registerEvents(ChatMessageListener(configManager, chatFormattingService, chatToggleService, messageFormattingService, chatInventoryPlaceholderService, swearFilterService), this)
-        server.pluginManager.registerEvents(PlayerJoinQuitListener(configManager, chatFormattingService, messageFormattingService), this)
+        server.pluginManager.registerEvents(
+            ChatMessageListener(
+                configManager,
+                chatFormattingService,
+                chatToggleService,
+                messageFormattingService,
+                chatInventoryPlaceholderService,
+                swearFilterService
+            ), this
+        )
+        server.pluginManager.registerEvents(
+            PlayerJoinQuitListener(
+                configManager,
+                chatFormattingService,
+                messageFormattingService,
+                playerDataManager,
+                this
+            ), this
+        )
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)
         server.pluginManager.registerEvents(PlayerAdvancementListener(configManager, messageFormattingService), this)
         server.pluginManager.registerEvents(InventoryProtectionListener(), this)
 
-        logger.info("ZealousChat enabled successfully!")
-        logger.info("Features enabled:")
-        logger.info("  - Chat formatting: ${configManager.config.chat.enableFormatting}")
-        logger.info("  - Colors: ${configManager.config.chat.enableColorCodes}")
-        logger.info("  - Text formatting: ${configManager.config.chat.enableTextFormatting}")
-        logger.info("  - Group formats: ${configManager.config.chatFormat.enableGroupFormats}")
-        logger.info("  - World formats: ${configManager.config.chatFormat.enableWorldFormats}")
-        logger.info("  - Join messages: ${configManager.config.joinLeave.enableJoin}")
-        logger.info("  - Leave messages: ${configManager.config.joinLeave.enableLeave}")
-        logger.info("  - Death messages: ${configManager.config.death.enabled}")
-        logger.info("  - Chat cooldown: ${configManager.config.chat.enableCooldown} (${configManager.config.chat.cooldownSeconds}s)")
-        logger.info("  - Mentions: ${configManager.config.chat.enableMentions}")
-        logger.info("  - URLs: ${configManager.config.chat.enableUrls}")
-        logger.info("  - Private messages: ${configManager.config.privateMessages.enablePrivateMessages}")
-        logger.info("  - Social spy: ${configManager.config.socialSpy.enableSocialSpy}")
-        logger.info("  - Swear filter: ${configManager.config.swearFilter.enabled}")
-        logger.info("  - PlaceholderAPI: ${placeholderAPIService.isEnabled()}")
+        // Switch to global region dispatcher for final setup
+        withContext(globalRegionDispatcher) {
+            logger.info("ZealousChat enabled successfully!")
+            logger.info("Features enabled:")
+            logger.info("  - Chat formatting: ${configManager.config.chat.enableFormatting}")
+            logger.info("  - Colors: ${configManager.config.chat.enableColorCodes}")
+            logger.info("  - Text formatting: ${configManager.config.chat.enableTextFormatting}")
+            logger.info("  - Group formats: ${configManager.config.chatFormat.enableGroupFormats}")
+            logger.info("  - World formats: ${configManager.config.chatFormat.enableWorldFormats}")
+            logger.info("  - Join messages: ${configManager.config.joinLeave.enableJoin}")
+            logger.info("  - Leave messages: ${configManager.config.joinLeave.enableLeave}")
+            logger.info("  - Death messages: ${configManager.config.death.enabled}")
+            logger.info("  - Chat cooldown: ${configManager.config.chat.enableCooldown} (${configManager.config.chat.cooldownSeconds}s)")
+            logger.info("  - Mentions: ${configManager.config.chat.enableMentions}")
+            logger.info("  - URLs: ${configManager.config.chat.enableUrls}")
+            logger.info("  - Private messages: ${configManager.config.privateMessages.enablePrivateMessages}")
+            logger.info("  - Social spy: ${configManager.config.socialSpy.enableSocialSpy}")
+            logger.info("  - Swear filter: ${configManager.config.swearFilter.enabled}")
+            logger.info("  - PlaceholderAPI: ${placeholderAPIService.isEnabled()}")
+        }
     }
 
-    override fun onDisable() {
-        // Clear any cooldowns
-        if (::chatFormattingService.isInitialized) {
-            chatFormattingService.clearAllCooldowns()
+    override suspend fun onDisableAsync() {
+        // Cancel scheduled tasks
+        if (::scheduledTaskService.isInitialized) {
+            scheduledTaskService.cancelAllTasks()
         }
-        
-        // Save persisted data
-        if (::blockService.isInitialized) {
-            blockService.saveBlocks()
+
+        // Close database
+        if (::databaseService.isInitialized) {
+            databaseService.close()
         }
-        
+
         // Save configuration
         if (::configManager.isInitialized) {
             configManager.saveConfig()
         }
-        
+
         logger.info("ZealousChat disabled!")
+    }
+
+    private fun createDatabaseConfig(): DatabaseConfig {
+        val dbConfig = configManager.config.database
+        val dbType = when (dbConfig.type.lowercase()) {
+            "mysql" -> DatabaseType.MYSQL
+            "sqlite" -> DatabaseType.SQLITE
+            else -> DatabaseType.SQLITE
+        }
+
+        return DatabaseConfig(
+            type = dbType,
+            host = dbConfig.host,
+            port = dbConfig.port,
+            database = dbConfig.database,
+            username = dbConfig.username,
+            password = dbConfig.password,
+            sqliteFile = dbConfig.sqliteFile,
+            poolSize = dbConfig.poolSize,
+            connectionTimeout = dbConfig.connectionTimeout,
+            maxLifetime = dbConfig.maxLifetime,
+            leakDetectionThreshold = dbConfig.leakDetectionThreshold,
+            autoMigrate = dbConfig.autoMigrate,
+            enableArchive = dbConfig.enableArchive,
+            dataRetentionDays = dbConfig.dataRetentionDays
+        )
     }
 }

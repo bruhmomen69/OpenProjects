@@ -217,3 +217,18 @@ return Tag.styling(ClickEvent.openUrl("https://jd.advntr.dev/api/ " + version + 
 });
 // creates a tag to get javadocs of adventure by the version: <click-by-version:'4.14.0'>
 You can create your own complex placeholders with multiple arguments and their own logic.
+
+# Run test server
+
+To run the test server, use the following command:
+```
+timeout 30s ./gradlew :PaperMC:runServer || echo "Server test completed (timeout is expected)"
+```
+
+The server will automatically shut down after 30 seconds, which is expected behavior for testing.
+
+To run tests:
+```
+./gradlew :PaperMC:test
+```
+

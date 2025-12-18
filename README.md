@@ -115,7 +115,10 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
 - `/chatplugin admin toggle chat/messages/all <player> <true/false>` - Force toggle player settings
 - `/chatplugin admin socialspy <player> <true/false>` - Manage social spy access
 - `/chatplugin admin stats` - View system statistics and active users
-- `/chatplugin admin clear <toggles/socialspy/cooldowns/all>` - Clear various data types
+- `/chatplugin admin block <player> <target>` - Force a player to block another player
+- `/chatplugin admin unblock <player> <target>` - Force a player to unblock another player
+- `/chatplugin admin clearblocks <player>` - Clear all blocks for a player
+- `/chatplugin admin clear <toggles/socialspy/cooldowns/blocks/all>` - Clear various data types
 
 ### 🔧 **Technical Excellence**
 - **Modern Paper API** usage (AsyncChatEvent, Adventure Components)

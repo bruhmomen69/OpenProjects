@@ -30,7 +30,7 @@ class PrivateMessageService(
     /**
      * Send a private message from one player to another
      */
-    fun sendPrivateMessage(sender: Player, recipientName: String, message: String): Boolean {
+    suspend fun sendPrivateMessage(sender: Player, recipientName: String, message: String): Boolean {
         val config = configManager.config.privateMessages
         
         // Check if private messages are enabled
@@ -86,7 +86,7 @@ class PrivateMessageService(
         }
         
         // Check if sender is blocked by recipient
-        if (blockService?.isBlocked(recipient, sender) == true) {
+        if (blockService?.isBlocked(recipient.uniqueId, sender.uniqueId) == true) {
             sender.sendMessage(messageFormattingService.getConfigMessage(
                 "blocks.target_blocked_you",
                 sender,
@@ -148,7 +148,7 @@ class PrivateMessageService(
     /**
      * Reply to the last person who sent a message
      */
-    fun replyToLastSender(sender: Player, message: String): Boolean {
+    suspend fun replyToLastSender(sender: Player, message: String): Boolean {
         val lastSenderUUID = lastSenders[sender.uniqueId]
         if (lastSenderUUID == null) {
             sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.no_reply_target", sender))
@@ -186,10 +186,7 @@ class PrivateMessageService(
     fun handlePlayerQuit(player: Player) {
         lastSenders.remove(player.uniqueId)
         messageCooldowns.remove(player.uniqueId)
-        
-        // Handle player quit in block service
-        blockService?.handlePlayerQuit(player)
-        
+                
         // Remove this player as a last sender for others
         lastSenders.values.removeAll { it == player.uniqueId }
     }

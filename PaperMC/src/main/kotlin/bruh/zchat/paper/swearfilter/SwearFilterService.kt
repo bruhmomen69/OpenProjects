@@ -4,8 +4,12 @@ import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.FilterGroup
 import bruh.zchat.paper.utils.Levenshtein
+import com.github.shynixn.mccoroutine.folia.asyncDispatcher
+import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
+import com.github.shynixn.mccoroutine.folia.launch
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.PatternSyntaxException
 
 class SwearFilterService(
@@ -13,7 +17,7 @@ class SwearFilterService(
     private val configManager: ConfigManager,
     private val infractionManager: InfractionManager
 ) {
-    private val regexCache = mutableMapOf<String, Regex>()
+    private val regexCache = ConcurrentHashMap<String, Regex>()
 
     fun checkMessage(player: Player, message: String): Boolean {
         if (!configManager.config.swearFilter.enabled) {
@@ -22,7 +26,9 @@ class SwearFilterService(
 
         for (group in configManager.config.swearFilter.filterGroups) {
             if (isMatch(group, message)) {
-                handleInfraction(player, group)
+                plugin.launch(plugin.asyncDispatcher) {
+                    handleInfraction(player, group)
+                }
                 return true
             }
         }
@@ -42,6 +48,7 @@ class SwearFilterService(
                 }
                 regex.containsMatchIn(message)
             }
+
             "levenshtein" -> {
                 val words = message.split(Regex("\\s+"))
                 words.any { word ->
@@ -50,20 +57,21 @@ class SwearFilterService(
                     }
                 }
             }
+
             else -> false
         }
     }
 
-    private fun handleInfraction(player: Player, group: FilterGroup) {
-        val newInfractionCount = infractionManager.addInfraction(player, group.name)
+    private suspend fun handleInfraction(player: Player, group: FilterGroup) {
+        val newInfractionCount = infractionManager.addInfraction(player.uniqueId, group.name)
         val punishments = group.punishments[newInfractionCount]
 
         if (punishments != null) {
             for (command in punishments) {
                 val formattedCommand = command.replace("{player}", player.name)
-                Bukkit.getScheduler().runTask(plugin, Runnable {
+                plugin.launch(plugin.globalRegionDispatcher) {
                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), formattedCommand)
-                })
+                }
             }
         }
     }

@@ -91,6 +91,9 @@ class PaperMCLoader : PluginLoader {
             "io.github.revxrsal:lamp.common:4.0.0-rc.12",
             "io.github.revxrsal:lamp.bukkit:4.0.0-rc.12",
             "io.github.revxrsal:lamp.brigadier:4.0.0-rc.12",
+            "com.mysql:mysql-connector-j:9.5.0",
+            "org.xerial:sqlite-jdbc:3.47.1.0",
+            "com.zaxxer:HikariCP:7.0.2"
         )
     }
 }

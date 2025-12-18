@@ -12,6 +12,9 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - **Chat / Message toggles** per-player (with staff bypass)
 - **Inventory placeholders** `[inv]`, `[ender]`, `[armor]`, `[hand]`, `[pos]`, `[health]`
 - **URL auto-linking** & **@mentions** (configurable)
+- **Advanced swear filter** with regex and fuzzy (Levenshtein) matching
+- **Tiered punishment system** with configurable infraction thresholds
+- **Database-backed infraction tracking** with caching for performance
 - **Command framework** powered by Lamp with live `/zchat test` preview
 - **PlaceholderAPI bridge** (optional soft-depend)
 - **Hot-reloadable** HOCON configuration (`/zchat reload`)
@@ -83,11 +86,77 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - `/zealouschat toggle status` — View your current chat & private message status
   - Permission: `chatplugin.status`
 
+## Swear Filter System
+
+The swear filter provides advanced profanity detection with configurable punishment tiers and database persistence.
+
+### Filter Types
+
+**Regex Matching**
+- Uses regular expressions for precise pattern matching
+- Case-insensitive by default (e.g., `(?i)badword`)
+- Supports complex patterns and word boundaries
+- Automatically caches compiled patterns for performance
+
+**Levenshtein Distance Matching**
+- Fuzzy matching based on character distance between words
+- Configurable distance threshold (default: 2-3 characters)
+- Detects misspellings and variations of filtered words
+- Splits messages into individual words for comparison
+
+### Configuration Structure
+
+The swear filter uses filter groups with the following structure:
+
+```hocon
+swearFilter {
+    enabled = true
+    
+    filterGroups = [
+        {
+            name = "Default Regex"
+            type = "regex"
+            filters = ["(?i)badword", "(?i)anotherbadword"]
+            punishments = {
+                1 = ["warn {player} Language warning"]
+                3 = ["kick {player} Repeated language violations"]
+                5 = ["ban {player} Banned for language violations"]
+            }
+        },
+        {
+            name = "Default Levenshtein"
+            type = "levenshtein"
+            distance = 2
+            filters = ["swear", "curse"]
+            punishments = {
+                1 = ["mute {player} 5m Language violation"]
+                3 = ["mute {player} 30m Repeated violations"]
+            }
+        }
+    ]
+}
+```
+
+### Punishment System
+
+- **Infraction Tracking**: Each filter group tracks infractions independently
+- **Tiered Punishments**: Map infraction counts to command lists
+- **Command Placeholders**: Use `{player}` for the offending player's name
+- **Console Execution**: All punishment commands run as console
+- **Database Persistence**: Infraction counts persist across server restarts
+
+### Performance Features
+
+- **Caching**: Online player infractions cached in memory for instant access
+- **Async Processing**: Infraction handling runs asynchronously to prevent chat delays
+- **Database Optimization**: Efficient queries with proper indexing
+- **Regex Caching**: Compiled patterns cached to avoid recompilation
+
 ### Administrator Controls
 - `/zealouschat admin clear <type>` — Clear various chat-related data
   - Permission: `chatplugin.admin`
   - Parameters:
-    - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), or `all` (clears all data)
+    - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), `blocks` (clears all block lists), or `all` (clears all data)
 - `/zealouschat admin toggle chat <player> <true|false>` — Force toggle public chat for a player
   - Permission: `chatplugin.admin`
   - Parameters:
@@ -110,6 +179,20 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
     - `<true|false>`: Enable or disable social spy
 - `/zealouschat admin stats` — Display server-wide chat and private message toggle statistics
   - Permission: `chatplugin.admin`
+- `/zealouschat admin block <player> <target>` — Force a player to block another player
+  - Permission: `chatplugin.admin.block`
+  - Parameters:
+    - `<player>`: Player who will do the blocking
+    - `<target>`: Player to be blocked
+- `/zealouschat admin unblock <player> <target>` — Force a player to unblock another player
+  - Permission: `chatplugin.admin.block`
+  - Parameters:
+    - `<player>`: Player who will do the unblocking
+    - `<target>`: Player to be unblocked
+- `/zealouschat admin clearblocks <player>` — Clear all blocks for a player
+  - Permission: `chatplugin.admin.block`
+  - Parameters:
+    - `<player>`: Player whose block list will be cleared
 
 ## Quick Start
 1. Drop the built jar into `plugins/` and restart.
@@ -137,6 +220,7 @@ All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags
 | `chatplugin.admin.test`             | op      | Test formatting                     |
 | `chatplugin.admin.format`           | op      | Manage chat formats                 |
 | `chatplugin.admin.toggle`           | op      | Toggle plugin features              |
+| `chatplugin.admin.block`            | op      | Manage player block lists           |
 | `chatplugin.color`                  | true    | Use colour codes in chat            |
 | `chatplugin.formatting`             | true    | Use text formatting codes           |
 | `chatplugin.url`                    | true    | Send clickable URLs                 |

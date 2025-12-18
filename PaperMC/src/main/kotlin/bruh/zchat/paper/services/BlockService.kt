@@ -1,196 +1,167 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.database.DatabaseService
+import bruh.zchat.paper.database.PlayerDataManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
-import org.spongepowered.configurate.hocon.HoconConfigurationLoader
-import org.spongepowered.configurate.ConfigurationNode
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
-import java.nio.file.Path
-import java.nio.file.Files
 
-/**
- * Service for managing player block lists for private messages
- */
 class BlockService(
     private val configManager: ConfigManager,
     private val messageFormattingService: MessageFormattingService,
     private val socialSpyService: SocialSpyService,
-    private val dataFolder: Path
+    private val databaseService: DatabaseService,
+    private val playerDataManager: PlayerDataManager
 ) {
     private val logger = LoggerFactory.getLogger(BlockService::class.java)
     
-    // Track blocked players: player UUID -> set of blocked player UUIDs
-    private val blockedPlayers = ConcurrentHashMap<UUID, MutableSet<UUID>>()
-    
-    private val blocksFile = dataFolder.resolve("blocks.conf")
-    private val blocksLoader = HoconConfigurationLoader.builder()
-        .path(blocksFile)
-        .prettyPrinting(true)
-        .build()
-    
-    /**
-     * Block a player from sending private messages to the blocker
-     */
-    fun blockPlayer(player: Player, targetName: String): Boolean {
+    suspend fun blockPlayer(blockerUuid: UUID, blockedUuid: UUID): Boolean = withContext(Dispatchers.IO) {
         val config = configManager.config.blocks
         
-        // Check if block system is enabled
         if (!config.enableBlockSystem) {
-            player.sendMessage(messageFormattingService.getConfigMessage("system.feature_disabled", player))
-            return false
+            return@withContext false
         }
         
-        // Find target player
-        val target = Bukkit.getPlayer(targetName)
-        if (target == null) {
-            player.sendMessage(messageFormattingService.getConfigMessage(
-                "commands.player_not_found",
-                player,
-                mapOf("player" to targetName)
-            ))
-            return false
+        try {
+            databaseService.executeTransaction { tx ->
+                // Check if already blocked
+                val existing = tx.executeQuerySingle(
+                    "SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
+                    blockerUuid, blockedUuid
+                ) { rs -> rs.getLong("id") }
+                
+                if (existing != null) {
+                    return@executeTransaction false // Already blocked
+                }
+                
+                // Check block limit
+                val currentBlocks = tx.executeQuery(
+                    "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
+                    blockerUuid
+                ) { rs -> rs.getString("blocked_uuid") }.size
+                
+                if (currentBlocks >= config.maxBlocksPerPlayer) {
+                    return@executeTransaction false // Block limit reached
+                }
+                
+                // Add block
+                tx.executeUpdate(
+                    """INSERT INTO player_blocks 
+                    (blocker_uuid, blocked_uuid, blocked_by_username) 
+                    VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))""",
+                    blockerUuid, blockedUuid, blockerUuid
+                )
+                
+                // Update player cache
+                val playerData = playerDataManager.getPlayerData(blockerUuid)
+                if (playerData != null) {
+                    val updatedBlocked = playerData.blockedPlayers.toMutableSet()
+                    updatedBlocked.add(blockedUuid)
+                    playerDataManager.updatePlayerBlockedPlayers(blockerUuid, updatedBlocked)
+                }
+                
+                true
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to block player", e)
+            false
         }
-        
-        // Check if trying to block self
-        if (target.uniqueId == player.uniqueId && !config.blockSelf) {
-            player.sendMessage(messageFormattingService.getConfigMessage(
-                "private_messages.self_message",
-                player
-            ))
-            return false
-        }
-        
-        // Get or create block list for player
-        val blockList = blockedPlayers.getOrPut(player.uniqueId) { ConcurrentHashMap.newKeySet() }
-        
-        // Check if already blocked
-        if (blockList.contains(target.uniqueId)) {
-            player.sendMessage(messageFormattingService.getConfigMessage(
-                "blocks.already_blocked",
-                player,
-                mapOf("player" to target.name)
-            ))
-            return false
-        }
-        
-        // Check max blocks limit
-        if (blockList.size >= config.maxBlocksPerPlayer) {
-            player.sendMessage(messageFormattingService.getConfigMessage(
-                "system.genericError", // Could add specific message for max blocks
-                player
-            ))
-            return false
-        }
-        
-        // Add to block list
-        blockList.add(target.uniqueId)
-        
-        // Send success message
-        player.sendMessage(messageFormattingService.getConfigMessage(
-            "blocks.blocked",
-            player,
-            mapOf("player" to target.name)
-        ))
-        
-        // Log if enabled
-        if (config.logBlocks) {
-            logger.info("${player.name} blocked ${target.name}")
-        }
-        
-        // Notify social spy if enabled
-        socialSpyService.broadcastBlockAction(player, target, "blocked")
-        
-        return true
     }
     
-    /**
-     * Unblock a player
-     */
-    fun unblockPlayer(player: Player, targetName: String): Boolean {
+    suspend fun unblockPlayer(blockerUuid: UUID, blockedUuid: UUID): Boolean = withContext(Dispatchers.IO) {
         val config = configManager.config.blocks
         
-        // Check if block system is enabled
         if (!config.enableBlockSystem) {
-            player.sendMessage(messageFormattingService.getConfigMessage("system.feature_disabled", player))
-            return false
+            return@withContext false
         }
         
-        // Find target player (check offline players too)
-        val target = Bukkit.getPlayer(targetName) ?: Bukkit.getOfflinePlayer(targetName)
-        if (target?.uniqueId == null) {
-            player.sendMessage(messageFormattingService.getConfigMessage(
-                "commands.player_not_found",
-                player,
-                mapOf("player" to targetName)
-            ))
-            return false
+        try {
+            val affectedRows = databaseService.executeUpdate(
+                "DELETE FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
+                blockerUuid, blockedUuid
+            )
+            
+            if (affectedRows > 0) {
+                // Update player cache
+                val playerData = playerDataManager.getPlayerData(blockerUuid)
+                if (playerData != null) {
+                    val updatedBlocked = playerData.blockedPlayers.toMutableSet()
+                    updatedBlocked.remove(blockedUuid)
+                    playerDataManager.updatePlayerBlockedPlayers(blockerUuid, updatedBlocked)
+                }
+            }
+            
+            affectedRows > 0
+        } catch (e: Exception) {
+            logger.error("Failed to unblock player", e)
+            false
         }
-        
-        // Get block list for player
-        val blockList = blockedPlayers[player.uniqueId]
-        if (blockList == null || !blockList.contains(target.uniqueId)) {
-            player.sendMessage(messageFormattingService.getConfigMessage(
-                "blocks.not_blocked",
-                player,
-                mapOf("player" to targetName)
-            ))
-            return false
-        }
-        
-        // Remove from block list
-        blockList.remove(target.uniqueId)
-        
-        // Clean up empty block list
-        if (blockList.isEmpty()) {
-            blockedPlayers.remove(player.uniqueId)
-        }
-        
-        // Send success message
-        player.sendMessage(messageFormattingService.getConfigMessage(
-            "blocks.unblocked",
-            player,
-            mapOf("player" to targetName)
-        ))
-        
-        // Log if enabled
-        if (config.logBlocks) {
-            logger.info("${player.name} unblocked $targetName")
-        }
-        
-        // Notify social spy if enabled
-        if (target is Player) {
-            socialSpyService.broadcastBlockAction(player, target, "unblocked")
-        }
-        
-        return true
     }
     
-    /**
-     * Get list of blocked players for a player
-     */
-    fun getBlockedPlayers(player: Player): List<String> {
-        val blockList = blockedPlayers[player.uniqueId] ?: return emptyList()
+    suspend fun getBlockedPlayers(playerUuid: UUID): Set<UUID> {
+        // Check cache first
+        val playerData = playerDataManager.getPlayerData(playerUuid)
+        if (playerData != null) {
+            return playerData.blockedPlayers
+        }
         
-        return blockList.mapNotNull { uuid ->
+        // Fallback to database for offline players
+        return withContext(Dispatchers.IO) {
+            try {
+                databaseService.executeQuery(
+                    "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
+                    playerUuid
+                ) { rs ->
+                    UUID.fromString(rs.getString("blocked_uuid"))
+                }.toSet()
+            } catch (e: Exception) {
+                logger.error("Failed to get blocked players for $playerUuid", e)
+                emptySet()
+            }
+        }
+    }
+    
+    suspend fun isBlocked(recipientUuid: UUID, senderUuid: UUID): Boolean {
+        // Check cache first
+        val recipientData = playerDataManager.getPlayerData(recipientUuid)
+        if (recipientData != null) {
+            return senderUuid in recipientData.blockedPlayers
+        }
+        
+        // Fallback to database for offline players
+        return withContext(Dispatchers.IO) {
+            try {
+                val count = databaseService.executeQuerySingle(
+                    "SELECT COUNT(*) as count FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
+                    recipientUuid, senderUuid
+                ) { rs -> rs.getInt("count") } ?: 0
+                
+                count > 0
+            } catch (e: Exception) {
+                logger.error("Failed to check if player is blocked", e)
+                false
+            }
+        }
+    }
+    
+    fun getBlockedPlayersSync(player: Player): List<String> {
+        val blockedSet = runBlocking { getBlockedPlayers(player.uniqueId) }
+        
+        return blockedSet.mapNotNull { uuid ->
             val blockedPlayer = Bukkit.getOfflinePlayer(uuid)
             blockedPlayer.name
         }.sorted()
     }
     
-    /**
-     * Check if a sender is blocked by the recipient
-     */
-    fun isBlocked(recipient: Player, sender: Player): Boolean {
-        val blockList = blockedPlayers[recipient.uniqueId] ?: return false
-        return blockList.contains(sender.uniqueId)
+    fun isBlockedSync(recipient: Player, sender: Player): Boolean {
+        return runBlocking { isBlocked(recipient.uniqueId, sender.uniqueId) }
     }
     
-    /**
-     * Display block list to player
-     */
     fun showBlockList(player: Player) {
         val config = configManager.config.blocks
         
@@ -199,7 +170,7 @@ class BlockService(
             return
         }
         
-        val blockedList = getBlockedPlayers(player)
+        val blockedList = getBlockedPlayersSync(player)
         
         if (blockedList.isEmpty()) {
             player.sendMessage(messageFormattingService.getConfigMessage("blocks.block_list_empty", player))
@@ -213,156 +184,105 @@ class BlockService(
         }
     }
     
-    /**
-     * Force block a player (admin command)
-     */
-    fun forceBlock(admin: Player, playerName: String, targetName: String): Boolean {
-        val targetPlayer = Bukkit.getPlayer(playerName)
-        if (targetPlayer == null) {
-            admin.sendMessage(messageFormattingService.getConfigMessage(
-                "commands.player_not_found",
-                admin,
-                mapOf("player" to playerName)
-            ))
-            return false
+    suspend fun clearBlocks(playerUuid: UUID): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val affectedRows = databaseService.executeUpdate(
+                "DELETE FROM player_blocks WHERE blocker_uuid = ?",
+                playerUuid
+            )
+            
+            // Update player cache
+            val playerData = playerDataManager.getPlayerData(playerUuid)
+            if (playerData != null) {
+                playerDataManager.updatePlayerBlockedPlayers(playerUuid, emptySet())
+            }
+            
+            logger.info("Cleared $affectedRows blocks for player $playerUuid")
+            affectedRows > 0
+        } catch (e: Exception) {
+            logger.error("Failed to clear blocks for player $playerUuid", e)
+            false
         }
-        
-        return blockPlayer(targetPlayer, targetName)
     }
     
-    /**
-     * Force unblock a player (admin command)
-     */
-    fun forceUnblock(admin: Player, playerName: String, targetName: String): Boolean {
-        val targetPlayer = Bukkit.getPlayer(playerName)
-        if (targetPlayer == null) {
-            admin.sendMessage(messageFormattingService.getConfigMessage(
-                "commands.player_not_found",
-                admin,
-                mapOf("player" to playerName)
-            ))
-            return false
-        }
-        
-        return unblockPlayer(targetPlayer, targetName)
-    }
-    
-    /**
-     * Clear all blocks for a player (admin command)
-     */
-    fun clearBlocks(player: Player) {
-        val blockList = blockedPlayers.remove(player.uniqueId)
-        val count = blockList?.size ?: 0
-        
-        logger.info("Cleared $count blocks for ${player.name}")
-    }
-    
-    /**
-     * Clear all blocks for a player by name (admin command)
-     */
-    fun clearBlocksByName(admin: Player, playerName: String): Boolean {
-        val targetPlayer = Bukkit.getPlayer(playerName)
-        if (targetPlayer == null) {
-            admin.sendMessage(messageFormattingService.getConfigMessage(
-                "commands.player_not_found",
-                admin,
-                mapOf("player" to playerName)
-            ))
-            return false
-        }
-        
-        clearBlocks(targetPlayer)
-        admin.sendMessage(messageFormattingService.getConfigMessage(
-            "commands.feature_enabled", // Generic success message
-            admin,
-            mapOf("feature" to "Block list cleared for ${targetPlayer.name}")
-        ))
-        
-        return true
-    }
-    
-    /**
-     * Get statistics about blocks
-     */
     fun getBlockStats(): Map<String, Int> {
-        val totalBlocks = blockedPlayers.values.sumOf { it.size }
+        val onlinePlayers = playerDataManager.getOnlinePlayerData()
+        val totalBlocks = onlinePlayers.values.sumOf { it.blockedPlayers.size }
         return mapOf(
-            "total_blocking_players" to blockedPlayers.size,
+            "total_blocking_players" to onlinePlayers.size,
             "total_blocks" to totalBlocks,
-            "average_blocks_per_player" to if (blockedPlayers.isNotEmpty()) totalBlocks / blockedPlayers.size else 0
+            "average_blocks_per_player" to if (onlinePlayers.isNotEmpty()) totalBlocks / onlinePlayers.size else 0
         )
     }
     
-    /**
-     * Handle player quit - clean up if not persistent
-     */
-    fun handlePlayerQuit(player: Player) {
-        val config = configManager.config.blocks
+    // Admin methods for database management
+    suspend fun forceBlock(adminPlayerUuid: UUID, playerName: String, targetName: String): Boolean = withContext(Dispatchers.IO) {
+        // Resolve the player who should be doing the blocking
+        val player = Bukkit.getPlayer(playerName) ?: withContext(Dispatchers.IO) { Bukkit.getOfflinePlayer(playerName) }
         
-        if (!config.persistBlockLists) {
-            blockedPlayers.remove(player.uniqueId)
-            logger.debug("Removed non-persistent block list for ${player.name}")
+        // Resolve the target to be blocked
+        val target = Bukkit.getPlayer(targetName) ?: withContext(Dispatchers.IO) { Bukkit.getOfflinePlayer(targetName) }
+
+        
+        // Use the player's UUID as the blocker, not the admin's UUID
+        val success = blockPlayer(player.uniqueId, target.uniqueId)
+        
+        if (success) {
+            val adminLabel = if (adminPlayerUuid == UUID(0L, 0L)) "CONSOLE" else adminPlayerUuid.toString()
+            logger.info("Admin $adminLabel forced ${player.name} to block ${target.name}")
         }
+        
+        return@withContext success
     }
     
-    /**
-     * Clear all block data (admin command)
-     */
-    fun clearAllBlocks() {
-        val totalBlocks = blockedPlayers.values.sumOf { it.size }
-        val totalPlayers = blockedPlayers.size
+    suspend fun forceUnblock(adminPlayerUuid: UUID, playerName: String, targetName: String): Boolean {
+        // Resolve the player who should be doing the unblocking
+        val player = Bukkit.getPlayer(playerName) ?: withContext(Dispatchers.IO) { Bukkit.getOfflinePlayer(playerName) }
         
-        blockedPlayers.clear()
+        // Resolve the target to be unblocked
+        val target = Bukkit.getPlayer(targetName) ?: withContext(Dispatchers.IO) { Bukkit.getOfflinePlayer(targetName) }
         
-        logger.info("Cleared all block data: $totalBlocks blocks from $totalPlayers players")
+        // Use the player's UUID as the blocker, not the admin's UUID
+        val success = unblockPlayer(player.uniqueId, target.uniqueId)
+        
+        if (success) {
+            val adminLabel = if (adminPlayerUuid == UUID(0L, 0L)) "CONSOLE" else adminPlayerUuid.toString()
+            logger.info("Admin $adminLabel forced ${player.name} to unblock ${target.name}")
+        }
+        
+        return success
     }
     
-    /**
-     * Load persisted block lists
-     */
-    fun loadBlocks() {
-        val config = configManager.config.blocks
-        if (!config.persistBlockLists) return
+    suspend fun clearBlocksByName(playerName: String): Boolean {
+        // Resolve the player (support both online and offline players)
+        val player = Bukkit.getPlayer(playerName) ?: withContext(Dispatchers.IO) { Bukkit.getOfflinePlayer(playerName) }
         
+        val success = clearBlocks(player.uniqueId)
+        
+        if (success) {
+            logger.info("Cleared all blocks for player ${player.name} ($playerName)")
+        }
+        
+        return success
+    }
+    
+    suspend fun clearAllBlocks(): Boolean = withContext(Dispatchers.IO) {
         try {
-            if (!Files.exists(blocksFile)) return
+            val affectedRows = databaseService.executeUpdate(
+                "DELETE FROM player_blocks"
+            )
             
-            val node: ConfigurationNode = blocksLoader.load()
-            val blocksNode = node.node("blocks")
-            
-            for (entry in blocksNode.childrenMap()) {
-                val playerUUID = UUID.fromString(entry.key.toString())
-                val blockedList = entry.value.getList(String::class.java)
-                    ?.map { UUID.fromString(it) }
-                    ?.toMutableSet() ?: mutableSetOf()
-                blockedPlayers[playerUUID] = blockedList
+            // Update all online player caches
+            val onlinePlayers = playerDataManager.getOnlinePlayerData()
+            onlinePlayers.forEach { (uuid, _) ->
+                playerDataManager.updatePlayerBlockedPlayers(uuid, emptySet())
             }
             
-            logger.info("Loaded block lists for ${blockedPlayers.size} players")
+            logger.info("Cleared all block data")
+            affectedRows > 0
         } catch (e: Exception) {
-            logger.error("Failed to load block lists", e)
-        }
-    }
-    
-    /**
-     * Save block lists to file
-     */
-    fun saveBlocks() {
-        val config = configManager.config.blocks
-        if (!config.persistBlockLists) return
-        
-        try {
-            val node = blocksLoader.createNode()
-            val blocksNode = node.node("blocks")
-            
-            for ((playerUUID, blockedSet) in blockedPlayers) {
-                blocksNode.node(playerUUID.toString()).setList(String::class.java, blockedSet.map { it.toString() })
-            }
-            
-            blocksLoader.save(node)
-            logger.info("Saved block lists for ${blockedPlayers.size} players")
-        } catch (e: Exception) {
-            logger.error("Failed to save block lists", e)
+            logger.error("Failed to clear all blocks", e)
+            false
         }
     }
 }

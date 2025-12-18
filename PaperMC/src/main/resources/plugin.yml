@@ -11,6 +11,11 @@ libraries:
   - io.github.revxrsal:lamp.common:4.0.0-rc.12
   - io.github.revxrsal:lamp.bukkit:4.0.0-rc.12
   - io.github.revxrsal:lamp.brigadier:4.0.0-rc.12
+  - com.mysql:mysql-connector-j:9.5.0
+  - org.xerial:sqlite-jdbc:3.47.1.0
+  - com.zaxxer:HikariCP:7.0.2
+  - com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.22.0
+  - com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.22.0
 
 softdepend:
   - PlaceholderAPI
@@ -54,6 +59,7 @@ permissions:
       chatplugin.admin.test: true
       chatplugin.admin.format: true
       chatplugin.admin.toggle: true
+      chatplugin.admin.block: true
     default: op
   
   chatplugin.admin.reload:
@@ -74,6 +80,10 @@ permissions:
   
   chatplugin.admin.toggle:
     description: Toggle plugin features
+    default: op
+  
+  chatplugin.admin.block:
+    description: Manage player block lists
     default: op
   
   chatplugin.color:

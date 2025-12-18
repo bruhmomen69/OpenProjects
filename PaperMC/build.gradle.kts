@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     id("buildsrc.convention.kotlin-jvm")
     id("com.gradleup.shadow") version "8.3.0"
@@ -44,6 +46,17 @@ dependencies {
     // PlaceholderAPI integration (optional)
     compileOnly("me.clip:placeholderapi:2.11.6")
 
+    // Database dependencies
+    implementation("org.flywaydb:flyway-core:11.19.0")
+    implementation("org.flywaydb:flyway-mysql:11.19.0")
+    compileOnly("com.mysql:mysql-connector-j:9.5.0")
+    compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
+    compileOnly("com.zaxxer:HikariCP:7.0.2")
+
+    implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.22.0")
+    implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.22.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+
     implementation(project(":utils"))
     implementation(libs.kotlinxSerialization)
 }
@@ -55,6 +68,10 @@ tasks {
     // Your plugin's jar (or shadowJar if present) will be used automatically.
     minecraftVersion("1.21")
   }
+}
+
+tasks.named<ShadowJar>("shadowJar") {
+    mergeServiceFiles()
 }
 
 val targetJavaVersion = 21

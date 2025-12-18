@@ -1,5 +1,6 @@
 package bruh.zchat.paper.config
 
+import bruh.zchat.paper.database.DatabaseType
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
 
@@ -45,7 +46,10 @@ data class Config(
     val messages: MessagesConfig = MessagesConfig(),
     
     @field:Comment("Configurable swear filter with different filter groups, types (regex, levenshtein), and tiered punishments.")
-    val swearFilter: SwearFilterConfig = SwearFilterConfig()
+    val swearFilter: SwearFilterConfig = SwearFilterConfig(),
+    
+    @field:Comment("Database configuration for player data storage")
+    val database: DatabaseConfig = DatabaseConfig()
 )
 
 @ConfigSerializable
@@ -752,4 +756,47 @@ data class FilterGroup(
 
     @field:Comment("A map of infraction counts to a list of punishment commands. Use {player} for the player's name.")
     val punishments: Map<Int, List<String>> = emptyMap()
+)
+
+@ConfigSerializable
+data class DatabaseConfig(
+    @field:Comment("Database type: 'sqlite' or 'mysql'")
+    val type: String = "sqlite",
+    
+    @field:Comment("MySQL/PostgreSQL connection settings (ignored for SQLite)")
+    val host: String = "localhost",
+    val port: Int = 3306,
+    val database: String = "chatplugin",
+    val username: String = "",
+    val password: String = "",
+    
+    @field:Comment("SQLite database file name")
+    val sqliteFile: String = "database.db",
+    
+    @field:Comment("Connection pool size (default: 8)")
+    val poolSize: Int = 8,
+    
+    @field:Comment("Connection timeout in milliseconds (default: 30000)")
+    val connectionTimeout: Long = 30000,
+    
+    @field:Comment("Maximum connection lifetime in milliseconds (default: 1800000)")
+    val maxLifetime: Long = 1800000,
+    
+    @field:Comment("Connection leak detection threshold in milliseconds (default: 30000)")
+    val leakDetectionThreshold: Long = 30000,
+    
+    @field:Comment("Automatically migrate existing block data")
+    val autoMigrate: Boolean = true,
+    
+    @field:Comment("Enable data archiving before deletion")
+    val enableArchive: Boolean = true,
+    
+    @field:Comment("Data retention period in days (default: 30)")
+    val dataRetentionDays: Int = 30,
+    
+    @field:Comment("Daily maintenance time (24-hour format, default: 02:00)")
+    val maintenanceTime: String = "02:00",
+    
+    @field:Comment("Enable performance monitoring and logging")
+    val enablePerformanceMonitoring: Boolean = false
 )

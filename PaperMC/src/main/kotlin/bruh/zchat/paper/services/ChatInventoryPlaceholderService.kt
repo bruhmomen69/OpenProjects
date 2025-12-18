@@ -13,6 +13,7 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import bruh.zchat.paper.utils.streaming.BukkitObjectInputStream
 import bruh.zchat.paper.utils.streaming.BukkitObjectOutputStream
+import org.bukkit.attribute.Attribute
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.Files
@@ -251,7 +252,7 @@ class ChatInventoryPlaceholderService(
             }
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
-                val maxHealth = player.maxHealth.roundToInt()
+                val maxHealth = player.getAttribute(Attribute.MAX_HEALTH)?.value?.roundToInt() ?: 20
                 val food = player.foodLevel
                 val saturation = player.saturation.roundToInt()
                 val placeholders = mapOf(
@@ -320,7 +321,7 @@ class ChatInventoryPlaceholderService(
             }
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
-                val maxHealth = player.maxHealth.roundToInt()
+                val maxHealth = player.getAttribute(Attribute.MAX_HEALTH)?.value?.roundToInt() ?: 20
                 val food = player.foodLevel
                 val saturation = player.saturation.roundToInt()
                 val effects = getEffectsText(player)

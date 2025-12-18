@@ -1,0 +1,309 @@
+package bruh.zchat.paper.database
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.bukkit.entity.Player
+import org.slf4j.LoggerFactory
+import java.sql.ResultSet
+import java.time.Instant
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+
+class PlayerDataManager(private val databaseService: DatabaseService) {
+    private val logger = LoggerFactory.getLogger(PlayerDataManager::class.java)
+    private val onlinePlayers = ConcurrentHashMap<UUID, PlayerData>()
+    
+    data class PlayerData(
+        val uuid: UUID,
+        val username: String,
+        val firstSeen: Instant,
+        val lastSeen: Instant,
+        val isOnline: Boolean,
+        val infractions: Map<String, Int>,
+        val blockedPlayers: Set<UUID>,
+        val joinTimestamp: Instant = Instant.now(), // Added for server switching detection
+        var isDirty: Boolean = false
+    )
+    
+    suspend fun onPlayerJoin(player: Player): PlayerData = withContext(Dispatchers.IO) {
+        val now = Instant.now()
+        
+        try {
+            // Check if player exists
+            val existingPlayer = databaseService.executeQuerySingle(
+                "SELECT uuid, username, first_seen, last_seen FROM players WHERE uuid = ?",
+                player.uniqueId
+            ) { rs -> 
+                PlayerData(
+                    uuid = UUID.fromString(rs.getString("uuid")),
+                    username = rs.getString("username"),
+                    firstSeen = rs.getTimestamp("first_seen").toInstant(),
+                    lastSeen = rs.getTimestamp("last_seen").toInstant(),
+                    isOnline = true,
+                    infractions = emptyMap(),
+                    blockedPlayers = emptySet(),
+                    joinTimestamp = now // Initialize with current join time for existing players
+                )
+            }
+
+            if (existingPlayer == null) {
+                val insertSql = when (databaseService.databaseType) {
+                    DatabaseType.MYSQL -> """INSERT IGNORE INTO players
+                    (uuid, username, first_seen, last_seen, is_online)
+                    VALUES (?, ?, ?, ?, ?)"""
+                    DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
+                    (uuid, username, first_seen, last_seen, is_online)
+                    VALUES (?, ?, ?, ?, ?)"""
+                }
+
+                databaseService.executeUpdate(
+                    insertSql,
+                    player.uniqueId, player.name, now, now, true
+                )
+            }
+            
+            // Update existing player - ensure is_online is set to TRUE
+            databaseService.executeUpdate(
+                "UPDATE players SET username = ?, last_seen = ?, is_online = TRUE WHERE uuid = ?",
+                player.name, now, player.uniqueId
+            )
+            
+            // Load infractions
+            val infractions = databaseService.executeQuery(
+                "SELECT group_name, count FROM player_infractions WHERE player_uuid = ?",
+                player.uniqueId
+            ) { rs ->
+                rs.getString("group_name") to rs.getInt("count")
+            }.toMap()
+            
+            // Load blocked players
+            val blockedPlayers = databaseService.executeQuery(
+                "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
+                player.uniqueId
+            ) { rs ->
+                UUID.fromString(rs.getString("blocked_uuid"))
+            }.toSet()
+            
+            val playerData = (existingPlayer ?: PlayerData(
+                uuid = player.uniqueId,
+                username = player.name,
+                firstSeen = now,
+                lastSeen = now,
+                isOnline = true,
+                infractions = emptyMap(),
+                blockedPlayers = emptySet(),
+                joinTimestamp = now
+            )).copy(
+                username = player.name,
+                lastSeen = now,
+                isOnline = true,
+                infractions = infractions,
+                blockedPlayers = blockedPlayers,
+                joinTimestamp = now
+            )
+            
+            onlinePlayers[player.uniqueId] = playerData
+            
+            logger.debug("Loaded player data for ${player.name}: ${infractions.size} infractions, ${blockedPlayers.size} blocked players")
+            playerData
+            
+        } catch (e: Exception) {
+            // Create new player if doesn't exist
+            val insertSql = when (databaseService.databaseType) {
+                DatabaseType.MYSQL -> """INSERT IGNORE INTO players
+                (uuid, username, first_seen, last_seen, is_online)
+                VALUES (?, ?, ?, ?, ?)"""
+                DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
+                (uuid, username, first_seen, last_seen, is_online)
+                VALUES (?, ?, ?, ?, ?)"""
+            }
+
+            databaseService.executeUpdate(
+                insertSql,
+                player.uniqueId, player.name, now, now, true
+            )
+            
+            val playerData = PlayerData(
+                uuid = player.uniqueId,
+                username = player.name,
+                firstSeen = now,
+                lastSeen = now,
+                isOnline = true,
+                infractions = emptyMap(),
+                blockedPlayers = emptySet(),
+                joinTimestamp = now
+            )
+            
+            onlinePlayers[player.uniqueId] = playerData
+            
+            logger.debug("Created new player data for ${player.name}")
+            playerData
+        }
+    }
+    
+    suspend fun onPlayerQuit(player: Player) = withContext(Dispatchers.IO) {
+        try {
+            val now = Instant.now()
+            
+            // Get player data from cache and persist if dirty before removal
+            val playerData = onlinePlayers[player.uniqueId]
+            if (playerData != null) {
+                if (playerData.isDirty) {
+                    persistPlayerData(playerData)
+                    logger.debug("Persisted dirty data for ${player.name} on quit")
+                }
+                
+                // Check for server switching scenario before updating is_online
+                val currentLastSeen = getCurrentLastSeenFromDatabase(player.uniqueId)
+                val joinTimestamp = playerData.joinTimestamp
+                val timeSinceJoin = now.epochSecond - joinTimestamp.epochSecond
+                val timeSinceLastSeen = if (currentLastSeen != Instant.EPOCH) {
+                    now.epochSecond - currentLastSeen.epochSecond
+                } else {
+                    0L
+                }
+                
+                // Don't set offline if this appears to be a server switch:
+                // 1. Last seen in database is >= 10 seconds newer than our stored join time
+                // 2. The last seen update was within the last 30 seconds  
+                // 3. Player was online for less than 10 seconds (likely server switch)
+                val isServerSwitch = timeSinceLastSeen >= 10 && timeSinceLastSeen <= 30 && timeSinceJoin < 10
+                
+                if (isServerSwitch) {
+                    // Likely server switch - update last_seen but keep is_online = TRUE
+                    databaseService.executeUpdate(
+                        "UPDATE players SET last_seen = ? WHERE uuid = ?",
+                        now, player.uniqueId
+                    )
+                    logger.debug("Skipping is_online update for ${player.name} - likely server switch detected (timeSinceJoin: ${timeSinceJoin}s, timeSinceLastSeen: ${timeSinceLastSeen}s)")
+                } else {
+                    // Normal quit - update database to set is_online = FALSE and update last_seen
+                    databaseService.executeUpdate(
+                        "UPDATE players SET last_seen = ?, is_online = FALSE WHERE uuid = ?",
+                        now, player.uniqueId
+                    )
+                }
+                
+                // Remove from online cache AFTER persisting and database update
+                onlinePlayers.remove(player.uniqueId)
+                
+                logger.debug("Saved player data for ${player.name}: ${playerData.infractions.size} infractions, ${playerData.blockedPlayers.size} blocked players")
+            } else {
+                // Player data not in cache, still update database to ensure is_online = FALSE
+                databaseService.executeUpdate(
+                    "UPDATE players SET last_seen = ?, is_online = FALSE WHERE uuid = ?",
+                    now, player.uniqueId
+                )
+                logger.debug("Updated database for ${player.name} (data not in cache)")
+            }
+            
+        } catch (e: Exception) {
+            logger.error("Failed to save player data for ${player.name}", e)
+        }
+    }
+    
+    fun getPlayerData(uuid: UUID): PlayerData? {
+        return onlinePlayers[uuid]
+    }
+    
+    fun getOnlinePlayerData(): Map<UUID, PlayerData> {
+        return onlinePlayers.toMap()
+    }
+    
+    suspend fun markInfractionDirty(playerUuid: UUID) {
+        val playerData = onlinePlayers[playerUuid]
+        if (playerData != null) {
+            playerData.isDirty = true
+        }
+    }
+    
+    suspend fun markBlockDirty(playerUuid: UUID) {
+        val playerData = onlinePlayers[playerUuid]
+        if (playerData != null) {
+            playerData.isDirty = true
+        }
+    }
+    
+    suspend fun updatePlayerInfractions(playerUuid: UUID, infractions: Map<String, Int>) = withContext(Dispatchers.IO) {
+        val playerData = onlinePlayers[playerUuid]
+        if (playerData != null) {
+            onlinePlayers[playerUuid] = playerData.copy(infractions = infractions, isDirty = true)
+        }
+    }
+    
+    suspend fun updatePlayerBlockedPlayers(playerUuid: UUID, blockedPlayers: Set<UUID>) = withContext(Dispatchers.IO) {
+        val playerData = onlinePlayers[playerUuid]
+        if (playerData != null) {
+            onlinePlayers[playerUuid] = playerData.copy(blockedPlayers = blockedPlayers, isDirty = true)
+        }
+    }
+    
+    // NEW: Persist individual player data
+    private suspend fun persistPlayerData(playerData: PlayerData) {
+        try {
+            databaseService.executeTransaction { tx ->
+                // Persist infractions
+                persistInfractions(tx, playerData)
+                // Persist blocked players
+                persistBlockedPlayers(tx, playerData)
+            }
+            playerData.isDirty = false
+        } catch (e: Exception) {
+            logger.error("Failed to persist dirty data for player ${playerData.uuid}", e)
+            throw e
+        }
+    }
+    
+
+    
+    // Helper method to get current lastSeen from database for server switching detection
+    private suspend fun getCurrentLastSeenFromDatabase(uuid: UUID): Instant {
+        return try {
+            databaseService.executeQuerySingle(
+                "SELECT last_seen FROM players WHERE uuid = ?",
+                uuid
+            ) { rs -> rs.getTimestamp("last_seen").toInstant() } ?: Instant.EPOCH
+        } catch (e: Exception) {
+            logger.debug("Failed to get last_seen for player $uuid, using epoch", e)
+            Instant.EPOCH
+        }
+    }
+    
+    // NEW: Helper methods for persisting specific data
+    private suspend fun persistInfractions(tx: DatabaseService.TransactionContext, playerData: PlayerData) {
+        // Delete existing infractions
+        tx.executeUpdate(
+            "DELETE FROM player_infractions WHERE player_uuid = ?",
+            playerData.uuid
+        )
+        
+        // Insert current infractions
+        playerData.infractions.forEach { (groupName, count) ->
+            tx.executeUpdate(
+                """INSERT INTO player_infractions 
+                (player_uuid, group_name, count, last_updated) 
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)""",
+                playerData.uuid, groupName, count
+            )
+        }
+    }
+    
+    private suspend fun persistBlockedPlayers(tx: DatabaseService.TransactionContext, playerData: PlayerData) {
+        // Delete existing blocked players
+        tx.executeUpdate(
+            "DELETE FROM player_blocks WHERE blocker_uuid = ?",
+            playerData.uuid
+        )
+        
+        // Insert current blocked players
+        playerData.blockedPlayers.forEach { blockedUuid ->
+            tx.executeUpdate(
+                """INSERT INTO player_blocks 
+                (blocker_uuid, blocked_uuid, blocked_at, blocked_by_username) 
+                VALUES (?, ?, CURRENT_TIMESTAMP, ?)""",
+                playerData.uuid, blockedUuid, playerData.username
+            )
+        }
+    }
+}
+
