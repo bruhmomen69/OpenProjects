@@ -309,7 +309,7 @@ class MessageFormattingService(
         player: Player? = null,
         additionalPlaceholders: Map<String, String> = emptyMap()
     ): Component {
-        val messages = configManager.config.messages
+        val messages = configManager.messages
         val messageText = getMessageByKey(messages, messageKey) ?: "<red>Message not found: $messageKey</red>"
         
         return formatMessage(
@@ -355,12 +355,12 @@ class MessageFormattingService(
             "chat.cooldown" -> messages.chat.cooldown
             
             // Chat toggle messages
-            "chat_toggle.system_disabled" -> messages.chatToggle.systemDisabled
-            "chat_toggle.message_toggle_disabled" -> messages.chatToggle.messageToggleDisabled
-            "chat_toggle.chat_enabled" -> messages.chatToggle.chatEnabled
-            "chat_toggle.chat_disabled" -> messages.chatToggle.chatDisabled
-            "chat_toggle.messages_enabled" -> messages.chatToggle.messagesEnabled
-            "chat_toggle.messages_disabled" -> messages.chatToggle.messagesDisabled
+            "chat_toggle.system_disabled" -> messages.chat.systemDisabled
+            "chat_toggle.message_toggle_disabled" -> messages.chat.messageToggleDisabled
+            "chat_toggle.chat_enabled" -> messages.chat.chatEnabled
+            "chat_toggle.chat_disabled" -> messages.chat.chatDisabled
+            "chat_toggle.messages_enabled" -> messages.chat.messagesEnabled
+            "chat_toggle.messages_disabled" -> messages.chat.messagesDisabled
             
             // Social spy messages
             "social_spy.system_disabled" -> messages.socialSpy.systemDisabled
@@ -380,10 +380,11 @@ class MessageFormattingService(
             "blocks.max_blocks_reached" -> messages.blocks.maxBlocksReached
             
             // Alert messages
-            "alerts.system_disabled" -> messages.alerts.systemDisabled
-            "alerts.no_permission" -> messages.alerts.noPermission
-            "alerts.enabled" -> messages.alerts.enabled
-            "alerts.disabled" -> messages.alerts.disabled
+            "alerts.system_disabled" -> messages.swearFilter.alertsDisabled
+            "alerts.no_permission" -> messages.swearFilter.alertsNoPermission
+            "alerts.enabled" -> messages.swearFilter.alertsEnabled
+            "alerts.disabled" -> messages.swearFilter.alertsDisabledPersonal
+            "alerts.auto_enabled" -> messages.swearFilter.alertsAutoEnabled
             
             // System messages
             "system.error" -> messages.system.error

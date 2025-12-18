@@ -40,7 +40,7 @@ class ScheduledTaskService(
     }
     
     fun scheduleCrossServerTasks(serverInstanceId: String) {
-        val config = configManager.config.crossServerMessaging
+        val config = configManager.storage.crossServerMessaging
         if (!config.enabled) return
         
         // 1. Heartbeat task (every X seconds)

@@ -76,7 +76,7 @@ class PrivateMessageService(
         }
         
         // Try cross-server recipient
-        if (configManager.config.crossServerMessaging.enabled && crossServerMessageBusService != null) {
+        if (configManager.storage.crossServerMessaging.enabled && crossServerMessageBusService != null) {
             // Look up UUID from name using our DB (async and safe)
             val targetUuid = playerDataManager.getUuidByUsername(recipientName)
             
@@ -84,7 +84,7 @@ class PrivateMessageService(
                 // Check presence
                 val targetServerId = playerDataManager.getCrossServerPresence(
                     targetUuid,
-                    configManager.config.crossServerMessaging.heartbeatTimeoutSeconds
+                    configManager.storage.crossServerMessaging.heartbeatTimeoutSeconds
                 )
                 
                 if (targetServerId != null) {
@@ -130,7 +130,7 @@ class PrivateMessageService(
                     if (success) {
                         // Show sender formatted message
                         val senderMessage = messageFormattingService.formatMessage(
-                            format = config.senderFormat,
+                            format = configManager.messages.privateMessages.senderFormat,
                             player = sender,
                             additionalPlaceholders = mapOf(
                                 "sender" to sender.name,
@@ -195,7 +195,7 @@ class PrivateMessageService(
         
         // Create formatted messages using MessageFormattingService
         val senderMessage = messageFormattingService.formatMessage(
-            format = config.senderFormat,
+            format = configManager.messages.privateMessages.senderFormat,
             player = sender,
             additionalPlaceholders = mapOf(
                 "sender" to sender.name,
@@ -209,7 +209,7 @@ class PrivateMessageService(
         )
         
         val recipientMessage = messageFormattingService.formatMessage(
-            format = config.recipientFormat,
+            format = configManager.messages.privateMessages.recipientFormat,
             player = recipient,
             additionalPlaceholders = mapOf(
                 "sender" to sender.name,
@@ -255,10 +255,10 @@ class PrivateMessageService(
             return sendPrivateMessage(sender, lastSender.name, message)
         }
 
-        if (configManager.config.crossServerMessaging.enabled && crossServerMessageBusService != null) {
+        if (configManager.storage.crossServerMessaging.enabled && crossServerMessageBusService != null) {
             val serverId = playerDataManager.getCrossServerPresence(
                 lastSenderUUID,
-                configManager.config.crossServerMessaging.heartbeatTimeoutSeconds
+                configManager.storage.crossServerMessaging.heartbeatTimeoutSeconds
             )
 
             if (serverId != null) {

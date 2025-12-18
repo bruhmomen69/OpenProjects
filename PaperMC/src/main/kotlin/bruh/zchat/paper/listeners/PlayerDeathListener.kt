@@ -46,17 +46,17 @@ class PlayerDeathListener(
         ?: legacyComponentSerializer.deserialize(player.lastDamageCause?.cause?.name ?: "UNKNOWN")
 
         // First try to find a custom message by death cause
-        var customMessage = configManager.config.death.messages[deathCause]
+        var customMessage = configManager.messages.death.messages[deathCause]
 
         // If not found by death cause, try to find by the original vanilla message text
         if (customMessage == null) {
             val originalText = plainTextSerializer.serialize(originalMessage)
-            customMessage = configManager.config.death.messages[originalText]
+            customMessage = configManager.messages.death.messages[originalText]
         }
 
         // If still no custom message found, use the backup death message
         if (customMessage == null) {
-            customMessage = configManager.config.death.defaultMessage
+            customMessage = configManager.messages.death.defaultMessage
         }
 
         // If custom message is empty, disable this specific death message

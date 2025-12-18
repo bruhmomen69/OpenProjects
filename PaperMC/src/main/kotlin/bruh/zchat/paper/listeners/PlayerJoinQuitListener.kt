@@ -60,7 +60,7 @@ class PlayerJoinQuitListener(
 
         val player = event.player
         val originalMessage = event.joinMessage()
-        val joinMessage = configManager.config.joinLeave.joinMessage
+        val joinMessage = configManager.messages.joinLeave.joinMessage
 
         if (joinMessage.isBlank()) {
             event.joinMessage(null)
@@ -140,7 +140,7 @@ class PlayerJoinQuitListener(
 
         val player = event.player
         val originalMessage = event.quitMessage()
-        val leaveMessage = configManager.config.joinLeave.leaveMessage
+        val leaveMessage = configManager.messages.joinLeave.leaveMessage
 
         if (leaveMessage.isBlank()) {
             event.quitMessage(null)

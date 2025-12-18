@@ -95,7 +95,7 @@ class AlertService(
             
             // Send auto-enabled message if configured and enabled
             if (config.showAutoEnabledMessage) {
-                val autoEnabledMessage = configManager.config.messages.alerts.autoEnabled
+                val autoEnabledMessage = configManager.messages.swearFilter.alertsAutoEnabled
                 if (autoEnabledMessage.isNotEmpty()) {
                     player.sendMessage(messageFormattingService.formatMessageComponent(autoEnabledMessage, player))
                 }
@@ -145,7 +145,7 @@ class AlertService(
         
         // Use existing MessageFormattingService infrastructure
         val alertComponent = messageFormattingService.formatMessageComponent(
-            format = config.alertMessage,
+            format = configManager.messages.swearFilter.alertMessage,
             player = player,
             additionalPlaceholders = alertPlaceholders,
             processUrls = false, // Don't process URLs in alerts
@@ -232,7 +232,7 @@ class AlertService(
             )
             
             val consoleMessage = messageFormattingService.formatMessageComponent(
-                format = config.consoleAlertMessage,
+                format = configManager.messages.swearFilter.consoleAlertMessage,
                 player = player,
                 additionalPlaceholders = consolePlaceholders,
                 processUrls = false,

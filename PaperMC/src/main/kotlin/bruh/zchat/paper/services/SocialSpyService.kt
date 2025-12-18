@@ -69,7 +69,7 @@ class SocialSpyService(
         }
         
         val spyMessage = messageFormattingService.formatMessage(
-            format = config.socialSpyFormat,
+            format = configManager.messages.socialSpy.socialSpyFormat,
             player = sender,
             additionalPlaceholders = mapOf(
                 "sender" to sender.name,
@@ -115,7 +115,7 @@ class SocialSpyService(
         }
         
         val spyMessage = messageFormattingService.formatMessage(
-            format = config.socialSpyFormat,
+            format = configManager.messages.socialSpy.socialSpyFormat,
             player = recipient, // Use recipient for placeholder parsing context
             additionalPlaceholders = mapOf(
                 "sender" to senderName,
@@ -234,7 +234,7 @@ class SocialSpyService(
         }
         
         val spyMessage = messageFormattingService.formatMessage(
-            format = config.commandSpyFormat,
+            format = configManager.messages.socialSpy.commandSpyFormat,
             player = player,
             additionalPlaceholders = mapOf(
                 "player" to player.name,

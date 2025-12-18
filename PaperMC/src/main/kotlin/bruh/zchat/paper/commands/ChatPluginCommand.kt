@@ -36,9 +36,10 @@ class ChatPluginCommands(
     @CommandPermission("zchat.admin.info")
     fun info(actor: BukkitCommandActor) {
         val config = configManager.config
+        val messages = configManager.messages
         val message = """
             <gold>===== ZealousChat Info =====</gold>
-            <yellow>Default Format:</yellow> <gray>${config.chatFormat.defaultFormat}</gray>
+            <yellow>Default Format:</yellow> <gray>${messages.chatFormat.defaultFormat}</gray>
             <yellow>Group Formats Enabled:</yellow> <gray>${config.chatFormat.enableGroupFormats}</gray>
             <yellow>World Formats Enabled:</yellow> <gray>${config.chatFormat.enableWorldFormats}</gray>
             <yellow>PlaceholderAPI Enabled:</yellow> <gray>${config.placeholders.enablePlaceholderAPI}</gray>
@@ -78,13 +79,13 @@ class ChatPluginCommands(
         @Subcommand("set default")
         @CommandPermission("zchat.admin.format")
         fun setDefault(actor: BukkitCommandActor, format: String) {
-            val newConfig = configManager.config.copy(
-                chatFormat = configManager.config.chatFormat.copy(
+            val newMessages = configManager.messages.copy(
+                chatFormat = configManager.messages.chatFormat.copy(
                     defaultFormat = format
                 )
             )
 
-            if (configManager.updateConfig(newConfig)) {
+            if (configManager.updateMessages(newMessages)) {
                 actor.reply(
                     MiniMessage.miniMessage().deserialize("<green>Default format updated successfully!</green>")
                 )
@@ -96,16 +97,16 @@ class ChatPluginCommands(
         @Subcommand("set group")
         @CommandPermission("zchat.admin.format")
         fun setGroup(actor: BukkitCommandActor, groupName: String, format: String) {
-            val newGroupFormats = configManager.config.chatFormat.groupFormats.toMutableMap()
+            val newGroupFormats = configManager.messages.chatFormat.groupFormats.toMutableMap()
             newGroupFormats[groupName] = format
 
-            val newConfig = configManager.config.copy(
-                chatFormat = configManager.config.chatFormat.copy(
+            val newMessages = configManager.messages.copy(
+                chatFormat = configManager.messages.chatFormat.copy(
                     groupFormats = newGroupFormats
                 )
             )
 
-            if (configManager.updateConfig(newConfig)) {
+            if (configManager.updateMessages(newMessages)) {
                 actor.reply(
                     MiniMessage.miniMessage()
                         .deserialize("<green>Group format for '$groupName' updated successfully!</green>")
@@ -118,16 +119,16 @@ class ChatPluginCommands(
         @Subcommand("set world")
         @CommandPermission("zchat.admin.format")
         fun setWorld(actor: BukkitCommandActor, worldName: String, format: String) {
-            val newWorldFormats = configManager.config.chatFormat.worldFormats.toMutableMap()
+            val newWorldFormats = configManager.messages.chatFormat.worldFormats.toMutableMap()
             newWorldFormats[worldName] = format
 
-            val newConfig = configManager.config.copy(
-                chatFormat = configManager.config.chatFormat.copy(
+            val newMessages = configManager.messages.copy(
+                chatFormat = configManager.messages.chatFormat.copy(
                     worldFormats = newWorldFormats
                 )
             )
 
-            if (configManager.updateConfig(newConfig)) {
+            if (configManager.updateMessages(newMessages)) {
                 actor.reply(
                     MiniMessage.miniMessage()
                         .deserialize("<green>World format for '$worldName' updated successfully!</green>")
@@ -140,21 +141,21 @@ class ChatPluginCommands(
         @Subcommand("list")
         @CommandPermission("zchat.admin.format")
         fun list(actor: BukkitCommandActor) {
-            val config = configManager.config.chatFormat
+            val messages = configManager.messages.chatFormat
             val message = StringBuilder("<gold>===== Chat Formats =====</gold>\n")
 
-            message.append("<yellow>Default:</yellow> <gray>${config.defaultFormat}</gray>\n")
+            message.append("<yellow>Default:</yellow> <gray>${messages.defaultFormat}</gray>\n")
 
-            if (config.groupFormats.isNotEmpty()) {
+            if (messages.groupFormats.isNotEmpty()) {
                 message.append("<yellow>Group Formats:</yellow>\n")
-                config.groupFormats.forEach { (group, format) ->
+                messages.groupFormats.forEach { (group, format) ->
                     message.append("<gray>  $group:</gray> <white>$format</white>\n")
                 }
             }
 
-            if (config.worldFormats.isNotEmpty()) {
+            if (messages.worldFormats.isNotEmpty()) {
                 message.append("<yellow>World Formats:</yellow>\n")
-                config.worldFormats.forEach { (world, format) ->
+                messages.worldFormats.forEach { (world, format) ->
                     message.append("<gray>  $world:</gray> <white>$format</white>\n")
                 }
             }

@@ -71,7 +71,7 @@ class ChatInventoryPlaceholderService(
             if (containsInventoryPlaceholders(message)) {
                 player.sendMessage(
                     messageFormattingService.formatMessage(
-                        configManager.config.messages.inventoryPlaceholders.noPermission,
+                        configManager.messages.inventoryPlaceholders.noPermission,
                         player
                     )
                 )
@@ -123,7 +123,7 @@ class ChatInventoryPlaceholderService(
                         
                         // Check if this specific placeholder type is enabled
                         if (!isPlaceholderTypeEnabled(placeholderType)) {
-                            val errorMsg = configManager.config.messages.inventoryPlaceholders.placeholderDisabled
+                            val errorMsg = configManager.messages.inventoryPlaceholders.placeholderDisabled
                                 .replace("{type}", placeholderType.displayName)
                             val errorComponent = Component.text("[$type: disabled]").color(NamedTextColor.RED)
                             replacements.add(PlaceholderReplacement(start, end, placeholder, errorComponent))
@@ -231,7 +231,7 @@ class ChatInventoryPlaceholderService(
                 )
                 // Use MiniMessage formatting with proper placeholders
                 messageFormattingService.formatMessage(
-                    config.inventoryDisplayFormat,
+                    configManager.messages.inventoryPlaceholders.inventoryDisplayFormat,
                     player,
                     placeholders
                 )
@@ -245,7 +245,7 @@ class ChatInventoryPlaceholderService(
                     "world" to (loc.world?.name ?: "Unknown")
                 )
                 messageFormattingService.formatMessage(
-                    config.positionDisplayFormat,
+                    configManager.messages.inventoryPlaceholders.positionDisplayFormat,
                     player,
                     placeholders
                 )
@@ -262,7 +262,7 @@ class ChatInventoryPlaceholderService(
                     "saturation" to saturation.toString()
                 )
                 messageFormattingService.formatMessage(
-                    config.healthDisplayFormat,
+                    configManager.messages.inventoryPlaceholders.healthDisplayFormat,
                     player,
                     placeholders
                 )
@@ -288,7 +288,7 @@ class ChatInventoryPlaceholderService(
                 )
                 // Parse the hover text through MiniMessage with proper placeholders
                 messageFormattingService.formatMessageComponent(
-                    config.inventoryHoverFormat.replace("\\n", "\n"),
+                    configManager.messages.inventoryPlaceholders.inventoryHoverFormat.replace("\\n", "\n"),
                     player,
                     stringPlaceholders,
                     componentPlaceholders,
@@ -314,7 +314,7 @@ class ChatInventoryPlaceholderService(
                     "biome" to biome
                 )
                 messageFormattingService.formatMessage(
-                    config.positionHoverFormat.replace("\\n", "\n"),
+                    configManager.messages.inventoryPlaceholders.positionHoverFormat.replace("\\n", "\n"),
                     player,
                     placeholders
                 )
@@ -334,7 +334,7 @@ class ChatInventoryPlaceholderService(
                     "effects" to effects
                 )
                 messageFormattingService.formatMessage(
-                    config.healthHoverFormat.replace("\\n", "\n"),
+                    configManager.messages.inventoryPlaceholders.healthHoverFormat.replace("\\n", "\n"),
                     player,
                     placeholders
                 )
@@ -371,7 +371,7 @@ class ChatInventoryPlaceholderService(
         val nonEmptyItems = items.filterNotNull().filter { it.type != Material.AIR }.take(config.maxPreviewItems)
         
         if (nonEmptyItems.isEmpty()) {
-            return messageFormattingService.formatMessage(config.emptyInventoryText, player)
+            return messageFormattingService.formatMessage(configManager.messages.inventoryPlaceholders.emptyInventoryText, player)
         }
         
         val builder = Component.text()
@@ -390,7 +390,7 @@ class ChatInventoryPlaceholderService(
             )
             // Use MiniMessage formatting for item preview with safe placeholders
             val itemComponent = messageFormattingService.formatMessage(
-                config.itemPreviewFormat,
+                configManager.messages.inventoryPlaceholders.itemPreviewFormat,
                 player,
                 placeholders
             )
@@ -403,7 +403,7 @@ class ChatInventoryPlaceholderService(
                 "count" to (items.size - config.maxPreviewItems).toString()
             )
             val moreComponent = messageFormattingService.formatMessage(
-                config.moreItemsText,
+                configManager.messages.inventoryPlaceholders.moreItemsText,
                 player,
                 placeholders
             )
@@ -480,7 +480,7 @@ class ChatInventoryPlaceholderService(
         if (!Files.exists(snapshotFile)) {
             viewer.sendMessage(
                 messageFormattingService.formatMessage(
-                    configManager.config.messages.inventoryPlaceholders.snapshotNotFound,
+                    configManager.messages.inventoryPlaceholders.snapshotNotFound,
                     viewer
                 )
             )
@@ -506,7 +506,7 @@ class ChatInventoryPlaceholderService(
             logger.error("Failed to load inventory snapshot $snapshotId", e)
             viewer.sendMessage(
                 messageFormattingService.formatMessage(
-                    configManager.config.messages.inventoryPlaceholders.viewFailed,
+                    configManager.messages.inventoryPlaceholders.viewFailed,
                     viewer
                 )
             )

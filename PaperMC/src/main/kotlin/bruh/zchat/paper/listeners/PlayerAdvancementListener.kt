@@ -58,8 +58,8 @@ class PlayerAdvancementListener(
         
         try {
             // Get the appropriate message format
-            val messageFormat = configManager.config.advancement.messages[advancementKey]
-                ?: configManager.config.advancement.defaultMessage
+            val messageFormat = configManager.messages.advancement.messages[advancementKey]
+                ?: configManager.messages.advancement.defaultMessage
             
             if (messageFormat.isBlank()) {
                 return // Skip if message format is empty

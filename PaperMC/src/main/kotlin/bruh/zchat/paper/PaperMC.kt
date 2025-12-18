@@ -123,21 +123,21 @@ class PaperMC : SuspendingJavaPlugin() {
         scheduledTaskService.scheduleMaintenanceTasks()
         
         // Schedule cross-server tasks
-        if (configManager.config.crossServerMessaging.enabled) {
+        if (configManager.storage.crossServerMessaging.enabled) {
             if (databaseService.databaseType == DatabaseType.MYSQL) {
                 scheduledTaskService.scheduleCrossServerTasks(serverInstanceId)
                 logger.info("Cross-server messaging enabled with Server ID: $serverInstanceId")
             } else {
                 logger.info("Cross-server messaging requires MySQL. Disabling crossServerMessaging.enabled in config.")
-                val newConfig = configManager.config.copy(
-                    crossServerMessaging = configManager.config.crossServerMessaging.copy(enabled = false)
+                val newStorage = configManager.storage.copy(
+                    crossServerMessaging = configManager.storage.crossServerMessaging.copy(enabled = false)
                 )
-                configManager.updateConfig(newConfig)
+                configManager.updateStorage(newStorage)
             }
         }
 
         // Migrate existing data if enabled (run on async dispatcher)
-        if (configManager.config.database.autoMigrate) {
+        if (configManager.storage.database.autoMigrate) {
             launch {
                 withContext(asyncDispatcher) {
                     try {
@@ -264,15 +264,15 @@ class PaperMC : SuspendingJavaPlugin() {
         logger.info("ZealousChat disabled!")
     }
 
-    private fun createDatabaseConfig(): DatabaseConfig {
-        val dbConfig = configManager.config.database
+    private fun createDatabaseConfig(): bruh.zchat.paper.database.DatabaseConfig {
+        val dbConfig = configManager.storage.database
         val dbType = when (dbConfig.type.lowercase()) {
             "mysql" -> DatabaseType.MYSQL
             "sqlite" -> DatabaseType.SQLITE
             else -> DatabaseType.SQLITE
         }
 
-        return DatabaseConfig(
+        return bruh.zchat.paper.database.DatabaseConfig(
             type = dbType,
             host = dbConfig.host,
             port = dbConfig.port,

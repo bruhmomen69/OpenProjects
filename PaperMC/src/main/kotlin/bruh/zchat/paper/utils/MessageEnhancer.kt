@@ -46,23 +46,23 @@ class MessageEnhancer(
         val (hoverEnabled, hoverFormat, clickAction) = when (messageType) {
             MessageType.JOIN -> Triple(
                 configManager.config.joinLeave.enableJoinHover,
-                configManager.config.joinLeave.joinHoverMessage,
-                configManager.config.joinLeave.joinClickAction
+                configManager.messages.joinLeave.joinHoverMessage,
+                configManager.messages.joinLeave.joinClickAction
             )
             MessageType.LEAVE -> Triple(
                 configManager.config.joinLeave.enableLeaveHover,
-                configManager.config.joinLeave.leaveHoverMessage,
-                configManager.config.joinLeave.leaveClickAction
+                configManager.messages.joinLeave.leaveHoverMessage,
+                configManager.messages.joinLeave.leaveClickAction
             )
             MessageType.DEATH -> Triple(
                 configManager.config.death.enableHover,
-                configManager.config.death.hoverMessage,
-                configManager.config.death.clickAction
+                configManager.messages.death.hoverMessage,
+                configManager.messages.death.clickAction
             )
             MessageType.ADVANCEMENT -> Triple(
                 configManager.config.advancement.enableHover,
-                configManager.config.advancement.hoverMessage,
-                configManager.config.advancement.clickAction
+                configManager.messages.advancement.hoverMessage,
+                configManager.messages.advancement.clickAction
             )
         }
 

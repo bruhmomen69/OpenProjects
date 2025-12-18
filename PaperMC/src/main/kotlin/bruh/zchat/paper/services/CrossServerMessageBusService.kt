@@ -53,7 +53,7 @@ class CrossServerMessageBusService(
     }
 
     suspend fun pollMessages() = withContext(Dispatchers.IO) {
-        val config = configManager.config.crossServerMessaging
+        val config = configManager.storage.crossServerMessaging
         if (!config.enabled || databaseService.databaseType != DatabaseType.MYSQL) return@withContext
 
         try {
@@ -136,7 +136,7 @@ class CrossServerMessageBusService(
                     withContext(plugin.entityDispatcher(recipient)) {
                         // Use raw processed message from sender to ensure consistent formatting
                         val finalMessage = messageFormattingService.formatMessage(
-                            format = configManager.config.privateMessages.recipientFormat,
+                            format = configManager.messages.privateMessages.recipientFormat,
                             player = recipient,
                             additionalPlaceholders = mapOf(
                                 "sender" to senderName,
@@ -194,7 +194,7 @@ class CrossServerMessageBusService(
         originalPayload: MessagePayload,
         reason: String
     ) {
-        val config = configManager.config.crossServerMessaging
+        val config = configManager.storage.crossServerMessaging
         val cutoff = Instant.now().minusSeconds(config.heartbeatTimeoutSeconds.toLong())
 
         // Find where sender is now (heartbeat-aware)
@@ -292,7 +292,7 @@ class CrossServerMessageBusService(
     }
 
     suspend fun reclaimStaleMessages() = withContext(Dispatchers.IO) {
-        val config = configManager.config.crossServerMessaging
+        val config = configManager.storage.crossServerMessaging
         if (!config.enabled) return@withContext
 
         try {

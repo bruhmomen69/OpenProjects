@@ -107,6 +107,7 @@ class ChatFormattingService(
 
     private fun getFormatForPlayer(player: Player): String {
         val config = configManager.config.chatFormat
+        val messages = configManager.messages.chatFormat
 
         // Check format priority
         for (priority in config.formatPriority) {
@@ -120,40 +121,42 @@ class ChatFormattingService(
 
                 "world" -> {
                     if (config.enableWorldFormats) {
-                        val worldFormat = config.worldFormats[player.world.name]
+                        val worldFormat = messages.worldFormats[player.world.name]
                         if (worldFormat != null) return worldFormat
                     }
                 }
 
                 "group" -> {
                     if (config.enableGroupFormats) {
-                        val groupFormat = findGroupFormat(player, config.groupFormats)
+                        val groupFormat = findGroupFormat(player, messages.groupFormats)
                         if (groupFormat != null) return groupFormat
                     }
                 }
 
                 "default" -> {
-                    return config.defaultFormat
+                    return messages.defaultFormat
                 }
             }
         }
 
-        return config.defaultFormat
+        return messages.defaultFormat
     }
 
     private fun findPermissionBasedFormat(player: Player, config: ChatFormatConfig): String? {
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
+            val messages = configManager.messages.chatFormat
             for (rank in config.rankedFormatPriority) {
                 if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank")) {
-                    return config.groupFormats[rank]
+                    return messages.groupFormats[rank]
                 }
             }
         }
 
         // Check for specific format permissions
         val formatPrefix = configManager.config.permissions.formatPermissionPrefix
-        for ((group, format) in config.groupFormats) {
+        val messages = configManager.messages.chatFormat
+        for ((group, format) in messages.groupFormats) {
             if (player.hasPermission("$formatPrefix$group")) {
                 return format
             }
@@ -187,12 +190,13 @@ class ChatFormattingService(
 
     private fun addInteractiveElements(format: String, player: Player): String {
         val config = configManager.config.chatFormat
+        val messages = configManager.messages.chatFormat
         var result = format
 
         // Add hover messages if enabled
         if (config.enableHoverMessages) {
             val playerRank = getPlayerRank(player)
-            val hoverMessage = config.hoverMessages[playerRank] ?: config.hoverMessages["default"]
+            val hoverMessage = messages.hoverMessages[playerRank] ?: messages.hoverMessages["default"]
 
             if (hoverMessage != null) {
                 // Process hover message with basic placeholder replacement
@@ -209,7 +213,7 @@ class ChatFormattingService(
         // Add click actions if enabled
         if (config.enableClickActions) {
             val playerRank = getPlayerRank(player)
-            val clickAction = config.clickActions[playerRank] ?: config.clickActions["default"]
+            val clickAction = messages.clickActions[playerRank] ?: messages.clickActions["default"]
 
             if (clickAction != null) {
                 // Process click action with basic placeholder replacement
@@ -268,7 +272,8 @@ class ChatFormattingService(
         }
 
         // Check other group formats
-        for ((group, _) in config.groupFormats) {
+        val messages = configManager.messages.chatFormat
+        for ((group, _) in messages.groupFormats) {
             if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$group") ||
                 player.hasPermission("group.$group") ||
                 player.hasPermission(group)
@@ -300,11 +305,12 @@ class ChatFormattingService(
      */
     private fun applyEntireMessageInteractive(message: Component, player: Player): Component {
         val config = configManager.config.chatFormat
+        val messages = configManager.messages.chatFormat
 
         // Get player rank for hover/click configuration
         val playerRank = getPlayerRank(player)
-        val hoverMessage = config.hoverMessages[playerRank] ?: config.hoverMessages["default"]
-        val clickAction = config.clickActions[playerRank] ?: config.clickActions["default"]
+        val hoverMessage = messages.hoverMessages[playerRank] ?: messages.hoverMessages["default"]
+        val clickAction = messages.clickActions[playerRank] ?: messages.clickActions["default"]
 
         // If no hover or click is configured, return original message
         if (hoverMessage == null && clickAction == null) {
