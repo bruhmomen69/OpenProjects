@@ -9,6 +9,7 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - **MiniMessage everywhere** – gradients, hex colours, hover/click events
 - **Rank, world & permission based formats** with priority system
 - **Private messaging** (`/msg`, `/reply`) with social-spy & cooldowns
+- **Cross-server private messaging** (optional, **MySQL required**) for networks running multiple servers
 - **Chat / Message toggles** per-player (with staff bypass)
 - **Inventory placeholders** `[inv]`, `[ender]`, `[armor]`, `[hand]`, `[pos]`, `[health]`
 - **URL auto-linking** & **@mentions** (configurable)
@@ -74,6 +75,14 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
   - Permission: `zchat.message`
   - Parameters:
     - `<message>`: Reply text
+
+#### Cross-server private messages
+
+When using a **MySQL** database, ZealousChat can deliver private messages across multiple Paper servers on the same network.
+
+- `/msg` will attempt cross-server delivery when the target is online on another server
+- `/reply` also supports cross-server targets
+- Recipients that have private messages toggled off will not receive cross-server messages
 
 ### Chat & Social Spy Toggles
 - `/zealouschat toggle chat` — Toggle your public chat on/off

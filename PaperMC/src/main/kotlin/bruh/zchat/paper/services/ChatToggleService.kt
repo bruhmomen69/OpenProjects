@@ -1,26 +1,24 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
-import net.kyori.adventure.text.minimessage.MiniMessage
+import bruh.zchat.paper.database.PlayerDataManager
+import com.github.shynixn.mccoroutine.folia.launch
+import kotlinx.coroutines.Dispatchers
 import org.bukkit.entity.Player
+import org.bukkit.plugin.java.JavaPlugin
 import org.slf4j.LoggerFactory
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Service for managing per-player chat toggle functionality
  */
 class ChatToggleService(
+    private val plugin: JavaPlugin,
     private val configManager: ConfigManager,
-    private val messageFormattingService: MessageFormattingService
+    private val messageFormattingService: MessageFormattingService,
+    private val playerDataManager: PlayerDataManager
 ) {
     private val logger = LoggerFactory.getLogger(ChatToggleService::class.java)
-
-    // Track players who have chat disabled
-    private val chatDisabledPlayers = ConcurrentHashMap.newKeySet<UUID>()
-    
-    // Track players who have private messages disabled
-    private val messagesDisabledPlayers = ConcurrentHashMap.newKeySet<UUID>()
     
     /**
      * Toggle chat for a player
@@ -33,24 +31,31 @@ class ChatToggleService(
             return false
         }
         
-        val wasDisabled = chatDisabledPlayers.contains(player.uniqueId)
+        val wasDisabled = playerDataManager.isChatDisabledOnline(player.uniqueId)
         
         if (wasDisabled) {
-            chatDisabledPlayers.remove(player.uniqueId)
+            playerDataManager.setChatDisabledCached(player.uniqueId, false)
             // Also toggle messages if linked
             if (config.linkChatAndMessages) {
-                messagesDisabledPlayers.remove(player.uniqueId)
+                playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
             }
             player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.chat_enabled", player))
             logger.info("${player.name} enabled their chat")
         } else {
-            chatDisabledPlayers.add(player.uniqueId)
+            playerDataManager.setChatDisabledCached(player.uniqueId, true)
             // Also toggle messages if linked
             if (config.linkChatAndMessages) {
-                messagesDisabledPlayers.add(player.uniqueId)
+                playerDataManager.setMessagesDisabledCached(player.uniqueId, true)
             }
             player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.chat_disabled", player))
             logger.info("${player.name} disabled their chat")
+        }
+
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setChatDisabled(player.uniqueId, !wasDisabled)
+            if (config.linkChatAndMessages) {
+                playerDataManager.setMessagesDisabled(player.uniqueId, !wasDisabled)
+            }
         }
         
         return !wasDisabled // Return new state (true = enabled, false = disabled)
@@ -67,16 +72,20 @@ class ChatToggleService(
             return false
         }
         
-        val wasDisabled = messagesDisabledPlayers.contains(player.uniqueId)
+        val wasDisabled = playerDataManager.isMessagesDisabledOnline(player.uniqueId)
         
         if (wasDisabled) {
-            messagesDisabledPlayers.remove(player.uniqueId)
+            playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
             player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.messages_enabled", player))
             logger.info("${player.name} enabled their private messages")
         } else {
-            messagesDisabledPlayers.add(player.uniqueId)
+            playerDataManager.setMessagesDisabledCached(player.uniqueId, true)
             player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.messages_disabled", player))
             logger.info("${player.name} disabled their private messages")
+        }
+
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setMessagesDisabled(player.uniqueId, !wasDisabled)
         }
         
         return !wasDisabled // Return new state (true = enabled, false = disabled)
@@ -86,31 +95,43 @@ class ChatToggleService(
      * Check if a player can send chat messages
      */
     fun canSendChat(player: Player): Boolean {
+        if (!configManager.config.chatToggle.enableChatToggle) {
+            return true
+        }
+
         // Staff can always bypass chat toggle
         if (player.hasPermission("zchat.bypass.chattoggle")) {
             return true
         }
         
-        return !chatDisabledPlayers.contains(player.uniqueId)
+        return !playerDataManager.isChatDisabledOnline(player.uniqueId)
     }
     
     /**
      * Check if a player can receive private messages
      */
     fun canReceiveMessages(player: Player): Boolean {
-        return !messagesDisabledPlayers.contains(player.uniqueId)
+        if (!configManager.config.chatToggle.enableMessageToggle) {
+            return true
+        }
+
+        return !playerDataManager.isMessagesDisabledOnline(player.uniqueId)
     }
     
     /**
      * Check if a player can send private messages
      */
     fun canSendMessages(player: Player): Boolean {
+        if (!configManager.config.chatToggle.enableMessageToggle) {
+            return true
+        }
+
         // Staff can always bypass message toggle
         if (player.hasPermission("zchat.bypass.messagetoggle")) {
             return true
         }
         
-        return !messagesDisabledPlayers.contains(player.uniqueId)
+        return !playerDataManager.isMessagesDisabledOnline(player.uniqueId)
     }
     
     /**
@@ -132,50 +153,70 @@ class ChatToggleService(
      * Force enable chat for a player (admin command)
      */
     fun forceEnableChat(player: Player) {
-        chatDisabledPlayers.remove(player.uniqueId)
-        logger.info("Chat force-enabled for ${player.name}")
+        playerDataManager.setChatDisabledCached(player.uniqueId, false)
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setChatDisabled(player.uniqueId, false)
+            logger.info("Chat force-enabled for ${player.name}")
+        }
     }
     
     /**
      * Force disable chat for a player (admin command)
      */
     fun forceDisableChat(player: Player) {
-        chatDisabledPlayers.add(player.uniqueId)
-        logger.info("Chat force-disabled for ${player.name}")
+        playerDataManager.setChatDisabledCached(player.uniqueId, true)
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setChatDisabled(player.uniqueId, true)
+            logger.info("Chat force-disabled for ${player.name}")
+        }
     }
     
     /**
      * Force enable messages for a player (admin command)
      */
     fun forceEnableMessages(player: Player) {
-        messagesDisabledPlayers.remove(player.uniqueId)
-        logger.info("Messages force-enabled for ${player.name}")
+        playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setMessagesDisabled(player.uniqueId, false)
+            logger.info("Messages force-enabled for ${player.name}")
+        }
     }
     
     /**
      * Force disable messages for a player (admin command)
      */
     fun forceDisableMessages(player: Player) {
-        messagesDisabledPlayers.add(player.uniqueId)
-        logger.info("Messages force-disabled for ${player.name}")
+        playerDataManager.setMessagesDisabledCached(player.uniqueId, true)
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setMessagesDisabled(player.uniqueId, true)
+            logger.info("Messages force-disabled for ${player.name}")
+        }
     }
     
     /**
      * Force enable both chat and messages for a player (admin command)
      */
     fun forceEnableAll(player: Player) {
-        chatDisabledPlayers.remove(player.uniqueId)
-        messagesDisabledPlayers.remove(player.uniqueId)
-        logger.info("Chat and messages force-enabled for ${player.name}")
+        playerDataManager.setChatDisabledCached(player.uniqueId, false)
+        playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setChatDisabled(player.uniqueId, false)
+            playerDataManager.setMessagesDisabled(player.uniqueId, false)
+            logger.info("Chat and messages force-enabled for ${player.name}")
+        }
     }
     
     /**
      * Force disable both chat and messages for a player (admin command)
      */
     fun forceDisableAll(player: Player) {
-        chatDisabledPlayers.add(player.uniqueId)
-        messagesDisabledPlayers.add(player.uniqueId)
-        logger.info("Chat and messages force-disabled for ${player.name}")
+        playerDataManager.setChatDisabledCached(player.uniqueId, true)
+        playerDataManager.setMessagesDisabledCached(player.uniqueId, true)
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.setChatDisabled(player.uniqueId, true)
+            playerDataManager.setMessagesDisabled(player.uniqueId, true)
+            logger.info("Chat and messages force-disabled for ${player.name}")
+        }
     }
     
     /**
@@ -188,8 +229,13 @@ class ChatToggleService(
         
         val config = configManager.config.chatToggle
         if (!config.persistToggleState) {
-            chatDisabledPlayers.remove(player.uniqueId)
-            messagesDisabledPlayers.remove(player.uniqueId)
+            playerDataManager.setChatDisabledCached(player.uniqueId, false)
+            playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
+
+            plugin.launch(Dispatchers.IO) {
+                playerDataManager.setChatDisabled(player.uniqueId, false)
+                playerDataManager.setMessagesDisabled(player.uniqueId, false)
+            }
         }
     }
     
@@ -197,23 +243,23 @@ class ChatToggleService(
      * Get statistics about chat toggles
      */
     fun getToggleStats(): Map<String, Int> {
+        val online = org.bukkit.Bukkit.getOnlinePlayers()
+        val chatDisabledCount = online.count { !canSendChat(it) }
+        val messageDisabledCount = online.count { !canReceiveMessages(it) }
         return mapOf(
-            "chat_disabled" to chatDisabledPlayers.size,
-            "messages_disabled" to messagesDisabledPlayers.size,
-            "total_online" to org.bukkit.Bukkit.getOnlinePlayers().size
+            "chat_disabled" to chatDisabledCount,
+            "messages_disabled" to messageDisabledCount,
+            "total_online" to online.size
         )
     }
-    
+
     /**
      * Clear all toggle states (admin command)
      */
     fun clearAllToggles() {
-        val chatCount = chatDisabledPlayers.size
-        val messageCount = messagesDisabledPlayers.size
-        
-        chatDisabledPlayers.clear()
-        messagesDisabledPlayers.clear()
-        
-        logger.info("Cleared $chatCount chat toggles and $messageCount message toggles")
+        plugin.launch(Dispatchers.IO) {
+            playerDataManager.clearAllToggleStates()
+            logger.info("Cleared all chat toggles and message toggles")
+        }
     }
 }

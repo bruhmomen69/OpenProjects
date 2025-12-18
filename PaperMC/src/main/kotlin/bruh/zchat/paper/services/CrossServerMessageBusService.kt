@@ -4,6 +4,7 @@ import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.DatabaseType
+import bruh.zchat.paper.database.PlayerDataManager
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,6 +21,7 @@ class CrossServerMessageBusService(
     private val plugin: PaperMC,
     private val configManager: ConfigManager,
     private val databaseService: DatabaseService,
+    private val playerDataManager: PlayerDataManager,
     private val privateMessageService: PrivateMessageService,
     private val socialSpyService: SocialSpyService,
     private val messageFormattingService: MessageFormattingService,
@@ -113,6 +115,23 @@ class CrossServerMessageBusService(
             MessageType.PM_DELIVER -> {
                 val recipient = Bukkit.getPlayer(recipientUuid)
                 if (recipient != null && recipient.isOnline) {
+                    // Respect recipient message toggle on delivery server (prevents bypass)
+                    if (configManager.config.chatToggle.enableMessageToggle) {
+                        val toggleState = playerDataManager.getToggleState(recipientUuid)
+                        if (toggleState?.messagesDisabled == true) {
+                        updateMessageStatus(id, "FAILED", "Recipient has messages disabled")
+                        sendReverseNotification(
+                            senderUuid,
+                            senderName,
+                            recipientUuid,
+                            recipientName,
+                            payload,
+                            "RECIPIENT_MESSAGES_DISABLED"
+                        )
+                        return
+                        }
+                    }
+
                     // Deliver on main thread
                     withContext(plugin.entityDispatcher(recipient)) {
                         // Use raw processed message from sender to ensure consistent formatting
@@ -137,7 +156,14 @@ class CrossServerMessageBusService(
                 } else {
                     // Recipient not found locally - fail and notify sender
                     updateMessageStatus(id, "FAILED", "Recipient offline on target server")
-                    sendReverseNotification(senderUuid, senderName, recipientUuid, recipientName, payload)
+                    sendReverseNotification(
+                        senderUuid,
+                        senderName,
+                        recipientUuid,
+                        recipientName,
+                        payload,
+                        "RECIPIENT_OFFLINE"
+                    )
                 }
             }
             MessageType.PM_DELIVERY_FAILED -> {
@@ -145,13 +171,11 @@ class CrossServerMessageBusService(
                 if (sender != null && sender.isOnline) {
                     withContext(plugin.entityDispatcher(sender)) {
                         val targetLabel = recipientName ?: recipientUuid.toString()
-                        sender.sendMessage(
-                            messageFormattingService.getConfigMessage(
-                                "private_messages.delivery_failed",
-                                sender,
-                                mapOf("player" to targetLabel)
-                            )
-                        )
+                        val messageKey = when (payload.reason) {
+                            "RECIPIENT_MESSAGES_DISABLED" -> "private_messages.target_messages_disabled"
+                            else -> "private_messages.delivery_failed"
+                        }
+                        sender.sendMessage(messageFormattingService.getConfigMessage(messageKey, sender, mapOf("player" to targetLabel)))
                     }
                     updateMessageStatus(id, "DELIVERED")
                 } else {
@@ -167,7 +191,8 @@ class CrossServerMessageBusService(
         originalSenderName: String,
         originalRecipientUuid: UUID,
         originalRecipientName: String?,
-        originalPayload: MessagePayload
+        originalPayload: MessagePayload,
+        reason: String
     ) {
         val config = configManager.config.crossServerMessaging
         val cutoff = Instant.now().minusSeconds(config.heartbeatTimeoutSeconds.toLong())
@@ -188,7 +213,7 @@ class CrossServerMessageBusService(
             val failurePayload = MessagePayload(
                 processedMessage = originalPayload.processedMessage,
                 originalMessage = originalPayload.originalMessage,
-                reason = "RECIPIENT_OFFLINE"
+                reason = reason
             )
 
             val recipientLabel = originalRecipientName

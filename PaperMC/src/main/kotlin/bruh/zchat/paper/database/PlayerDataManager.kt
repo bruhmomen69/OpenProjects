@@ -23,7 +23,14 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         val blockedPlayers: Set<UUID>,
         val joinTimestamp: Instant = Instant.now(), // Added for server switching detection
         val onlineServerId: String? = null,
+        val chatDisabled: Boolean = false,
+        val messagesDisabled: Boolean = false,
         var isDirty: Boolean = false
+    )
+
+    data class ToggleState(
+        val chatDisabled: Boolean,
+        val messagesDisabled: Boolean
     )
     
     suspend fun onPlayerJoin(player: Player, serverInstanceId: String): PlayerData = withContext(Dispatchers.IO) {
@@ -32,7 +39,7 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         try {
             // Check if player exists
             val existingPlayer = databaseService.executeQuerySingle(
-                "SELECT uuid, username, first_seen, last_seen FROM players WHERE uuid = ?",
+                "SELECT uuid, username, first_seen, last_seen, chat_disabled, messages_disabled FROM players WHERE uuid = ?",
                 player.uniqueId
             ) { rs -> 
                 PlayerData(
@@ -44,7 +51,9 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                     infractions = emptyMap(),
                     blockedPlayers = emptySet(),
                     joinTimestamp = now, // Initialize with current join time for existing players
-                    onlineServerId = serverInstanceId
+                    onlineServerId = serverInstanceId,
+                    chatDisabled = rs.getBoolean("chat_disabled"),
+                    messagesDisabled = rs.getBoolean("messages_disabled")
                 )
             }
 
@@ -143,6 +152,99 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             
             logger.debug("Created new player data for ${player.name}")
             playerData
+        }
+    }
+
+    suspend fun clearAllToggleStates() = withContext(Dispatchers.IO) {
+        try {
+            databaseService.executeUpdate(
+                "UPDATE players SET chat_disabled = ?, messages_disabled = ?",
+                false,
+                false
+            )
+
+            val snapshot = onlinePlayers.toMap()
+            snapshot.forEach { (uuid, data) ->
+                onlinePlayers[uuid] = data.copy(chatDisabled = false, messagesDisabled = false)
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to clear all toggle states", e)
+        }
+    }
+
+    fun setChatDisabledCached(uuid: UUID, disabled: Boolean) {
+        val cached = onlinePlayers[uuid] ?: return
+        onlinePlayers[uuid] = cached.copy(chatDisabled = disabled)
+    }
+
+    fun setMessagesDisabledCached(uuid: UUID, disabled: Boolean) {
+        val cached = onlinePlayers[uuid] ?: return
+        onlinePlayers[uuid] = cached.copy(messagesDisabled = disabled)
+    }
+
+    /**
+     * Fast-path check for online players.
+     */
+    fun isChatDisabledOnline(uuid: UUID): Boolean = onlinePlayers[uuid]?.chatDisabled ?: false
+
+    /**
+     * Fast-path check for online players.
+     */
+    fun isMessagesDisabledOnline(uuid: UUID): Boolean = onlinePlayers[uuid]?.messagesDisabled ?: false
+
+    suspend fun getToggleState(uuid: UUID): ToggleState? = withContext(Dispatchers.IO) {
+        val cached = onlinePlayers[uuid]
+        if (cached != null) {
+            return@withContext ToggleState(cached.chatDisabled, cached.messagesDisabled)
+        }
+
+        try {
+            return@withContext databaseService.executeQuerySingle(
+                "SELECT chat_disabled, messages_disabled FROM players WHERE uuid = ?",
+                uuid
+            ) { rs ->
+                ToggleState(
+                    chatDisabled = rs.getBoolean("chat_disabled"),
+                    messagesDisabled = rs.getBoolean("messages_disabled")
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to get toggle state for $uuid", e)
+            null
+        }
+    }
+
+    suspend fun setChatDisabled(uuid: UUID, disabled: Boolean) = withContext(Dispatchers.IO) {
+        try {
+            databaseService.executeUpdate(
+                "UPDATE players SET chat_disabled = ? WHERE uuid = ?",
+                disabled,
+                uuid
+            )
+
+            val cached = onlinePlayers[uuid]
+            if (cached != null) {
+                onlinePlayers[uuid] = cached.copy(chatDisabled = disabled)
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to update chat_disabled for $uuid", e)
+        }
+    }
+
+    suspend fun setMessagesDisabled(uuid: UUID, disabled: Boolean) = withContext(Dispatchers.IO) {
+        try {
+            databaseService.executeUpdate(
+                "UPDATE players SET messages_disabled = ? WHERE uuid = ?",
+                disabled,
+                uuid
+            )
+
+            val cached = onlinePlayers[uuid]
+            if (cached != null) {
+                onlinePlayers[uuid] = cached.copy(messagesDisabled = disabled)
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to update messages_disabled for $uuid", e)
         }
     }
 

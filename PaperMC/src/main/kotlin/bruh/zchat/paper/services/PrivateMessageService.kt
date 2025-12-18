@@ -88,6 +88,21 @@ class PrivateMessageService(
                 )
                 
                 if (targetServerId != null) {
+                    // Respect recipient message toggle (cross-server)
+                    if (configManager.config.chatToggle.enableMessageToggle) {
+                        val toggleState = playerDataManager.getToggleState(targetUuid)
+                        if (toggleState?.messagesDisabled == true) {
+                            sender.sendMessage(
+                                messageFormattingService.getConfigMessage(
+                                    "private_messages.target_messages_disabled",
+                                    sender,
+                                    mapOf("player" to recipientName)
+                                )
+                            )
+                            return false
+                        }
+                    }
+
                     // Check blocks (basic DB check)
                     if (blockService?.isBlocked(targetUuid, sender.uniqueId) == true) {
                         sender.sendMessage(messageFormattingService.getConfigMessage(

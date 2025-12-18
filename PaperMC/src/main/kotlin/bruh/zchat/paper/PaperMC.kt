@@ -84,7 +84,7 @@ class PaperMC : SuspendingJavaPlugin() {
         placeholderAPIService = PlaceholderAPIService(configManager)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
         chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this, configManager, messageFormattingService)
-        chatToggleService = ChatToggleService(configManager, messageFormattingService)
+        chatToggleService = ChatToggleService(this, configManager, messageFormattingService, playerDataManager)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
         alertService = bruh.zchat.paper.services.AlertService(this, configManager, messageFormattingService)
         blockService =
@@ -101,6 +101,7 @@ class PaperMC : SuspendingJavaPlugin() {
             this,
             configManager,
             databaseService,
+            playerDataManager,
             privateMessageService,
             socialSpyService,
             messageFormattingService,
@@ -210,6 +211,7 @@ class PaperMC : SuspendingJavaPlugin() {
             PlayerJoinQuitListener(
                 configManager,
                 chatFormattingService,
+                chatToggleService,
                 messageFormattingService,
                 playerDataManager,
                 alertService,
