@@ -41,7 +41,6 @@ class ScheduledTaskService(
     
     fun scheduleCrossServerTasks(serverInstanceId: String) {
         val config = configManager.storage.crossServerMessaging
-        if (!config.enabled) return
         
         // 1. Heartbeat task (every X seconds)
         val heartbeatTicks = config.heartbeatIntervalSeconds * 20L
@@ -51,6 +50,9 @@ class ScheduledTaskService(
             }
         }, heartbeatTicks, heartbeatTicks).taskId
         scheduledTasks["heartbeat"] = heartbeatTaskId
+
+        // Heartbeat should always be enabled but other tasks depend on state config
+        if (!config.enabled) return
         
         // 2. Message Bus Polling (every X ms) - Fixed 250ms per plan, but using config value as base
         // Note: Bukkit scheduler runs in ticks (50ms). 250ms = 5 ticks.
