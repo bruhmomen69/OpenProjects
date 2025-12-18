@@ -97,7 +97,7 @@ When using a **MySQL** database, ZealousChat can deliver private messages across
 ## Swear Filter System
 
 The swear filter provides advanced profanity detection with configurable punishment tiers, database persistence, and bypass permissions for trusted staff.
-*This system is currently experimental.*
+*This system is currently experimental. There will be (mostly small) issues here. Please report any bugs you find.*
 
 ### Filter Types
 
