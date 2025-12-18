@@ -1,14 +1,14 @@
 package bruh.zchat.paper.listeners
 
+import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.PlayerDataManager
+import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.utils.MessageEnhancer
-import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
@@ -23,7 +23,8 @@ class PlayerJoinQuitListener(
     private val chatFormattingService: ChatFormattingService,
     private val messageFormattingService: MessageFormattingService,
     private val playerDataManager: PlayerDataManager,
-    private val plugin: bruh.zchat.paper.PaperMC
+    private val alertService: AlertService,
+    private val plugin: PaperMC
 ) : Listener {
 
     private val messageEnhancer = MessageEnhancer(configManager, messageFormattingService)
@@ -35,6 +36,9 @@ class PlayerJoinQuitListener(
     @EventHandler(priority = EventPriority.NORMAL)
     fun onPlayerJoin(event: PlayerJoinEvent) {
         processJoinMessage(event)
+
+        // Initialize alerts for player
+        alertService.initializeAlertsForPlayer(event.player)
 
         // Load player data asynchronously
         plugin.launch(Dispatchers.Unconfined) {

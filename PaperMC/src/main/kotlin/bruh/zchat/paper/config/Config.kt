@@ -531,6 +531,9 @@ data class MessagesConfig(
     @field:Comment("Inventory placeholder system messages")
     val inventoryPlaceholders: InventoryPlaceholderMessagesConfig = InventoryPlaceholderMessagesConfig(),
     
+    @field:Comment("Alert system messages")
+    val alerts: AlertMessagesConfig = AlertMessagesConfig(),
+    
     @field:Comment("Error and system messages")
     val system: SystemMessagesConfig = SystemMessagesConfig()
 )
@@ -698,6 +701,24 @@ data class InventoryPlaceholderMessagesConfig(
 )
 
 @ConfigSerializable
+data class AlertMessagesConfig(
+    @field:Comment("Message shown when alerts system is disabled")
+    val systemDisabled: String = "<red>The alert system is disabled in the configuration.</red>",
+    
+    @field:Comment("Message shown when a player lacks permission to receive alerts")
+    val noPermission: String = "<red>You don't have permission to receive swear filter alerts.</red>",
+    
+    @field:Comment("Message shown when alerts are enabled for a player")
+    val enabled: String = "<green>Swear filter alerts enabled. You will now be notified of violations.</green>",
+    
+    @field:Comment("Message shown when alerts are disabled for a player")
+    val disabled: String = "<red>Swear filter alerts disabled. You will no longer receive notifications.</red>",
+    
+    @field:Comment("Message shown when alerts are automatically enabled on join (empty = no message)")
+    val autoEnabled: String = ""
+)
+
+@ConfigSerializable
 data class SystemMessagesConfig(
     @field:Comment("Message shown for general errors")
     val error: String = "<red>An error occurred. Please try again.</red>",
@@ -740,7 +761,49 @@ data class SwearFilterConfig(
                 3 to listOf("mute {player} 10m You have been muted for 10 minutes.")
             )
         )
-    )
+    ),
+    
+    @field:Comment("Alert system configuration for swear filter violations.")
+    val alerts: AlertConfig = AlertConfig()
+)
+
+@ConfigSerializable
+data class AlertConfig(
+    @field:Comment("Enable swear filter violation alerts to staff.")
+    val enableAlerts: Boolean = true,
+    
+    @field:Comment("Permission required to receive swear filter alerts.")
+    val alertPermission: String = "zchat.alerts.swearfilter",
+    
+    @field:Comment("Enable alerts by default for players with alert permission.")
+    val enableByDefault: Boolean = true,
+    
+    @field:Comment("Send notification when alerts are automatically enabled on join.")
+    val showAutoEnabledMessage: Boolean = false,
+    
+    @field:Comment("Alert message format for swear filter violations.")
+    val alertMessage: String = "<red>[ALERT]</red> <yellow><player_name></yellow> <gray>triggered swear filter</gray> <gold>'<group_name>'</gold> <gray>with message:</gray> <white>'<original_message>'</white>",
+    
+    @field:Comment("Show alerts in console for logging.")
+    val logToConsole: Boolean = true,
+    
+    @field:Comment("Console alert message format.")
+    val consoleAlertMessage: String = "[ALERT] <player_name> triggered <group_name> filter: <original_message>",
+    
+    @field:Comment("Which filter groups should trigger alerts (empty list = all groups).")
+    val alertGroups: List<String> = emptyList(),
+    
+    @field:Comment("Minimum severity level to trigger alerts (1-5).")
+    val minimumSeverity: Int = 1,
+    
+    @field:Comment("Alert cooldown in seconds to prevent spam (0 = no cooldown).")
+    val alertCooldownSeconds: Int = 5,
+    
+    @field:Comment("Only show alerts from players who haven't reached the punishment threshold yet.")
+    val onlyBeforePunishment: Boolean = false,
+    
+    @field:Comment("Maximum alerts per minute per player (0 = no limit).")
+    val maxAlertsPerMinute: Int = 3
 )
 
 @ConfigSerializable

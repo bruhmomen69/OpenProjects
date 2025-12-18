@@ -1,18 +1,13 @@
 package bruh.zchat.paper.listeners
 
-import io.papermc.paper.event.player.AsyncChatEvent
 import bruh.zchat.paper.config.ConfigManager
-import bruh.zchat.paper.services.ChatCooldownException
-import bruh.zchat.paper.services.ChatFormattingService
-import bruh.zchat.paper.services.ChatToggleService
-import bruh.zchat.paper.services.MessageFormattingService
-import bruh.zchat.paper.services.ChatInventoryPlaceholderService
+import bruh.zchat.paper.services.*
 import bruh.zchat.paper.swearfilter.SwearFilterService
+import io.papermc.paper.event.player.AsyncChatEvent
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
-import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.slf4j.LoggerFactory
 
 class ChatMessageListener(
@@ -23,7 +18,7 @@ class ChatMessageListener(
     private val chatInventoryPlaceholderService: ChatInventoryPlaceholderService,
     private val swearFilterService: SwearFilterService
 ) : Listener {
-    
+
     private val logger = LoggerFactory.getLogger(ChatMessageListener::class.java)
     private val plainTextSerializer = PlainTextComponentSerializer.plainText()
 
@@ -89,8 +84,12 @@ class ChatMessageListener(
                 }
             }
         } catch (e: ChatCooldownException) {
-            event.player.sendMessage(messageFormattingService.getConfigMessage("chat.cooldown", event.player, 
-                mapOf("time" to e.message!!.substringAfter("wait ").substringBefore(" seconds"))))
+            event.player.sendMessage(
+                messageFormattingService.getConfigMessage(
+                    "chat.cooldown", event.player,
+                    mapOf("time" to e.message!!.substringAfter("wait ").substringBefore(" seconds"))
+                )
+            )
             event.isCancelled = true
         } catch (e: Exception) {
             logger.error("Error formatting chat message for player ${event.player.name}", e)

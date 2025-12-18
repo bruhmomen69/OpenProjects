@@ -91,6 +91,23 @@ class MessageCommand(
     }
 }
 
+@Command("alerts", "chatplugin alerts", "zchat alerts")
+class AlertCommands(
+    private val alertService: AlertService,
+    private val messageFormattingService: MessageFormattingService
+) {
+    @CommandPermission("zchat.alerts.toggle")
+    fun toggleAlerts(actor: BukkitCommandActor) {
+        val player = actor.sender() as? Player ?: run {
+            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            return
+        }
+        
+        alertService.toggleAlerts(player)
+    }
+}
+
+
 /**
  * Chat toggle commands as subcommands of the main chatplugin command
  */
@@ -175,6 +192,7 @@ class ChatAdminCommands(
     private val privateMessageService: PrivateMessageService,
     private val messageFormattingService: MessageFormattingService,
     private val blockService: BlockService,
+    private val alertService: AlertService,
     private val plugin: JavaPlugin
 ) {
     @Subcommand("toggle chat")
@@ -324,10 +342,31 @@ class ChatAdminCommands(
         }
     }
 
+    @Subcommand("alerts")
+    fun adminAlerts(
+        actor: BukkitCommandActor, 
+        playerName: String, 
+        enable: Boolean
+    ) {
+        val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
+        if (targetPlayer == null) {
+            actor.reply(MiniMessage.miniMessage().deserialize("<red>Player '$playerName' is not online!</red>"))
+            return
+        }
+
+        if (enable) {
+            alertService.forceEnableAlerts(targetPlayer)
+            actor.reply(MiniMessage.miniMessage().deserialize("<green>Enabled alerts for ${targetPlayer.name}</green>"))
+        } else {
+            alertService.forceDisableAlerts(targetPlayer)
+            actor.reply(MiniMessage.miniMessage().deserialize("<red>Disabled alerts for ${targetPlayer.name}</red>"))
+        }
+    }
+
     @Subcommand("clear")
     fun adminClear(
         actor: BukkitCommandActor,
-        @Values("toggles", "socialspy", "cooldowns", "blocks", "all") type: String
+        @Values("toggles", "socialspy", "cooldowns", "blocks", "alerts", "all") type: String
     ) = plugin.launch(Dispatchers.Unconfined) {
         when (type.lowercase()) {
             "toggles" -> {
@@ -350,18 +389,24 @@ class ChatAdminCommands(
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Cleared all block lists!</green>"))
             }
 
+            "alerts" -> {
+                alertService.clearAllAlerts()
+                actor.reply(MiniMessage.miniMessage().deserialize("<green>Cleared all alert states!</green>"))
+            }
+
             "all" -> {
                 chatToggleService.clearAllToggles()
                 socialSpyService.clearAllSocialSpy()
                 privateMessageService.clearAllCooldowns()
                 blockService.clearAllBlocks()
+                alertService.clearAllAlerts()
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Cleared all chat data!</green>"))
             }
 
             else -> {
                 actor.reply(
                     MiniMessage.miniMessage()
-                        .deserialize("<red>Usage: /chatplugin admin clear <toggles|socialspy|cooldowns|blocks|all></red>")
+                        .deserialize("<red>Usage: /chatplugin admin clear <toggles|socialspy|cooldowns|blocks|alerts|all></red>")
                 )
             }
         }

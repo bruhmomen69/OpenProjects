@@ -15,7 +15,8 @@ import java.util.regex.PatternSyntaxException
 class SwearFilterService(
     private val plugin: PaperMC,
     private val configManager: ConfigManager,
-    private val infractionManager: InfractionManager
+    private val infractionManager: InfractionManager,
+    private val alertService: bruh.zchat.paper.services.AlertService
 ) {
     private val regexCache = ConcurrentHashMap<String, Regex>()
 
@@ -32,7 +33,7 @@ class SwearFilterService(
         for (group in configManager.config.swearFilter.filterGroups) {
             if (isMatch(group, message)) {
                 plugin.launch(plugin.asyncDispatcher) {
-                    handleInfraction(player, group)
+                    handleInfraction(player, message, group)
                 }
                 return true
             }
@@ -67,8 +68,14 @@ class SwearFilterService(
         }
     }
 
-    private suspend fun handleInfraction(player: Player, group: FilterGroup) {
+    private suspend fun handleInfraction(player: Player, originalMessage: String, group: FilterGroup) {
         val newInfractionCount = infractionManager.addInfraction(player.uniqueId, group.name)
+        
+        // Send alert BEFORE punishments
+        plugin.launch(plugin.globalRegionDispatcher) {
+            alertService.sendViolationAlert(player, originalMessage, group, newInfractionCount)
+        }
+        
         val punishments = group.punishments[newInfractionCount]
 
         if (punishments != null) {

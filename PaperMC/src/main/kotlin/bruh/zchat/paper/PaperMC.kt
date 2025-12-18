@@ -5,6 +5,7 @@ import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.*
 import bruh.zchat.paper.listeners.*
 import bruh.zchat.paper.services.*
+import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.swearfilter.InfractionManager
 import bruh.zchat.paper.swearfilter.SwearFilterService
 import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
@@ -29,6 +30,7 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var blockService: BlockService
     private lateinit var privateMessageService: PrivateMessageService
     private lateinit var chatFormattingService: ChatFormattingService
+    private lateinit var alertService: AlertService
     private lateinit var infractionManager: InfractionManager
     private lateinit var swearFilterService: SwearFilterService
     private lateinit var blockMigrationService: BlockMigrationService
@@ -65,6 +67,7 @@ class PaperMC : SuspendingJavaPlugin() {
         chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this, configManager, messageFormattingService)
         chatToggleService = ChatToggleService(configManager, messageFormattingService)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
+        alertService = bruh.zchat.paper.services.AlertService(this, configManager, messageFormattingService)
         blockService =
             BlockService(configManager, messageFormattingService, socialSpyService, databaseService, playerDataManager)
         privateMessageService = PrivateMessageService(
@@ -76,7 +79,7 @@ class PaperMC : SuspendingJavaPlugin() {
         )
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
         infractionManager = InfractionManager(databaseService, playerDataManager)
-        swearFilterService = SwearFilterService(this, configManager, infractionManager)
+        swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService)
         blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
 
         // Initialize maintenance services
@@ -108,7 +111,7 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp = BukkitLamp.builder(this).build()
 
         // Register commands
-        val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService)
+        val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService, alertService)
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
@@ -138,9 +141,13 @@ class PaperMC : SuspendingJavaPlugin() {
                 privateMessageService,
                 messageFormattingService,
                 blockService,
+                alertService,
                 this
             )
         )
+        
+        // Register alert commands
+        lamp.register(bruh.zchat.paper.commands.AlertCommands(alertService, messageFormattingService))
 
         // Register event listeners
         server.pluginManager.registerEvents(
@@ -159,6 +166,7 @@ class PaperMC : SuspendingJavaPlugin() {
                 chatFormattingService,
                 messageFormattingService,
                 playerDataManager,
+                alertService,
                 this
             ), this
         )
@@ -184,6 +192,7 @@ class PaperMC : SuspendingJavaPlugin() {
             logger.info("  - Private messages: ${configManager.config.privateMessages.enablePrivateMessages}")
             logger.info("  - Social spy: ${configManager.config.socialSpy.enableSocialSpy}")
             logger.info("  - Swear filter: ${configManager.config.swearFilter.enabled}")
+            logger.info("  - Swear filter alerts: ${configManager.config.swearFilter.alerts.enableAlerts}")
             logger.info("  - PlaceholderAPI: ${placeholderAPIService.isEnabled()}")
         }
     }

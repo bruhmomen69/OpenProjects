@@ -1,20 +1,22 @@
 package bruh.zchat.paper.commands
 
-import revxrsal.commands.annotation.Command
-import revxrsal.commands.annotation.Subcommand
-import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
+import revxrsal.commands.annotation.Command
+import revxrsal.commands.annotation.Subcommand
+import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import revxrsal.commands.bukkit.annotation.CommandPermission
 
 @Command("chatplugin", "zealouschat", "zchat")
 class ChatPluginCommands(
     private val configManager: ConfigManager,
     private val chatFormattingService: ChatFormattingService,
-    private val messageFormattingService: MessageFormattingService
+    private val messageFormattingService: MessageFormattingService,
+    private val alertService: AlertService
 ) {
 
     @Subcommand("reload")
@@ -23,6 +25,7 @@ class ChatPluginCommands(
         val success = configManager.reloadConfig()
         if (success) {
             chatFormattingService.reloadPlaceholders()
+            alertService.reload()
             actor.reply(messageFormattingService.getConfigMessage("commands.reload_success"))
         } else {
             actor.reply(messageFormattingService.getConfigMessage("commands.reload_failed"))
@@ -50,7 +53,7 @@ class ChatPluginCommands(
             <gray>  - Death Messages: ${config.death.enabled}</gray>
             <gray>  - Advancement Messages: ${config.advancement.enabled}</gray>
         """.trimIndent()
-        
+
         actor.reply(MiniMessage.miniMessage().deserialize(message))
     }
 
@@ -61,7 +64,7 @@ class ChatPluginCommands(
             actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
             return
         }
-        
+
         val player = actor.sender() as Player
         val formattedMessage = chatFormattingService.formatMessage(player, message)
         actor.reply(MiniMessage.miniMessage().deserialize("<yellow>Test Result:</yellow>"))
@@ -80,9 +83,11 @@ class ChatPluginCommands(
                     defaultFormat = format
                 )
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
-                actor.reply(MiniMessage.miniMessage().deserialize("<green>Default format updated successfully!</green>"))
+                actor.reply(
+                    MiniMessage.miniMessage().deserialize("<green>Default format updated successfully!</green>")
+                )
             } else {
                 actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
             }
@@ -93,15 +98,18 @@ class ChatPluginCommands(
         fun setGroup(actor: BukkitCommandActor, groupName: String, format: String) {
             val newGroupFormats = configManager.config.chatFormat.groupFormats.toMutableMap()
             newGroupFormats[groupName] = format
-            
+
             val newConfig = configManager.config.copy(
                 chatFormat = configManager.config.chatFormat.copy(
                     groupFormats = newGroupFormats
                 )
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
-                actor.reply(MiniMessage.miniMessage().deserialize("<green>Group format for '$groupName' updated successfully!</green>"))
+                actor.reply(
+                    MiniMessage.miniMessage()
+                        .deserialize("<green>Group format for '$groupName' updated successfully!</green>")
+                )
             } else {
                 actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
             }
@@ -112,15 +120,18 @@ class ChatPluginCommands(
         fun setWorld(actor: BukkitCommandActor, worldName: String, format: String) {
             val newWorldFormats = configManager.config.chatFormat.worldFormats.toMutableMap()
             newWorldFormats[worldName] = format
-            
+
             val newConfig = configManager.config.copy(
                 chatFormat = configManager.config.chatFormat.copy(
                     worldFormats = newWorldFormats
                 )
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
-                actor.reply(MiniMessage.miniMessage().deserialize("<green>World format for '$worldName' updated successfully!</green>"))
+                actor.reply(
+                    MiniMessage.miniMessage()
+                        .deserialize("<green>World format for '$worldName' updated successfully!</green>")
+                )
             } else {
                 actor.reply(MiniMessage.miniMessage().deserialize("<red>Failed to update configuration!</red>"))
             }
@@ -131,23 +142,23 @@ class ChatPluginCommands(
         fun list(actor: BukkitCommandActor) {
             val config = configManager.config.chatFormat
             val message = StringBuilder("<gold>===== Chat Formats =====</gold>\n")
-            
+
             message.append("<yellow>Default:</yellow> <gray>${config.defaultFormat}</gray>\n")
-            
+
             if (config.groupFormats.isNotEmpty()) {
                 message.append("<yellow>Group Formats:</yellow>\n")
                 config.groupFormats.forEach { (group, format) ->
                     message.append("<gray>  $group:</gray> <white>$format</white>\n")
                 }
             }
-            
+
             if (config.worldFormats.isNotEmpty()) {
                 message.append("<yellow>World Formats:</yellow>\n")
                 config.worldFormats.forEach { (world, format) ->
                     message.append("<gray>  $world:</gray> <white>$format</white>\n")
                 }
             }
-            
+
             actor.reply(MiniMessage.miniMessage().deserialize(message.toString()))
         }
     }
@@ -165,7 +176,7 @@ class ChatPluginCommands(
             val newConfig = configManager.config.copy(
                 chat = chatConfig.copy(enableColorCodes = newValue)
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
                 val status = if (newValue) "enabled" else "disabled"
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Color codes $status!</green>"))
@@ -182,7 +193,7 @@ class ChatPluginCommands(
             val newConfig = configManager.config.copy(
                 chat = chatConfig.copy(enableTextFormatting = newValue)
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
                 val status = if (newValue) "enabled" else "disabled"
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Text formatting $status!</green>"))
@@ -199,7 +210,7 @@ class ChatPluginCommands(
             val newConfig = configManager.config.copy(
                 chat = chatConfig.copy(enableMentions = newValue)
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
                 val status = if (newValue) "enabled" else "disabled"
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Player mentions $status!</green>"))
@@ -216,7 +227,7 @@ class ChatPluginCommands(
             val newConfig = configManager.config.copy(
                 chat = chatConfig.copy(enableCooldown = newValue)
             )
-            
+
             if (configManager.updateConfig(newConfig)) {
                 val status = if (newValue) "enabled" else "disabled"
                 actor.reply(MiniMessage.miniMessage().deserialize("<green>Chat cooldown $status!</green>"))

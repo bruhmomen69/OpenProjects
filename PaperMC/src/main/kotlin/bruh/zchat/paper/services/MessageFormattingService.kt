@@ -378,6 +378,12 @@ class MessageFormattingService(
             "blocks.target_blocked_you" -> messages.blocks.targetBlockedYou
             "blocks.max_blocks_reached" -> messages.blocks.maxBlocksReached
             
+            // Alert messages
+            "alerts.system_disabled" -> messages.alerts.systemDisabled
+            "alerts.no_permission" -> messages.alerts.noPermission
+            "alerts.enabled" -> messages.alerts.enabled
+            "alerts.disabled" -> messages.alerts.disabled
+            
             // System messages
             "system.error" -> messages.system.error
             "system.success" -> messages.system.success
