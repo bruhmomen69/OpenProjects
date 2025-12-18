@@ -18,7 +18,6 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         val username: String,
         val firstSeen: Instant,
         val lastSeen: Instant,
-        val isOnline: Boolean,
         val infractions: Map<String, Int>,
         val blockedPlayers: Set<UUID>,
         val joinTimestamp: Instant = Instant.now(), // Added for server switching detection
@@ -47,7 +46,6 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                     username = rs.getString("username"),
                     firstSeen = rs.getTimestamp("first_seen").toInstant(),
                     lastSeen = rs.getTimestamp("last_seen").toInstant(),
-                    isOnline = true,
                     infractions = emptyMap(),
                     blockedPlayers = emptySet(),
                     joinTimestamp = now, // Initialize with current join time for existing players
@@ -60,22 +58,22 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             if (existingPlayer == null) {
                 val insertSql = when (databaseService.databaseType) {
                     DatabaseType.MYSQL -> """INSERT IGNORE INTO players
-                    (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)"""
+                    (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                    VALUES (?, ?, ?, ?, ?, ?)"""
                     DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
-                    (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)"""
+                    (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                    VALUES (?, ?, ?, ?, ?, ?)"""
                 }
 
                 databaseService.executeUpdate(
                     insertSql,
-                    player.uniqueId, player.name, now, now, true, serverInstanceId, now
+                    player.uniqueId, player.name, now, now, serverInstanceId, now
                 )
             }
             
-            // Update existing player - ensure is_online is set to TRUE and update server ID
+            // Update existing player - update server ID and heartbeat
             databaseService.executeUpdate(
-                "UPDATE players SET username = ?, last_seen = ?, is_online = TRUE, online_server_id = ?, online_last_heartbeat = ? WHERE uuid = ?",
+                "UPDATE players SET username = ?, last_seen = ?, online_server_id = ?, online_last_heartbeat = ? WHERE uuid = ?",
                 player.name, now, serverInstanceId, now, player.uniqueId
             )
             
@@ -100,7 +98,6 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                 username = player.name,
                 firstSeen = now,
                 lastSeen = now,
-                isOnline = true,
                 infractions = emptyMap(),
                 blockedPlayers = emptySet(),
                 joinTimestamp = now,
@@ -108,7 +105,6 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             )).copy(
                 username = player.name,
                 lastSeen = now,
-                isOnline = true,
                 infractions = infractions,
                 blockedPlayers = blockedPlayers,
                 joinTimestamp = now,
@@ -124,16 +120,16 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             // Create new player if doesn't exist
             val insertSql = when (databaseService.databaseType) {
                 DatabaseType.MYSQL -> """INSERT IGNORE INTO players
-                (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
-                VALUES (?, ?, ?, ?, ?, ?, ?)"""
+                (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                VALUES (?, ?, ?, ?, ?, ?)"""
                 DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
-                (uuid, username, first_seen, last_seen, is_online, online_server_id, online_last_heartbeat)
-                VALUES (?, ?, ?, ?, ?, ?, ?)"""
+                (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                VALUES (?, ?, ?, ?, ?, ?)"""
             }
 
             databaseService.executeUpdate(
                 insertSql,
-                player.uniqueId, player.name, now, now, true, serverInstanceId, now
+                player.uniqueId, player.name, now, now, serverInstanceId, now
             )
             
             val playerData = PlayerData(
@@ -141,7 +137,6 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                 username = player.name,
                 firstSeen = now,
                 lastSeen = now,
-                isOnline = true,
                 infractions = emptyMap(),
                 blockedPlayers = emptySet(),
                 joinTimestamp = now,
@@ -275,7 +270,7 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                     logger.debug("Persisted dirty data for ${player.name} on quit")
                 }
                 
-                // Check for server switching scenario before updating is_online
+                // Check for server switching scenario before updating last_seen
                 val currentLastSeen = getCurrentLastSeenFromDatabase(player.uniqueId)
                 val joinTimestamp = playerData.joinTimestamp
                 val timeSinceJoin = now.epochSecond - joinTimestamp.epochSecond
@@ -292,17 +287,16 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                 val isServerSwitch = timeSinceLastSeen >= 10 && timeSinceLastSeen <= 30 && timeSinceJoin < 10
                 
                 if (isServerSwitch) {
-                    // Likely server switch - update last_seen but keep is_online = TRUE
+                    // Likely server switch - update last_seen but keep presence data
                     databaseService.executeUpdate(
                         "UPDATE players SET last_seen = ? WHERE uuid = ?",
                         now, player.uniqueId
                     )
-                    logger.debug("Skipping is_online update for ${player.name} - likely server switch detected (timeSinceJoin: ${timeSinceJoin}s, timeSinceLastSeen: ${timeSinceLastSeen}s)")
+                    logger.debug("Skipping presence update for ${player.name} - likely server switch detected (timeSinceJoin: ${timeSinceJoin}s, timeSinceLastSeen: ${timeSinceLastSeen}s)")
                 } else {
-                    // Normal quit - update database to set is_online = FALSE and update last_seen
-                    // Also clear presence data
+                    // Normal quit - update last_seen and clear presence data
                     databaseService.executeUpdate(
-                        "UPDATE players SET last_seen = ?, is_online = FALSE, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
+                        "UPDATE players SET last_seen = ?, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
                         now, player.uniqueId
                     )
                 }
@@ -312,9 +306,9 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
                 
                 logger.debug("Saved player data for ${player.name}: ${playerData.infractions.size} infractions, ${playerData.blockedPlayers.size} blocked players")
             } else {
-                // Player data not in cache, still update database to ensure is_online = FALSE
+                // Player data not in cache, still update database to ensure presence data is cleared
                 databaseService.executeUpdate(
-                    "UPDATE players SET last_seen = ?, is_online = FALSE, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
+                    "UPDATE players SET last_seen = ?, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
                     now, player.uniqueId
                 )
                 logger.debug("Updated database for ${player.name} (data not in cache)")
@@ -355,14 +349,13 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         // Query database
         try {
             return@withContext databaseService.executeQuerySingle(
-                "SELECT online_server_id, online_last_heartbeat, is_online FROM players WHERE uuid = ?",
+                "SELECT online_server_id, online_last_heartbeat FROM players WHERE uuid = ?",
                 uuid
             ) { rs ->
-                val isOnline = rs.getBoolean("is_online")
                 val serverId = rs.getString("online_server_id")
                 val lastHeartbeat = rs.getTimestamp("online_last_heartbeat")?.toInstant()
                 
-                if (isOnline && serverId != null && lastHeartbeat != null && lastHeartbeat.isAfter(cutoff)) {
+                if (serverId != null && lastHeartbeat != null && lastHeartbeat.isAfter(cutoff)) {
                     serverId
                 } else {
                     null

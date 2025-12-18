@@ -201,7 +201,6 @@ class CrossServerMessageBusService(
         val senderPresence = databaseService.executeQuerySingle(
             """SELECT online_server_id FROM players
                WHERE uuid = ?
-               AND is_online = TRUE
                AND online_server_id IS NOT NULL
                AND online_last_heartbeat IS NOT NULL
                AND online_last_heartbeat >= ?""",

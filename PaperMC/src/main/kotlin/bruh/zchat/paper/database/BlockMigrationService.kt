@@ -114,7 +114,7 @@ class BlockMigrationService(
         
         if (exists == 0) {
             tx.executeUpdate(
-                "INSERT INTO players (uuid, username, is_online) VALUES (?, ?, FALSE)",
+                "INSERT INTO players (uuid, username) VALUES (?, ?)",
                 uuid, "Unknown"
             )
         }
