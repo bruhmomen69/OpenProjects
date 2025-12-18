@@ -56,11 +56,11 @@ class AlertService(
         if (wasEnabled) {
             alertsEnabled.remove(player.uniqueId)
             player.sendMessage(messageFormattingService.getConfigMessage("alerts.disabled", player))
-            logger.info("${player.name} disabled swear filter alerts")
+            logger.debug("${player.name} disabled swear filter alerts")
         } else {
             alertsEnabled.add(player.uniqueId)
             player.sendMessage(messageFormattingService.getConfigMessage("alerts.enabled", player))
-            logger.info("${player.name} enabled swear filter alerts")
+            logger.debug("${player.name} enabled swear filter alerts")
         }
         
         return !wasEnabled
