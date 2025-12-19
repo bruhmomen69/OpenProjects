@@ -573,22 +573,6 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun archiveOldBlocks(cutoffDate: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                """INSERT INTO player_blocks_archive 
-                (blocker_uuid, blocked_uuid, blocked_at, blocked_by_username, archived_at)
-                SELECT blocker_uuid, blocked_uuid, blocked_at, blocked_by_username, CURRENT_TIMESTAMP
-                FROM player_blocks 
-                WHERE blocked_at < ?""",
-                cutoffDate
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to archive old blocks", e)
-            0
-        }
-    }
-
     suspend fun cleanupOldInfractions(cutoffDate: Instant): Int = withContext(Dispatchers.IO) {
         try {
             databaseService.executeUpdate(
@@ -597,18 +581,6 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             )
         } catch (e: Exception) {
             logger.error("Failed to cleanup old infractions", e)
-            0
-        }
-    }
-
-    suspend fun cleanupOldBlocks(cutoffDate: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                "DELETE FROM player_blocks WHERE blocked_at < ?",
-                cutoffDate
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to cleanup old blocks", e)
             0
         }
     }
@@ -624,7 +596,6 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
                     databaseService.executeUpdate("OPTIMIZE TABLE player_infractions")
                     databaseService.executeUpdate("OPTIMIZE TABLE player_infractions_archive")
                     databaseService.executeUpdate("OPTIMIZE TABLE player_blocks")
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_blocks_archive")
                     databaseService.executeUpdate("OPTIMIZE TABLE message_bus")
                     databaseService.executeUpdate("OPTIMIZE TABLE players")
                 }

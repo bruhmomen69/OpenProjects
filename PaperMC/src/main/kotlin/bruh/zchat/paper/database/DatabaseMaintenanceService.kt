@@ -11,39 +11,37 @@ class DatabaseMaintenanceService(
     private val config: DatabaseConfig
 ) {
     private val logger = LoggerFactory.getLogger(DatabaseMaintenanceService::class.java)
-    
+
+    /**
+     * Performs data retention for infractions and message bus records.
+     * Player blocks are intentionally preserved and are neither archived nor deleted.
+     */
     suspend fun performDataRetention(): MaintenanceResult = withContext(Dispatchers.IO) {
         val cutoffDate = Instant.now().minus(config.dataRetentionDays.toLong(), ChronoUnit.DAYS)
         var totalDeleted = 0
-        
+
         try {
             logger.info("Starting data retention cleanup for records older than $cutoffDate")
-            
+
             // Archive old data before deletion (if archive enabled)
             if (config.enableArchive) {
                 val archivedInfractions = dbPlayerQueries.archiveOldInfractions(cutoffDate)
-                val archivedBlocks = dbPlayerQueries.archiveOldBlocks(cutoffDate)
-                logger.info("Archived $archivedInfractions infraction records and $archivedBlocks block records")
+                logger.info("Archived $archivedInfractions infraction records")
             }
-            
+
             // Clean old player infractions
             val infractionsDeleted = cleanupOldInfractions(cutoffDate)
             totalDeleted += infractionsDeleted
             logger.info("Deleted $infractionsDeleted old infraction records")
-            
-            // Clean old player blocks  
-            val blocksDeleted = cleanupOldBlocks(cutoffDate)
-            totalDeleted += blocksDeleted
-            logger.info("Deleted $blocksDeleted old block records")
-            
+
             // Clean old messages from bus
             val messagesDeleted = cleanupOldMessages(cutoffDate)
             totalDeleted += messagesDeleted
             logger.info("Deleted $messagesDeleted old message bus records")
-            
+
             // Optimize database
             optimizeDatabase()
-            
+
             return@withContext MaintenanceResult(
                 success = true,
                 recordsDeleted = totalDeleted,
@@ -63,11 +61,7 @@ class DatabaseMaintenanceService(
     private suspend fun cleanupOldInfractions(cutoffDate: Instant): Int {
         return dbPlayerQueries.cleanupOldInfractions(cutoffDate)
     }
-    
-    private suspend fun cleanupOldBlocks(cutoffDate: Instant): Int {
-        return dbPlayerQueries.cleanupOldBlocks(cutoffDate)
-    }
-    
+
     private suspend fun cleanupOldMessages(cutoffDate: Instant): Int {
         return dbPlayerQueries.deleteOldMessages(cutoffDate)
     }
