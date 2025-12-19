@@ -93,7 +93,8 @@ class PaperMCLoader : PluginLoader {
             "io.github.revxrsal:lamp.brigadier:4.0.0-rc.12",
             "com.mysql:mysql-connector-j:9.5.0",
             "org.xerial:sqlite-jdbc:3.47.1.0",
-            "com.zaxxer:HikariCP:7.0.2"
+            "com.zaxxer:HikariCP:7.0.2",
+            "io.lettuce:lettuce-core:7.2.1.RELEASE"
         )
     }
 }

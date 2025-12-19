@@ -370,10 +370,20 @@ data class LegacyDatabaseConfig(
 @ConfigSerializable
 data class LegacyCrossServerMessagingConfig(
     val enabled: Boolean = true,
+    val backend: String = "mysql",
     val pollIntervalMillis: Long = 250,
     val heartbeatIntervalSeconds: Int = 10,
     val heartbeatTimeoutSeconds: Int = 25,
     val claimTimeoutSeconds: Int = 60,
     val pollBatchSize: Int = 50,
-    val messageRetentionDays: Int = 7
+    val messageRetentionDays: Int = 7,
+    val redis: LegacyRedisCrossServerMessagingConfig = LegacyRedisCrossServerMessagingConfig()
+)
+
+@ConfigSerializable
+data class LegacyRedisCrossServerMessagingConfig(
+    val uri: String = "redis://localhost:6379/0",
+    val channelPrefix: String = "zealouschat:bus",
+    val clientName: String? = null,
+    val connectTimeoutMillis: Long = 10000
 )

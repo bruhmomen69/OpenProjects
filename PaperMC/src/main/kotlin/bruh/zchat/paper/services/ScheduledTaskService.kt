@@ -53,6 +53,11 @@ class ScheduledTaskService(
 
         // Heartbeat should always be enabled but other tasks depend on state config
         if (!config.enabled) return
+        val isRedisBackend = config.backend.equals("redis", ignoreCase = true)
+        if (isRedisBackend) {
+            logger.info("Cross-server messaging using Redis backend; skipping SQL poll/reclaim tasks")
+            return
+        }
         
         // 2. Message Bus Polling (every X ms) - Fixed 250ms per plan, but using config value as base
         // Note: Bukkit scheduler runs in ticks (50ms). 250ms = 5 ticks.

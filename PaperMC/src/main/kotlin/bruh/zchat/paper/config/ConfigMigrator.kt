@@ -271,6 +271,13 @@ class ConfigMigrator {
             ),
             crossServerMessaging = CrossServerMessagingConfig(
                 enabled = legacy.crossServerMessaging.enabled,
+                backend = legacy.crossServerMessaging.backend,
+                redis = RedisCrossServerMessagingConfig(
+                    uri = legacy.crossServerMessaging.redis.uri,
+                    channelPrefix = legacy.crossServerMessaging.redis.channelPrefix,
+                    clientName = legacy.crossServerMessaging.redis.clientName,
+                    connectTimeoutMillis = legacy.crossServerMessaging.redis.connectTimeoutMillis
+                ),
                 pollIntervalMillis = legacy.crossServerMessaging.pollIntervalMillis,
                 heartbeatIntervalSeconds = legacy.crossServerMessaging.heartbeatIntervalSeconds,
                 heartbeatTimeoutSeconds = legacy.crossServerMessaging.heartbeatTimeoutSeconds,

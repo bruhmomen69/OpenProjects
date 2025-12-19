@@ -124,9 +124,24 @@ class PaperMC : SuspendingJavaPlugin() {
         
         // Schedule cross-server tasks
         if (configManager.storage.crossServerMessaging.enabled) {
+            val isRedisBackend = configManager.storage.crossServerMessaging.backend.equals("redis", ignoreCase = true)
             if (databaseService.databaseType == DatabaseType.MYSQL) {
-                scheduledTaskService.scheduleCrossServerTasks(serverInstanceId)
-                logger.info("Cross-server messaging enabled with Server ID: $serverInstanceId")
+                // Initialize Redis backend if selected
+                if (isRedisBackend) {
+                    try {
+                        crossServerMessageBusService.start()
+                    } catch (e: Exception) {
+                        slF4JLogger.error("Failed to start Redis cross-server message bus; disabling cross-server messaging", e)
+                        val newStorage = configManager.storage.copy(
+                            crossServerMessaging = configManager.storage.crossServerMessaging.copy(enabled = false)
+                        )
+                        configManager.updateStorage(newStorage)
+                    }
+                }
+                if (configManager.storage.crossServerMessaging.enabled) {
+                    scheduledTaskService.scheduleCrossServerTasks(serverInstanceId)
+                    logger.info("Cross-server messaging enabled with Server ID: $serverInstanceId (backend=${configManager.storage.crossServerMessaging.backend})")
+                }
             } else {
                 logger.info("Cross-server messaging requires MySQL. Disabling crossServerMessaging.enabled in config.")
                 val newStorage = configManager.storage.copy(
@@ -249,6 +264,11 @@ class PaperMC : SuspendingJavaPlugin() {
         // Cancel scheduled tasks
         if (::scheduledTaskService.isInitialized) {
             scheduledTaskService.cancelAllTasks()
+        }
+
+        // Close Redis backend resources (if any)
+        if (::crossServerMessageBusService.isInitialized) {
+            crossServerMessageBusService.close()
         }
 
         // Close database

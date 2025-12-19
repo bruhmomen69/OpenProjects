@@ -60,6 +60,12 @@ data class CrossServerMessagingConfig(
     @field:Comment("Enable cross-server private messaging (requires MySQL database).")
     val enabled: Boolean = true,
     
+    @field:Comment("Backend for cross-server messaging: 'mysql' (existing message_bus polling) or 'redis' (Pub/Sub).")
+    val backend: String = "mysql",
+    
+    @field:Comment("Redis settings (used when backend = 'redis').")
+    val redis: RedisCrossServerMessagingConfig = RedisCrossServerMessagingConfig(),
+    
     @field:Comment("Interval in milliseconds to poll for new messages.")
     val pollIntervalMillis: Long = 250,
     
@@ -77,4 +83,19 @@ data class CrossServerMessagingConfig(
     
     @field:Comment("Data retention for message bus history in days.")
     val messageRetentionDays: Int = 7
+)
+
+@ConfigSerializable
+data class RedisCrossServerMessagingConfig(
+    @field:Comment("Redis URI, e.g. redis://[:password@]host:6379/0")
+    val uri: String = "redis://localhost:6379/0",
+    
+    @field:Comment("Channel prefix for cross-server messaging.")
+    val channelPrefix: String = "zealouschat:bus",
+    
+    @field:Comment("Optional Redis client name.")
+    val clientName: String? = null,
+    
+    @field:Comment("Connection timeout in milliseconds for Redis.")
+    val connectTimeoutMillis: Long = 10000
 )
