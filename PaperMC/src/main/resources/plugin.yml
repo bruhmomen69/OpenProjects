@@ -16,7 +16,7 @@ libraries:
   - com.zaxxer:HikariCP:7.0.2
   - com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.22.0
   - com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.22.0
-  - io.lettuce:lettuce-core:7.2.1.RELEASE
+  - io.projectreactor:reactor-core:3.8.1
 
 softdepend:
   - PlaceholderAPI

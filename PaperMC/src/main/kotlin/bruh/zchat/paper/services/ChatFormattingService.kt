@@ -9,6 +9,8 @@ import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.round
+import kotlin.math.roundToLong
 
 class ChatFormattingService(
     private val configManager: ConfigManager,
@@ -35,7 +37,7 @@ class ChatFormattingService(
             val currentTime = System.currentTimeMillis()
 
             if (currentTime - lastMessage < cooldownTime) {
-                val remainingTime = (cooldownTime - (currentTime - lastMessage)) / 1000.0
+                val remainingTime = ((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
                 throw ChatCooldownException(
                     "You must wait ${
                         String.format(

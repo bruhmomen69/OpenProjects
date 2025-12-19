@@ -52,7 +52,8 @@ dependencies {
     compileOnly("com.mysql:mysql-connector-j:9.5.0")
     compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
     compileOnly("com.zaxxer:HikariCP:7.0.2")
-    compileOnly("io.lettuce:lettuce-core:7.2.1.RELEASE")
+
+    implementation("io.lettuce:lettuce-core:7.2.1.RELEASE")
 
     implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.22.0")
     implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.22.0")
@@ -77,6 +78,19 @@ tasks.named<ShadowJar>("shadowJar") {
     relocate("com.github.shynixn", "bruh.zchat.paper.dependencies.com.github.shynixn")
     relocate("com.fasterxml.jackson", "bruh.zchat.paper.dependencies.com.fasterxml.jackson")
     relocate("org.flywaydb", "bruh.zchat.paper.dependencies.org.flywaydb")
+    relocate("io.lettuce", "bruh.zchat.paper.dependencies.io.lettuce")
+    relocate("io.netty", "bruh.zchat.paper.dependencies.io.netty")
+
+    exclude("META-INF/*.SF")
+    exclude("META-INF/*.DSA")
+    exclude("META-INF/*.RSA")
+    exclude("org/reactivestreams/*")
+
+    dependencies {
+        exclude(dependency("org.reactivestreams:reactive-streams:.*"))
+        exclude(dependency("io.projectreactor:reactor-core:.*"))
+
+    }
 }
 
 val targetJavaVersion = 21

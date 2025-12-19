@@ -85,10 +85,7 @@ class ChatMessageListener(
             }
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(
-                messageFormattingService.getConfigMessage(
-                    "chat.cooldown", event.player,
-                    mapOf("time" to e.message!!.substringAfter("wait ").substringBefore(" seconds"))
-                )
+               e.message!!
             )
             event.isCancelled = true
         } catch (e: Exception) {

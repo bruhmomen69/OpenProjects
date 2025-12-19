@@ -60,7 +60,7 @@ data class CrossServerMessagingConfig(
     @field:Comment("Enable cross-server private messaging (requires MySQL database).")
     val enabled: Boolean = true,
     
-    @field:Comment("Backend for cross-server messaging: 'mysql' (existing message_bus polling) or 'redis' (Pub/Sub).")
+    @field:Comment("Backend for cross-server messaging: 'mysql' or 'redis'.")
     val backend: String = "mysql",
     
     @field:Comment("Redis settings (used when backend = 'redis').")

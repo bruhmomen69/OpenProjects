@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import bruh.zchat.paper.database.PlayerDataManager
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.roundToLong
 
 /**
  * Service for handling private messages between players with MiniMessage formatting
@@ -56,11 +57,11 @@ class PrivateMessageService(
             val currentTime = System.currentTimeMillis()
             
             if (currentTime - lastMessage < cooldownTime) {
-                val remainingTime = (cooldownTime - (currentTime - lastMessage)) / 1000.0
+                val remainingTime = ((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
                 sender.sendMessage(messageFormattingService.getConfigMessage(
                     "private_messages.cooldown", 
                     sender, 
-                    mapOf("time" to String.format("%.1f", remainingTime))
+                    mapOf("time" to remainingTime.toString())
                 ))
                 return false
             }
