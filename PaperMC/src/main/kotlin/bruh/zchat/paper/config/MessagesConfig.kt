@@ -194,7 +194,7 @@ data class PrivateMessageMessages(
     val recipientFormat: String = "<gray>[<green>{sender}</green> -> <yellow>You</yellow>]</gray> <white><message></white>",
 
     @field:Comment("Message shown when trying to message a player who is not online")
-    val playerNotFound: String = "<red>Player '<player>' is not online!</red>",
+    val playerNotFound: String = "<red>Player '<recipient>' is not online!</red>",
     
     @field:Comment("Message shown when trying to message a player who has messages disabled")
     val targetMessagesDisabled: String = "<red><player> has private messages disabled!</red>",
@@ -398,7 +398,7 @@ data class CommandMessages(
     val reloadFailed: String = "<red>Failed to reload configuration. Check console for errors.</red>",
     
     @field:Comment("Message shown when a player is not found")
-    val playerNotFound: String = "<red>Player '<player>' is not online!</red>",
+    val playerNotFound: String = "<red>Player '<recipient>' is not online!</red>",
     
     @field:Comment("Message shown when a feature is successfully enabled")
     val featureEnabled: String = "<green><feature> enabled!</green>",

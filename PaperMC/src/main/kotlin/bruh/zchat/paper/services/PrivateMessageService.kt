@@ -166,7 +166,7 @@ class PrivateMessageService(
         sender.sendMessage(messageFormattingService.getConfigMessage(
             "private_messages.player_not_found",
             sender,
-            mapOf("player" to recipientName)
+            mapOf("recipient" to recipientName)
         ))
         return false
     }
