@@ -149,6 +149,14 @@ class PrivateMessageService(
                             logger.info("[MSG-CROSS] ${sender.name} -> $recipientName: $message")
                         }
                         return true
+                    } else {
+                        sender.sendMessage(messageFormattingService.getConfigMessage(
+                            "private_messages.delivery_failed",
+                            sender,
+                            mapOf("player" to recipientName)
+                        ))
+                        logger.warn("Failed to send cross-server private message from ${sender.name} to $recipientName")
+                        return false
                     }
                 }
             }

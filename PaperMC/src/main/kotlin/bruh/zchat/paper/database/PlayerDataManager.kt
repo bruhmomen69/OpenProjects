@@ -333,8 +333,9 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
             params.addAll(onlineUuids)
             
             databaseService.executeUpdate(sql, *params.toTypedArray())
+            logger.debug("Updated heartbeats for ${onlineUuids.size} online players on server $serverInstanceId")
         } catch (e: Exception) {
-            logger.error("Failed to update heartbeats", e)
+            logger.error("Failed to update heartbeats for server $serverInstanceId", e)
         }
     }
     
@@ -342,7 +343,10 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
     suspend fun getCrossServerPresence(uuid: UUID, heartbeatTimeoutSeconds: Int): String? = withContext(Dispatchers.IO) {
         // Check local cache first
         val cached = onlinePlayers[uuid]
-        if (cached != null) return@withContext cached.onlineServerId
+        if (cached != null) {
+            logger.warn("Found local cross-server presence for $uuid: ${cached.onlineServerId}. This should not happen.")
+            return@withContext cached.onlineServerId
+        }
         
         val cutoff = Instant.now().minusSeconds(heartbeatTimeoutSeconds.toLong())
         
@@ -374,10 +378,27 @@ class PlayerDataManager(private val databaseService: DatabaseService) {
         
         // Query database
         try {
-            return@withContext databaseService.executeQuerySingle(
-                "SELECT uuid FROM players WHERE username = ?",
+            val matches = databaseService.executeQuery(
+                "SELECT uuid, username, last_seen FROM players WHERE LOWER(username) = LOWER(?) ORDER BY last_seen DESC LIMIT 6",
                 username
-            ) { rs -> UUID.fromString(rs.getString("uuid")) }
+            ) { rs ->
+                val lastSeen = rs.getTimestamp("last_seen")?.toInstant() ?: Instant.EPOCH
+                Triple(UUID.fromString(rs.getString("uuid")), rs.getString("username"), lastSeen)
+            }
+
+            if (matches.isEmpty()) return@withContext null
+
+            if (matches.size > 1) {
+                val preview = matches.joinToString(", ") { (uuid, name, lastSeen) -> "$uuid(name=$name,lastSeen=$lastSeen)" }
+                logger.debug(
+                    "Multiple UUIDs found for username {} (showing up to {} matches, newest first): {}",
+                    username,
+                    matches.size,
+                    preview
+                )
+            }
+
+            return@withContext matches.first().first
         } catch (e: Exception) {
             logger.error("Failed to resolve UUID for username $username", e)
             null
