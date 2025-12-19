@@ -39,12 +39,7 @@ class ChatFormattingService(
             if (currentTime - lastMessage < cooldownTime) {
                 val remainingTime = ((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
                 throw ChatCooldownException(
-                    "You must wait ${
-                        String.format(
-                            "%.1f",
-                            remainingTime
-                        )
-                    } seconds before sending another message!"
+                    "You must wait $remainingTime seconds before sending another message!"
                 )
             }
 
