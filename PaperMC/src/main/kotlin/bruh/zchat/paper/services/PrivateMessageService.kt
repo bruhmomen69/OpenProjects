@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory
 import bruh.zchat.paper.database.PlayerDataManager
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.ceil
 import kotlin.math.roundToLong
 
 /**
@@ -57,7 +58,7 @@ class PrivateMessageService(
             val currentTime = System.currentTimeMillis()
             
             if (currentTime - lastMessage < cooldownTime) {
-                val remainingTime = ((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
+                val remainingTime = ceil((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
                 sender.sendMessage(messageFormattingService.getConfigMessage(
                     "private_messages.cooldown", 
                     sender, 

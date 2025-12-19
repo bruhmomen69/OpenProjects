@@ -184,36 +184,36 @@ class MessageFormattingService(
     ): Pair<TagResolver, String> {
         var mutFormat = format
         val resolvers = mutableListOf<TagResolver>()
-        
-        // Add string placeholders first (highest priority)
-        for ((placeholder, value) in stringPlaceholders) {
-            resolvers.add(Placeholder.unparsed(placeholder, value))
-        }
-        
-        // Add component placeholders
-        for ((placeholder, value) in componentPlaceholders) {
-            resolvers.add(Placeholder.component(placeholder, value))
-        }
-        
-        // Add built-in placeholders
+ 
+        // Add built-in placeholders first (lowest priority)
         if (configManager.config.placeholders.enableBuiltinPlaceholders) {
             for ((placeholder, resolver) in builtinPlaceholders) {
                 resolvers.add(Placeholder.unparsed(placeholder, resolver(player)))
             }
         }
-        
+ 
         // Add custom placeholders
         for ((placeholder, value) in configManager.config.placeholders.customPlaceholders) {
             resolvers.add(Placeholder.unparsed(placeholder, value))
         }
-        
+ 
         // Add PlaceholderAPI support if enabled
         if (player != null && placeholderAPIService.isEnabled()) {
             val placeholderAPIResolver = placeholderAPIService.createPlaceholderAPIResolver(player, mutFormat)
             resolvers.add(placeholderAPIResolver.first)
             mutFormat = placeholderAPIResolver.second
         }
-        
+ 
+        // Add string placeholders last (highest priority)
+        for ((placeholder, value) in stringPlaceholders) {
+            resolvers.add(Placeholder.unparsed(placeholder, value))
+        }
+ 
+        // Add component placeholders last (highest priority)
+        for ((placeholder, value) in componentPlaceholders) {
+            resolvers.add(Placeholder.component(placeholder, value))
+        }
+ 
         return Pair(TagResolver.resolver(resolvers), mutFormat)
     }
 

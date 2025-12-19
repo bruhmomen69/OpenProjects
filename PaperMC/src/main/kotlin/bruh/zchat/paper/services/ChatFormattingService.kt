@@ -9,7 +9,7 @@ import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.round
+import kotlin.math.ceil
 import kotlin.math.roundToLong
 
 class ChatFormattingService(
@@ -37,7 +37,7 @@ class ChatFormattingService(
             val currentTime = System.currentTimeMillis()
 
             if (currentTime - lastMessage < cooldownTime) {
-                val remainingTime = ((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
+                val remainingTime = ceil((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
                 throw ChatCooldownException(
                     remainingTime.toString()
                 )
