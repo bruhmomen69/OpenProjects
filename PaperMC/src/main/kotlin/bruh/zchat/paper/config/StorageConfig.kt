@@ -9,7 +9,10 @@ data class StorageConfig(
     val database: DatabaseConfig = DatabaseConfig(),
 
     @field:Comment("Cross-server messaging configuration (requires MySQL)")
-    val crossServerMessaging: CrossServerMessagingConfig = CrossServerMessagingConfig()
+    val crossServerMessaging: CrossServerMessagingConfig = CrossServerMessagingConfig(),
+
+    @field:Comment("Inventory snapshot storage configuration")
+    val inventorySnapshots: InventorySnapshotStorageConfig = InventorySnapshotStorageConfig()
 )
 
 @ConfigSerializable
@@ -52,7 +55,10 @@ data class DatabaseConfig(
     val maintenanceTime: String = "02:00",
     
     @field:Comment("Enable performance monitoring and logging")
-    val enablePerformanceMonitoring: Boolean = false
+    val enablePerformanceMonitoring: Boolean = false,
+
+    @field:Comment("Redis connection settings shared by services that use Redis backends.")
+    val redis: RedisConnectionConfig = RedisConnectionConfig()
 )
 
 @ConfigSerializable
@@ -87,15 +93,27 @@ data class CrossServerMessagingConfig(
 
 @ConfigSerializable
 data class RedisCrossServerMessagingConfig(
+    @field:Comment("Channel prefix for cross-server messaging.")
+    val channelPrefix: String = "zealouschat:bus"
+)
+
+@ConfigSerializable
+data class RedisConnectionConfig(
     @field:Comment("Redis URI, e.g. redis://[:password@]host:6379/0")
     val uri: String = "redis://localhost:6379/0",
-    
-    @field:Comment("Channel prefix for cross-server messaging.")
-    val channelPrefix: String = "zealouschat:bus",
-    
+
     @field:Comment("Optional Redis client name.")
     val clientName: String? = null,
-    
+
     @field:Comment("Connection timeout in milliseconds for Redis.")
     val connectTimeoutMillis: Long = 10000
+)
+
+@ConfigSerializable
+data class InventorySnapshotStorageConfig(
+    @field:Comment("Backend for inventory snapshots: 'fs', 'sql', or 'redis'")
+    val backend: String = "fs",
+
+    @field:Comment("Redis key prefix when backend = 'redis'")
+    val redisKeyPrefix: String = "zealouschat:inventory_snapshots"
 )

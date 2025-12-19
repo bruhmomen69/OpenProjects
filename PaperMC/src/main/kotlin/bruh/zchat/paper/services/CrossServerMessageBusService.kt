@@ -84,7 +84,7 @@ class CrossServerMessageBusService(
         if (!isRedisBackend || !backendConfig.crossServerMessaging.enabled) return@withContext
         if (pubSubConnection != null && publishConnection != null) return@withContext
 
-        val redisCfg = backendConfig.crossServerMessaging.redis
+        val redisCfg = backendConfig.database.redis
         val client = RedisClient.create(redisCfg.uri).apply {
             options = ClientOptions.builder()
                 .autoReconnect(true)

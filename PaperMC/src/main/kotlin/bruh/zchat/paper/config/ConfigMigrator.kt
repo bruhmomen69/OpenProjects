@@ -267,16 +267,18 @@ class ConfigMigrator {
                 enableArchive = legacy.database.enableArchive,
                 dataRetentionDays = legacy.database.dataRetentionDays,
                 maintenanceTime = legacy.database.maintenanceTime,
-                enablePerformanceMonitoring = legacy.database.enablePerformanceMonitoring
+                enablePerformanceMonitoring = legacy.database.enablePerformanceMonitoring,
+                redis = RedisConnectionConfig(
+                    uri = legacy.crossServerMessaging.redis.uri,
+                    clientName = legacy.crossServerMessaging.redis.clientName,
+                    connectTimeoutMillis = legacy.crossServerMessaging.redis.connectTimeoutMillis
+                )
             ),
             crossServerMessaging = CrossServerMessagingConfig(
                 enabled = legacy.crossServerMessaging.enabled,
                 backend = legacy.crossServerMessaging.backend,
                 redis = RedisCrossServerMessagingConfig(
-                    uri = legacy.crossServerMessaging.redis.uri,
-                    channelPrefix = legacy.crossServerMessaging.redis.channelPrefix,
-                    clientName = legacy.crossServerMessaging.redis.clientName,
-                    connectTimeoutMillis = legacy.crossServerMessaging.redis.connectTimeoutMillis
+                    channelPrefix = legacy.crossServerMessaging.redis.channelPrefix
                 ),
                 pollIntervalMillis = legacy.crossServerMessaging.pollIntervalMillis,
                 heartbeatIntervalSeconds = legacy.crossServerMessaging.heartbeatIntervalSeconds,
@@ -284,6 +286,10 @@ class ConfigMigrator {
                 claimTimeoutSeconds = legacy.crossServerMessaging.claimTimeoutSeconds,
                 pollBatchSize = legacy.crossServerMessaging.pollBatchSize,
                 messageRetentionDays = legacy.crossServerMessaging.messageRetentionDays
+            ),
+            inventorySnapshots = InventorySnapshotStorageConfig(
+                backend = "fs",
+                redisKeyPrefix = "zealouschat:inventory_snapshots"
             )
         )
 

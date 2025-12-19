@@ -6,6 +6,10 @@ import bruh.zchat.paper.database.*
 import bruh.zchat.paper.listeners.*
 import bruh.zchat.paper.services.*
 import bruh.zchat.paper.services.AlertService
+import bruh.zchat.paper.services.snapshots.FileInventorySnapshotStore
+import bruh.zchat.paper.services.snapshots.InventorySnapshotStore
+import bruh.zchat.paper.services.snapshots.RedisInventorySnapshotStore
+import bruh.zchat.paper.services.snapshots.SqlInventorySnapshotStore
 import bruh.zchat.paper.swearfilter.InfractionManager
 import bruh.zchat.paper.swearfilter.SwearFilterService
 import bruh.zchat.paper.utils.ModrinthUpdateChecker
@@ -36,6 +40,7 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var infractionManager: InfractionManager
     private lateinit var swearFilterService: SwearFilterService
     private lateinit var blockMigrationService: BlockMigrationService
+    private lateinit var inventorySnapshotStore: InventorySnapshotStore
     private lateinit var lamp: Lamp<*>
     
     // Server instance ID for cross-server messaging
@@ -84,7 +89,14 @@ class PaperMC : SuspendingJavaPlugin() {
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
-        chatInventoryPlaceholderService = ChatInventoryPlaceholderService(this, configManager, messageFormattingService)
+        inventorySnapshotStore = createInventorySnapshotStore()
+        chatInventoryPlaceholderService = ChatInventoryPlaceholderService(
+            this,
+            configManager,
+            messageFormattingService,
+            inventorySnapshotStore,
+            serverInstanceId
+        )
         chatToggleService = ChatToggleService(this, configManager, messageFormattingService, playerDataManager)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
         alertService = bruh.zchat.paper.services.AlertService(this, configManager, messageFormattingService)
@@ -186,7 +198,7 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp.register(MessageCommand.BlockCommand(blockService, messageFormattingService, this))
 
         // Register inventory view command
-        lamp.register(InventoryViewCommand(chatInventoryPlaceholderService))
+        lamp.register(InventoryViewCommand(this, chatInventoryPlaceholderService))
 
         // Register chat toggle and admin commands
         lamp.register(
@@ -272,6 +284,11 @@ class PaperMC : SuspendingJavaPlugin() {
             crossServerMessageBusService.close()
         }
 
+        // Close inventory snapshot store
+        if (::inventorySnapshotStore.isInitialized) {
+            inventorySnapshotStore.close()
+        }
+
         // Close database
         if (::databaseService.isInitialized) {
             databaseService.close()
@@ -309,5 +326,31 @@ class PaperMC : SuspendingJavaPlugin() {
             enableArchive = dbConfig.enableArchive,
             dataRetentionDays = dbConfig.dataRetentionDays
         )
+    }
+
+    private fun createInventorySnapshotStore(): InventorySnapshotStore {
+        val storageCfg = configManager.storage
+        val backend = storageCfg.inventorySnapshots.backend.lowercase()
+        return when (backend) {
+            "fs" -> FileInventorySnapshotStore(
+                dataFolder.toPath().resolve("inventory_snapshots"),
+                configManager
+            )
+            "sql" -> SqlInventorySnapshotStore(databaseService)
+            "redis" -> {
+                val redisCfg = storageCfg.database.redis
+                RedisInventorySnapshotStore(
+                    redisConfig = redisCfg,
+                    keyPrefix = storageCfg.inventorySnapshots.redisKeyPrefix
+                )
+            }
+            else -> {
+                logger.warning("Unknown inventorySnapshots backend '$backend', defaulting to fs")
+                FileInventorySnapshotStore(
+                    dataFolder.toPath().resolve("inventory_snapshots"),
+                    configManager
+                )
+            }
+        }
     }
 }
