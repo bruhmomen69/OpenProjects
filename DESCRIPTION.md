@@ -1,7 +1,7 @@
 # ZealousChat
 *A modern, MiniMessage-powered chat formatter for Paper & Spigot servers*
 
-ZealousChat replaces Vanilla chat with a fully–configurable system built on the Paper's high performance **AsyncChatEvent** and **MiniMessage** components.  It ships with rank/world specific formats, private messaging, inventory placeholders and a granular permission model – all while remaining light-weight and production ready.
+ZealousChat replaces Vanilla chat with a fully configurable system built on the Paper's high performance **AsyncChatEvent** and **MiniMessage** components.  It ships with rank/world specific formats, private messaging, inventory placeholders and a granular permission model – all while remaining light-weight and production ready.
 
 ---
 
@@ -9,7 +9,7 @@ ZealousChat replaces Vanilla chat with a fully–configurable system built on th
 - **MiniMessage everywhere** – gradients, hex colours, hover/click events
 - **Rank, world & permission based formats** with priority system
 - **Private messaging** (`/msg`, `/reply`) with social-spy & cooldowns
-- **Cross-server private messaging** (experimental, **MySQL required**) for networks running multiple servers
+- **Cross-server private messaging** (optional, **MySQL required**) for networks running multiple servers
 - **Chat / Message toggles** per-player (with staff bypass)
 - **Inventory placeholders** `[inv]`, `[ender]`, `[armor]`, `[hand]`, `[pos]`, `[health]`
 - **URL auto-linking** & **@mentions** (configurable)
@@ -224,5 +224,4 @@ All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags
 ---
 
 ### Need help?
-• Issues & suggestions: [GitHub Issues](https://github.com/your-org/ZealousChat)
-• Discord: *coming soon*
+• Discord: [Join Discord](https://discord.gg/A6NG8DaAb7)
