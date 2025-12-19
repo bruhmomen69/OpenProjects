@@ -68,7 +68,8 @@ class PaperMC : SuspendingJavaPlugin() {
         // Initialize database
         val dbConfig = createDatabaseConfig()
         databaseService = DatabaseService(dbConfig, this)
-        playerDataManager = PlayerDataManager(databaseService)
+        val dbPlayerQueries = DBPlayerQueries(databaseService)
+        playerDataManager = PlayerDataManager(databaseService, dbPlayerQueries)
 
         // Run database migrations
         try {
@@ -88,7 +89,7 @@ class PaperMC : SuspendingJavaPlugin() {
         socialSpyService = SocialSpyService(configManager, messageFormattingService)
         alertService = bruh.zchat.paper.services.AlertService(this, configManager, messageFormattingService)
         blockService =
-            BlockService(configManager, messageFormattingService, socialSpyService, databaseService, playerDataManager)
+            BlockService(configManager, messageFormattingService, socialSpyService, dbPlayerQueries, playerDataManager)
         privateMessageService = PrivateMessageService(
             configManager,
             messageFormattingService,
@@ -100,7 +101,7 @@ class PaperMC : SuspendingJavaPlugin() {
         crossServerMessageBusService = CrossServerMessageBusService(
             this,
             configManager,
-            databaseService,
+            dbPlayerQueries,
             playerDataManager,
             privateMessageService,
             socialSpyService,
@@ -111,12 +112,12 @@ class PaperMC : SuspendingJavaPlugin() {
         privateMessageService.crossServerMessageBusService = crossServerMessageBusService
         
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
-        infractionManager = InfractionManager(databaseService, playerDataManager)
+        infractionManager = InfractionManager(dbPlayerQueries, playerDataManager)
         swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
         blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
 
         // Initialize maintenance services
-        databaseMaintenanceService = DatabaseMaintenanceService(databaseService, dbConfig)
+        databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, dbConfig)
         scheduledTaskService = ScheduledTaskService(this, configManager, databaseMaintenanceService, playerDataManager, crossServerMessageBusService)
         
         // Schedule maintenance tasks

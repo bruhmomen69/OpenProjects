@@ -7,7 +7,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class DatabaseMaintenanceService(
-    private val databaseService: DatabaseService,
+    private val dbPlayerQueries: DBPlayerQueries,
     private val config: DatabaseConfig
 ) {
     private val logger = LoggerFactory.getLogger(DatabaseMaintenanceService::class.java)
@@ -21,7 +21,9 @@ class DatabaseMaintenanceService(
             
             // Archive old data before deletion (if archive enabled)
             if (config.enableArchive) {
-                archiveOldData(cutoffDate)
+                val archivedInfractions = dbPlayerQueries.archiveOldInfractions(cutoffDate)
+                val archivedBlocks = dbPlayerQueries.archiveOldBlocks(cutoffDate)
+                logger.info("Archived $archivedInfractions infraction records and $archivedBlocks block records")
             }
             
             // Clean old player infractions
@@ -57,84 +59,23 @@ class DatabaseMaintenanceService(
         }
     }
     
-    private suspend fun archiveOldData(cutoffDate: Instant) {
-        try {
-            logger.info("Archiving data older than $cutoffDate")
-            
-            // Archive old infractions
-            val archivedInfractions = databaseService.executeUpdate(
-                """INSERT INTO player_infractions_archive 
-                (player_uuid, group_name, count, last_updated, created_at, archived_at)
-                SELECT player_uuid, group_name, count, last_updated, created_at, CURRENT_TIMESTAMP
-                FROM player_infractions 
-                WHERE last_updated < ?""",
-                cutoffDate
-            )
-            logger.info("Archived $archivedInfractions infraction records")
-            
-            // Archive old blocks
-            val archivedBlocks = databaseService.executeUpdate(
-                """INSERT INTO player_blocks_archive 
-                (blocker_uuid, blocked_uuid, blocked_at, blocked_by_username, archived_at)
-                SELECT blocker_uuid, blocked_uuid, blocked_at, blocked_by_username, CURRENT_TIMESTAMP
-                FROM player_blocks 
-                WHERE blocked_at < ?""",
-                cutoffDate
-            )
-            logger.info("Archived $archivedBlocks block records")
-            
-        } catch (e: Exception) {
-            logger.error("Failed to archive old data", e)
-            throw e
-        }
-    }
     
     private suspend fun cleanupOldInfractions(cutoffDate: Instant): Int {
-        return databaseService.executeUpdate(
-            "DELETE FROM player_infractions WHERE last_updated < ?",
-            cutoffDate
-        )
+        return dbPlayerQueries.cleanupOldInfractions(cutoffDate)
     }
     
     private suspend fun cleanupOldBlocks(cutoffDate: Instant): Int {
-        return databaseService.executeUpdate(
-            "DELETE FROM player_blocks WHERE blocked_at < ?",
-            cutoffDate
-        )
+        return dbPlayerQueries.cleanupOldBlocks(cutoffDate)
     }
     
     private suspend fun cleanupOldMessages(cutoffDate: Instant): Int {
-        try {
-            // Check if table exists first (it won't on SQLite if we didn't run that migration, or if config disabled)
-            // But we can just run delete and catch exception if table missing
-            return databaseService.executeUpdate(
-                "DELETE FROM message_bus WHERE created_at < ?",
-                cutoffDate
-            )
-        } catch (e: Exception) {
-            // Table might not exist or other error
-            return 0
-        }
+        return dbPlayerQueries.deleteOldMessages(cutoffDate)
     }
     
     private suspend fun optimizeDatabase() {
         try {
             logger.info("Optimizing database")
-            
-            when (config.type) {
-                DatabaseType.SQLITE -> {
-                    databaseService.executeUpdate("VACUUM")
-                    databaseService.executeUpdate("ANALYZE")
-                }
-                DatabaseType.MYSQL -> {
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_infractions")
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_blocks")
-                    databaseService.executeUpdate("OPTIMIZE TABLE players")
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_infractions_archive")
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_blocks_archive")
-                }
-            }
-            
+            dbPlayerQueries.vacuumDatabase()
             logger.info("Database optimization completed")
         } catch (e: Exception) {
             logger.error("Database optimization failed", e)

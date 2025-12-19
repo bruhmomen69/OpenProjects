@@ -3,6 +3,7 @@ package bruh.zchat.paper.services
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.StorageConfig
+import bruh.zchat.paper.database.DBPlayerQueries
 import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.DatabaseType
 import bruh.zchat.paper.database.PlayerDataManager
@@ -30,7 +31,7 @@ import kotlin.time.toJavaDuration
 class CrossServerMessageBusService(
     private val plugin: PaperMC,
     private val configManager: ConfigManager,
-    private val databaseService: DatabaseService,
+    private val dbPlayerQueries: DBPlayerQueries,
     private val playerDataManager: PlayerDataManager,
     private val privateMessageService: PrivateMessageService,
     private val socialSpyService: SocialSpyService,
@@ -40,15 +41,6 @@ class CrossServerMessageBusService(
     private val logger = LoggerFactory.getLogger(CrossServerMessageBusService::class.java)
     private val json = Json { ignoreUnknownKeys = true }
 
-    private data class ClaimedMessage(
-        val id: Long,
-        val type: String,
-        val senderUuid: UUID,
-        val senderName: String,
-        val recipientUuid: UUID,
-        val recipientName: String?,
-        val payloadJson: String
-    )
 
     @Serializable
     data class MessagePayload(
@@ -177,37 +169,16 @@ class CrossServerMessageBusService(
 
     suspend fun pollMessages() = withContext(Dispatchers.IO) {
         val config = configManager.storage.crossServerMessaging
-        if (!config.enabled || databaseService.databaseType != DatabaseType.MYSQL || isRedisBackend) return@withContext
+        if (!config.enabled || dbPlayerQueries.databaseType != DatabaseType.MYSQL || isRedisBackend) return@withContext
 
         try {
             // 1. Claim messages
-            val claimedCount = databaseService.executeUpdate(
-                """UPDATE message_bus 
-                   SET status = 'CLAIMED', claimed_by = ?, claimed_at = CURRENT_TIMESTAMP 
-                   WHERE target_server_id = ? AND status = 'PENDING' 
-                   ORDER BY id ASC LIMIT ?""",
-                serverInstanceId, serverInstanceId, config.pollBatchSize
-            )
+            val claimedCount = dbPlayerQueries.claimMessages(serverInstanceId, serverInstanceId, config.pollBatchSize)
 
             if (claimedCount == 0) return@withContext
 
             // 2. Fetch claimed messages
-            val claimed = databaseService.executeQuery(
-                """SELECT id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload
-                   FROM message_bus
-                   WHERE claimed_by = ? AND status = 'CLAIMED'""",
-                serverInstanceId
-            ) { rs ->
-                ClaimedMessage(
-                    id = rs.getLong("id"),
-                    type = rs.getString("type"),
-                    senderUuid = UUID.fromString(rs.getString("sender_uuid")),
-                    senderName = rs.getString("sender_username"),
-                    recipientUuid = UUID.fromString(rs.getString("recipient_uuid")),
-                    recipientName = rs.getString("recipient_username"),
-                    payloadJson = rs.getString("payload")
-                )
-            }
+            val claimed = dbPlayerQueries.getClaimedMessages(serverInstanceId)
 
             for (msg in claimed) {
                 try {
@@ -321,15 +292,7 @@ class CrossServerMessageBusService(
         val cutoff = Instant.now().minusSeconds(config.heartbeatTimeoutSeconds.toLong())
 
         // Find where sender is now (heartbeat-aware)
-        val senderPresence = databaseService.executeQuerySingle(
-            """SELECT online_server_id FROM players
-               WHERE uuid = ?
-               AND online_server_id IS NOT NULL
-               AND online_last_heartbeat IS NOT NULL
-               AND online_last_heartbeat >= ?""",
-            originalSenderUuid,
-            cutoff
-        ) { rs -> rs.getString("online_server_id") }
+        val senderPresence = dbPlayerQueries.getSenderPresence(originalSenderUuid, cutoff)
 
         if (senderPresence != null) {
             val failurePayload = MessagePayload(
@@ -339,10 +302,7 @@ class CrossServerMessageBusService(
             )
 
             val recipientLabel = originalRecipientName
-                ?: databaseService.executeQuerySingle(
-                    "SELECT username FROM players WHERE uuid = ?",
-                    originalRecipientUuid
-                ) { rs -> rs.getString("username") }
+                ?: dbPlayerQueries.getUsername(originalRecipientUuid)
 
             val recipientLabelFinal = recipientLabel ?: originalRecipientUuid.toString()
 
@@ -357,10 +317,7 @@ class CrossServerMessageBusService(
                     payload = failurePayload
                 )
             } else {
-                databaseService.executeUpdate(
-                    """INSERT INTO message_bus 
-                       (target_server_id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload, status) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')""",
+                dbPlayerQueries.insertMessageBus(
                     senderPresence,
                     MessageType.PM_DELIVERY_FAILED.name,
                     originalSenderUuid, // We send "to" the sender
@@ -375,21 +332,7 @@ class CrossServerMessageBusService(
 
     private suspend fun updateMessageStatus(id: Long, status: String, error: String? = null) {
         if (isRedisBackend) return
-        try {
-            if (error == null) {
-                databaseService.executeUpdate(
-                    "UPDATE message_bus SET status = ?, delivered_at = CURRENT_TIMESTAMP, error = NULL WHERE id = ?",
-                    status, id
-                )
-            } else {
-                databaseService.executeUpdate(
-                    "UPDATE message_bus SET status = ?, delivered_at = CURRENT_TIMESTAMP, error = ? WHERE id = ?",
-                    status, error, id
-                )
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to update status for message $id", e)
-        }
+        dbPlayerQueries.updateMessageStatus(id, status, error)
     }
 
     /**
@@ -430,10 +373,7 @@ class CrossServerMessageBusService(
                 originalMessage = originalMessage
             )
 
-            databaseService.executeUpdate(
-                """INSERT INTO message_bus 
-                   (target_server_id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload, status) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')""",
+            dbPlayerQueries.insertMessageBus(
                 targetServerId,
                 MessageType.PM_DELIVER.name,
                 senderUuid,
@@ -455,12 +395,7 @@ class CrossServerMessageBusService(
 
         try {
             val cutoff = Instant.now().minusSeconds(config.claimTimeoutSeconds.toLong())
-            databaseService.executeUpdate(
-                """UPDATE message_bus 
-                   SET status = 'PENDING', claimed_by = NULL, claimed_at = NULL 
-                   WHERE status = 'CLAIMED' AND claimed_at < ?""",
-                cutoff
-            )
+            dbPlayerQueries.reclaimStaleMessages(cutoff)
         } catch (e: Exception) {
             logger.error("Failed to reclaim stale messages", e)
         }

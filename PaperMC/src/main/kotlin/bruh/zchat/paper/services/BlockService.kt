@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.database.DBPlayerQueries
 import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.PlayerDataManager
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +16,7 @@ class BlockService(
     private val configManager: ConfigManager,
     private val messageFormattingService: MessageFormattingService,
     private val socialSpyService: SocialSpyService,
-    private val databaseService: DatabaseService,
+    private val dbPlayerQueries: DBPlayerQueries,
     private val playerDataManager: PlayerDataManager
 ) {
     private val logger = LoggerFactory.getLogger(BlockService::class.java)
@@ -27,50 +28,25 @@ class BlockService(
             return@withContext false
         }
         
-        try {
-            databaseService.executeTransaction { tx ->
-                // Check if already blocked
-                val existing = tx.executeQuerySingle(
-                    "SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
-                    blockerUuid, blockedUuid
-                ) { rs -> rs.getLong("id") }
-                
-                if (existing != null) {
-                    return@executeTransaction false // Already blocked
-                }
-                
-                // Check block limit
-                val currentBlocks = tx.executeQuery(
-                    "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
-                    blockerUuid
-                ) { rs -> rs.getString("blocked_uuid") }.size
-                
-                if (currentBlocks >= config.maxBlocksPerPlayer) {
-                    return@executeTransaction false // Block limit reached
-                }
-                
-                // Add block
-                tx.executeUpdate(
-                    """INSERT INTO player_blocks 
-                    (blocker_uuid, blocked_uuid, blocked_by_username) 
-                    VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))""",
-                    blockerUuid, blockedUuid, blockerUuid
-                )
-                
-                // Update player cache
-                val playerData = playerDataManager.getPlayerData(blockerUuid)
-                if (playerData != null) {
-                    val updatedBlocked = playerData.blockedPlayers.toMutableSet()
-                    updatedBlocked.add(blockedUuid)
-                    playerDataManager.updatePlayerBlockedPlayers(blockerUuid, updatedBlocked)
-                }
-                
-                true
+        val blockerUsername = playerDataManager.getUsernameByUuid(blockerUuid) ?: "Unknown"
+        val success = dbPlayerQueries.createBlockWithChecks(
+            blockerUuid = blockerUuid,
+            blockedUuid = blockedUuid,
+            blockerUsername = blockerUsername,
+            maxBlocksPerPlayer = config.maxBlocksPerPlayer
+        )
+
+        if (success) {
+            // Update player cache
+            val playerData = playerDataManager.getPlayerData(blockerUuid)
+            if (playerData != null) {
+                val updatedBlocked = playerData.blockedPlayers.toMutableSet()
+                updatedBlocked.add(blockedUuid)
+                playerDataManager.updatePlayerBlockedPlayers(blockerUuid, updatedBlocked)
             }
-        } catch (e: Exception) {
-            logger.error("Failed to block player", e)
-            false
         }
+
+        success
     }
     
     suspend fun unblockPlayer(blockerUuid: UUID, blockedUuid: UUID): Boolean = withContext(Dispatchers.IO) {
@@ -81,12 +57,9 @@ class BlockService(
         }
         
         try {
-            val affectedRows = databaseService.executeUpdate(
-                "DELETE FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
-                blockerUuid, blockedUuid
-            )
+            val success = dbPlayerQueries.deleteBlock(blockerUuid, blockedUuid)
             
-            if (affectedRows > 0) {
+            if (success) {
                 // Update player cache
                 val playerData = playerDataManager.getPlayerData(blockerUuid)
                 if (playerData != null) {
@@ -96,9 +69,9 @@ class BlockService(
                 }
             }
             
-            affectedRows > 0
+            success
         } catch (e: Exception) {
-            logger.error("Failed to unblock player", e)
+            e.printStackTrace()
             false
         }
     }
@@ -111,19 +84,7 @@ class BlockService(
         }
         
         // Fallback to database for offline players
-        return withContext(Dispatchers.IO) {
-            try {
-                databaseService.executeQuery(
-                    "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
-                    playerUuid
-                ) { rs ->
-                    UUID.fromString(rs.getString("blocked_uuid"))
-                }.toSet()
-            } catch (e: Exception) {
-                logger.error("Failed to get blocked players for $playerUuid", e)
-                emptySet()
-            }
-        }
+        return dbPlayerQueries.getPlayerBlockedPlayers(playerUuid)
     }
     
     suspend fun isBlocked(recipientUuid: UUID, senderUuid: UUID): Boolean {
@@ -134,19 +95,7 @@ class BlockService(
         }
         
         // Fallback to database for offline players
-        return withContext(Dispatchers.IO) {
-            try {
-                val count = databaseService.executeQuerySingle(
-                    "SELECT COUNT(*) as count FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
-                    recipientUuid, senderUuid
-                ) { rs -> rs.getInt("count") } ?: 0
-                
-                count > 0
-            } catch (e: Exception) {
-                logger.error("Failed to check if player is blocked", e)
-                false
-            }
-        }
+        return dbPlayerQueries.checkBlockExists(recipientUuid, senderUuid)
     }
     
     fun getBlockedPlayersSync(player: Player): List<String> {
@@ -186,7 +135,7 @@ class BlockService(
     
     suspend fun clearBlocks(playerUuid: UUID): Boolean = withContext(Dispatchers.IO) {
         try {
-            val affectedRows = databaseService.executeUpdate(
+            val affectedRows = dbPlayerQueries.databaseService.executeUpdate(
                 "DELETE FROM player_blocks WHERE blocker_uuid = ?",
                 playerUuid
             )
@@ -197,10 +146,9 @@ class BlockService(
                 playerDataManager.updatePlayerBlockedPlayers(playerUuid, emptySet())
             }
             
-            logger.info("Cleared $affectedRows blocks for player $playerUuid")
             affectedRows > 0
         } catch (e: Exception) {
-            logger.error("Failed to clear blocks for player $playerUuid", e)
+            e.printStackTrace()
             false
         }
     }
@@ -268,7 +216,7 @@ class BlockService(
     
     suspend fun clearAllBlocks(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val affectedRows = databaseService.executeUpdate(
+            val affectedRows = dbPlayerQueries.databaseService.executeUpdate(
                 "DELETE FROM player_blocks"
             )
             
@@ -278,10 +226,9 @@ class BlockService(
                 playerDataManager.updatePlayerBlockedPlayers(uuid, emptySet())
             }
             
-            logger.info("Cleared all block data")
             affectedRows > 0
         } catch (e: Exception) {
-            logger.error("Failed to clear all blocks", e)
+            e.printStackTrace()
             false
         }
     }
