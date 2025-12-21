@@ -280,11 +280,7 @@ class ChannelCommandListener(
                 .map { cmd ->
                     AsyncTabCompleteEvent.Completion.completion(
                         cmd,
-                        Component.text(
-                            messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_CHANNEL_TOOLTIP, player)
-                                .toString().replace(Regex("<[^>]*>"), ""), // Strip MiniMessage tags for tooltip
-                            NamedTextColor.GREEN
-                        )
+                        messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_CHANNEL_TOOLTIP, player)
                     )
                 }
                 .toMutableList()
@@ -337,11 +333,7 @@ class ChannelCommandListener(
                 .map { name ->
                     AsyncTabCompleteEvent.Completion.completion(
                         name,
-                        Component.text(
-                            messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_PLAYER_TOOLTIP, player)
-                                .toString().replace(Regex("<[^>]*>"), ""), // Strip MiniMessage tags for tooltip
-                            NamedTextColor.AQUA
-                        )
+                        messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_PLAYER_TOOLTIP, player)
                     )
                 }
                 .toMutableList()
