@@ -47,10 +47,10 @@ data class Config(
 
 @ConfigSerializable
 data class ChatFormatConfig(
-    @field:Comment("Enable or disable group-based chat formats. When disabled, only default format is used.")
+    @field:Comment("Enable or disable group-based chat formats. When disabled, only default format is used. Group formats are configured in messages.conf.")
     val enableGroupFormats: Boolean = true,
     
-    @field:Comment("Enable or disable world-specific chat formats. When disabled, world formats are ignored.")
+    @field:Comment("Enable or disable world-specific chat formats. When disabled, world formats are ignored. World formats are configured in messages.conf.")
     val enableWorldFormats: Boolean = false,
     
     @field:Comment("Priority order for format selection. Options: 'permission', 'world', 'group', 'default'. First match wins.")
