@@ -18,7 +18,6 @@ class ConfigMigrator {
                 enableGroupFormats = legacy.chatFormat.enableGroupFormats,
                 enableWorldFormats = legacy.chatFormat.enableWorldFormats,
                 formatPriority = legacy.chatFormat.formatPriority,
-                enableRankedFormats = legacy.chatFormat.enableRankedFormats,
                 enableHoverMessages = legacy.chatFormat.enableHoverMessages,
                 enableClickActions = legacy.chatFormat.enableClickActions,
                 applyInteractiveToEntireMessage = legacy.chatFormat.applyInteractiveToEntireMessage

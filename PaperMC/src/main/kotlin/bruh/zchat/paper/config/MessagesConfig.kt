@@ -47,7 +47,7 @@ data class ChatFormatMessages(
     @field:Comment("Default chat format used when no group or world format applies")
     val defaultFormat: String = "<gray>[<gradient:white:aqua><player_name></gradient>]</gray> <gray><message></gray>",
 
-    @field:Comment("Priority order for group/ranked formats. Higher ranks should be listed first. Only used when enableRankedFormats is true.")
+    @field:Comment("Priority order for group/ranked formats. Higher groups should be listed first.")
     val groupFormatPriority: List<String> = listOf("owner", "admin", "moderator", "helper", "vip", "premium", "donor", "member", "default"),
 
     @field:Comment("Group-based chat formats mapped by group/rank name")

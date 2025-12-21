@@ -55,10 +55,7 @@ data class ChatFormatConfig(
     
     @field:Comment("Priority order for format selection. Options: 'permission', 'world', 'group', 'default'. First match wins.")
     val formatPriority: List<String> = listOf("permission", "world", "group", "default"),
-    
-    @field:Comment("Enable ranked format system with automatic priority based on rankedFormatPriority list.")
-    val enableRankedFormats: Boolean = true,
-    
+
     @field:Comment("Enable hover messages when players hover over names in chat.")
     val enableHoverMessages: Boolean = true,
     

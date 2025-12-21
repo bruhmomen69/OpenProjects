@@ -141,18 +141,15 @@ class ChatFormattingService(
 
     private fun findPermissionBasedFormat(player: Player, config: ChatFormatConfig): String? {
         // Check ranked formats if enabled
-        if (config.enableRankedFormats) {
-            val messages = configManager.messages.chatFormat
-            for (rank in messages.groupFormatPriority) {
-                if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank")) {
-                    return messages.groupFormats[rank]
-                }
+        val messages = configManager.messages.chatFormat
+        for (rank in messages.groupFormatPriority) {
+            if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank")) {
+                return messages.groupFormats[rank]
             }
         }
 
         // Check for specific format permissions
         val formatPrefix = configManager.config.permissions.formatPermissionPrefix
-        val messages = configManager.messages.chatFormat
         for ((group, format) in messages.groupFormats) {
             if (player.hasPermission("$formatPrefix$group")) {
                 return format
@@ -163,15 +160,11 @@ class ChatFormattingService(
     }
 
     private fun findGroupFormat(player: Player, groupFormats: Map<String, String>): String? {
-        val config = configManager.config.chatFormat
-
         // Check ranked formats if enabled
-        if (config.enableRankedFormats) {
-            val messages = configManager.messages.chatFormat
-            for (rank in messages.groupFormatPriority) {
-                if (player.hasPermission("group.$rank") || player.hasPermission(rank)) {
-                    return groupFormats[rank]
-                }
+        val messages = configManager.messages.chatFormat
+        for (rank in messages.groupFormatPriority) {
+            if (player.hasPermission("group.$rank") || player.hasPermission(rank)) {
+                return groupFormats[rank]
             }
         }
 
@@ -258,20 +251,17 @@ class ChatFormattingService(
         val config = configManager.config.chatFormat
 
         // Check ranked formats if enabled
-        if (config.enableRankedFormats) {
-            val messages = configManager.messages.chatFormat
-            for (rank in messages.groupFormatPriority) {
-                if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank") ||
-                    player.hasPermission("group.$rank") ||
-                    player.hasPermission(rank)
-                ) {
-                    return rank
-                }
+        val messages = configManager.messages.chatFormat
+        for (rank in messages.groupFormatPriority) {
+            if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank") ||
+                player.hasPermission("group.$rank") ||
+                player.hasPermission(rank)
+            ) {
+                return rank
             }
         }
 
         // Check other group formats
-        val messages = configManager.messages.chatFormat
         for ((group, _) in messages.groupFormats) {
             if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$group") ||
                 player.hasPermission("group.$group") ||
