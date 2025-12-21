@@ -1,6 +1,7 @@
 package bruh.zchat.paper.listeners
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.*
 import bruh.zchat.paper.swearfilter.SwearFilterService
 import io.papermc.paper.event.player.AsyncChatEvent
@@ -27,7 +28,7 @@ class ChatMessageListener(
         // Check if player can send chat messages
         if (!chatToggleService.canSendChat(event.player)) {
             event.isCancelled = true
-            event.player.sendMessage(messageFormattingService.getConfigMessage("chat.disabled_self", event.player))
+            event.player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_DISABLED_SELF, event.player))
             return
         }
 
@@ -86,14 +87,14 @@ class ChatMessageListener(
         } catch (e: ChatCooldownException) {
             event.player.sendMessage(
                 messageFormattingService.getConfigMessage(
-                    "chat.cooldown", event.player,
+                    MessageKey.CHAT_COOLDOWN, event.player,
                     mapOf("time" to e.message!!)
                 )
             )
             event.isCancelled = true
         } catch (e: Exception) {
             logger.error("Error formatting chat message for player ${event.player.name}", e)
-            event.player.sendMessage(messageFormattingService.getConfigMessage("chat.formatting_error", event.player))
+            event.player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_FORMATTING_ERROR, event.player))
             event.isCancelled = true
         }
     }

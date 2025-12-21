@@ -1,6 +1,7 @@
 package bruh.zchat.paper.commands
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.MessageFormattingService
@@ -26,9 +27,9 @@ class ChatPluginCommands(
         if (success) {
             chatFormattingService.reloadPlaceholders()
             alertService.reload()
-            actor.reply(messageFormattingService.getConfigMessage("commands.reload_success"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_SUCCESS))
         } else {
-            actor.reply(messageFormattingService.getConfigMessage("commands.reload_failed"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_FAILED))
         }
     }
 
@@ -62,7 +63,7 @@ class ChatPluginCommands(
     @CommandPermission("zchat.admin.test")
     fun test(actor: BukkitCommandActor, message: String) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return
         }
 

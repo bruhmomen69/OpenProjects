@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
@@ -28,12 +29,12 @@ class SocialSpyService(
         val config = configManager.config.socialSpy
         
         if (!config.enableSocialSpy) {
-            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.system_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.SOCIAL_SPY_SYSTEM_DISABLED, player))
             return false
         }
         
         if (!player.hasPermission("zchat.socialspy")) {
-            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.no_permission", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.SOCIAL_SPY_NO_PERMISSION, player))
             return false
         }
         
@@ -41,11 +42,11 @@ class SocialSpyService(
         
         if (wasEnabled) {
             socialSpyEnabled.remove(player.uniqueId)
-            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.SOCIAL_SPY_DISABLED, player))
             logger.info("${player.name} disabled social spy")
         } else {
             socialSpyEnabled.add(player.uniqueId)
-            player.sendMessage(messageFormattingService.getConfigMessage("social_spy.enabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.SOCIAL_SPY_ENABLED, player))
             logger.info("${player.name} enabled social spy")
         }
         

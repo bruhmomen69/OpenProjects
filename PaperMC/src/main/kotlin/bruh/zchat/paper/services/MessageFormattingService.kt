@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.config.MessagesConfig
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -302,15 +303,15 @@ class MessageFormattingService(
     }
 
     /**
-     * Get a configurable message with placeholder processing
+     * Get a configurable message using MessageKey enum with placeholder processing
      */
     fun getConfigMessage(
-        messageKey: String,
+        messageKey: MessageKey,
         player: Player? = null,
         additionalPlaceholders: Map<String, String> = emptyMap()
     ): Component {
         val messages = configManager.messages
-        val messageText = getMessageByKey(messages, messageKey) ?: "<red>Message not found: $messageKey</red>"
+        val messageText = getMessageByKey(messages, messageKey) ?: "<red>Message not found: ${messageKey.key}</red>"
         
         return formatMessage(
             format = messageText,
@@ -324,76 +325,26 @@ class MessageFormattingService(
     }
 
     /**
-     * Helper to get message by key from config
+     * Get a configurable message with placeholder processing (backward compatibility)
      */
-    private fun getMessageByKey(messages: MessagesConfig, key: String): String? {
-        return when (key) {
-            // Command messages
-            "commands.player_only" -> messages.commands.playerOnly
-            "commands.no_permission" -> messages.commands.noPermission
-            "commands.reload_success" -> messages.commands.reloadSuccess
-            "commands.reload_failed" -> messages.commands.reloadFailed
-            "commands.player_not_found" -> messages.commands.playerNotFound
-            "commands.feature_enabled" -> messages.commands.featureEnabled
-            "commands.feature_disabled" -> messages.commands.featureDisabled
-            "commands.update_failed" -> messages.commands.updateFailed
-            "commands.format_updated" -> messages.commands.formatUpdated
-            
-            // Private message messages
-            "private_messages.system_disabled" -> messages.privateMessages.systemDisabled
-            "private_messages.cooldown" -> messages.privateMessages.cooldown
-            "private_messages.player_not_found" -> messages.privateMessages.playerNotFound
-            "private_messages.self_message" -> messages.privateMessages.selfMessage
-            "private_messages.target_messages_disabled" -> messages.privateMessages.targetMessagesDisabled
-            "private_messages.no_reply_target" -> messages.privateMessages.noReplyTarget
-            "private_messages.reply_target_offline" -> messages.privateMessages.replyTargetOffline
-            "private_messages.delivery_failed" -> messages.privateMessages.deliveryFailed
-            
-            // Chat messages
-            "chat.disabled_self" -> messages.chat.disabledSelf
-            "chat.formatting_error" -> messages.chat.formattingError
-            "chat.cooldown" -> messages.chat.cooldown
-            
-            // Chat toggle messages
-            "chat_toggle.system_disabled" -> messages.chat.systemDisabled
-            "chat_toggle.message_toggle_disabled" -> messages.chat.messageToggleDisabled
-            "chat_toggle.chat_enabled" -> messages.chat.chatEnabled
-            "chat_toggle.chat_disabled" -> messages.chat.chatDisabled
-            "chat_toggle.messages_enabled" -> messages.chat.messagesEnabled
-            "chat_toggle.messages_disabled" -> messages.chat.messagesDisabled
-            
-            // Social spy messages
-            "social_spy.system_disabled" -> messages.socialSpy.systemDisabled
-            "social_spy.no_permission" -> messages.socialSpy.noPermission
-            "social_spy.enabled" -> messages.socialSpy.enabled
-            "social_spy.disabled" -> messages.socialSpy.disabled
-
-            // Block system messages
-            "blocks.system_disabled" -> messages.blocks.systemDisabled
-            "blocks.blocked" -> messages.blocks.blocked
-            "blocks.unblocked" -> messages.blocks.unblocked
-            "blocks.already_blocked" -> messages.blocks.alreadyBlocked
-            "blocks.not_blocked" -> messages.blocks.notBlocked
-            "blocks.block_list_empty" -> messages.blocks.blockListEmpty
-            "blocks.block_list" -> messages.blocks.blockList
-            "blocks.target_blocked_you" -> messages.blocks.targetBlockedYou
-            "blocks.max_blocks_reached" -> messages.blocks.maxBlocksReached
-            
-            // Alert messages
-            "alerts.system_disabled" -> messages.swearFilter.alertsDisabled
-            "alerts.no_permission" -> messages.swearFilter.alertsNoPermission
-            "alerts.enabled" -> messages.swearFilter.alertsEnabled
-            "alerts.disabled" -> messages.swearFilter.alertsDisabledPersonal
-            "alerts.auto_enabled" -> messages.swearFilter.alertsAutoEnabled
-            
-            // System messages
-            "system.error" -> messages.system.error
-            "system.success" -> messages.system.success
-            "system.data_cleared" -> messages.system.dataCleared
-            "system.invalid_usage" -> messages.system.invalidUsage
-            
-            else -> null
+    fun getConfigMessage(
+        messageKey: String,
+        player: Player? = null,
+        additionalPlaceholders: Map<String, String> = emptyMap()
+    ): Component {
+        val enumKey = MessageKey.fromKey(messageKey) ?: run {
+            logger.warn("Unknown message key: $messageKey")
+            return miniMessage.deserialize("<red>Message not found: $messageKey</red>")
         }
+        
+        return getConfigMessage(enumKey, player, additionalPlaceholders)
+    }
+
+    /**
+     * Get message text from config using MessageKey enum
+     */
+    private fun getMessageByKey(messages: MessagesConfig, messageKey: MessageKey): String? {
+        return messageKey.resolveMessage(messages)
     }
 
     /**

@@ -3,6 +3,7 @@ package bruh.zchat.paper.services
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.StorageConfig
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.database.DBPlayerQueries
 import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.DatabaseType
@@ -266,8 +267,8 @@ class CrossServerMessageBusService(
                     withContext(plugin.entityDispatcher(sender)) {
                         val targetLabel = recipientName ?: recipientUuid.toString()
                         val messageKey = when (payload.reason) {
-                            "RECIPIENT_MESSAGES_DISABLED" -> "private_messages.target_messages_disabled"
-                            else -> "private_messages.delivery_failed"
+                            "RECIPIENT_MESSAGES_DISABLED" -> MessageKey.PRIVATE_MESSAGES_TARGET_MESSAGES_DISABLED
+                            else -> MessageKey.PRIVATE_MESSAGES_DELIVERY_FAILED
                         }
                         sender.sendMessage(messageFormattingService.getConfigMessage(messageKey, sender, mapOf("player" to targetLabel)))
                     }

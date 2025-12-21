@@ -1,5 +1,6 @@
 package bruh.zchat.paper.commands
 
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.*
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,7 @@ class MessageCommand(
     @Command("msg", "message", "tell", "whisper", "w")
     fun msg(actor: BukkitCommandActor, recipient: String, message: String) = plugin.launch(Dispatchers.Unconfined) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return@launch
         }
 
@@ -39,7 +40,7 @@ class MessageCommand(
     @Command("reply", "r", "respond")
     fun reply(actor: BukkitCommandActor, message: String) = plugin.launch(Dispatchers.Unconfined) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return@launch
         }
 
@@ -59,7 +60,7 @@ class MessageCommand(
         @Command("block")
         fun block(actor: BukkitCommandActor, target: OfflinePlayer) = plugin.launch(Dispatchers.Unconfined) {
             if (actor.sender() !is Player) {
-                actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+                actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
                 return@launch
             }
 
@@ -70,7 +71,7 @@ class MessageCommand(
         @Command("unblock")
         fun unblock(actor: BukkitCommandActor, target: OfflinePlayer) = plugin.launch(Dispatchers.Unconfined) {
             if (actor.sender() !is Player) {
-                actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+                actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
                 return@launch
             }
 
@@ -81,7 +82,7 @@ class MessageCommand(
         @Command("blocklist")
         fun blockList(actor: BukkitCommandActor) {
             if (actor.sender() !is Player) {
-                actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+                actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
                 return
             }
 
@@ -99,7 +100,7 @@ class AlertCommands(
     @CommandPermission("zchat.alerts.toggle")
     fun toggleAlerts(actor: BukkitCommandActor) {
         val player = actor.sender() as? Player ?: run {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return
         }
         
@@ -122,7 +123,7 @@ class ChatToggleCommands(
     @Subcommand("chat")
     fun toggleChat(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return
         }
 
@@ -140,7 +141,7 @@ class ChatToggleCommands(
     @Subcommand("messages")
     fun toggleMessages(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return
         }
 
@@ -151,7 +152,7 @@ class ChatToggleCommands(
     @Subcommand("socialspy")
     fun toggleSocialSpy(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return
         }
 
@@ -162,7 +163,7 @@ class ChatToggleCommands(
     @Subcommand("status")
     fun status(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage("commands.player_only"))
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
             return
         }
 

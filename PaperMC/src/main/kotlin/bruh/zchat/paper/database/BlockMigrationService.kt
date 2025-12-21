@@ -29,7 +29,6 @@ class BlockMigrationService(
         val blocksFile = dataFolder.resolve("blocks.conf")
         
         if (!Files.exists(blocksFile)) {
-            logger.info("No existing block data found at ${blocksFile.fileName}")
             return@withContext MigrationResult(0, "No existing block data found")
         }
         

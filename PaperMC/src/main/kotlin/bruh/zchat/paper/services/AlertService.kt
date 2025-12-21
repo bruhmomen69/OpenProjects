@@ -4,6 +4,7 @@ import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.AlertConfig
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.FilterGroup
+import bruh.zchat.paper.enums.MessageKey
 import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.delay
@@ -43,12 +44,12 @@ class AlertService(
         val config = configManager.config.swearFilter.alerts
         
         if (!config.enableAlerts) {
-            player.sendMessage(messageFormattingService.getConfigMessage("alerts.system_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.ALERTS_SYSTEM_DISABLED, player))
             return false
         }
         
         if (!player.hasPermission(config.alertPermission)) {
-            player.sendMessage(messageFormattingService.getConfigMessage("alerts.no_permission", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.ALERTS_NO_PERMISSION, player))
             return false
         }
         
@@ -56,11 +57,11 @@ class AlertService(
         
         if (wasEnabled) {
             alertsEnabled.remove(player.uniqueId)
-            player.sendMessage(messageFormattingService.getConfigMessage("alerts.disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.ALERTS_DISABLED, player))
             logger.debug("${player.name} disabled swear filter alerts")
         } else {
             alertsEnabled.add(player.uniqueId)
-            player.sendMessage(messageFormattingService.getConfigMessage("alerts.enabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.ALERTS_ENABLED, player))
             logger.debug("${player.name} enabled swear filter alerts")
         }
         

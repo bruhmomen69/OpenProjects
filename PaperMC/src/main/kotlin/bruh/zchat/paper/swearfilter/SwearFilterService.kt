@@ -3,6 +3,7 @@ package bruh.zchat.paper.swearfilter
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.FilterGroup
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.utils.Levenshtein
@@ -39,7 +40,7 @@ class SwearFilterService(
                 if (configManager.config.swearFilter.enableBlockedMessage) {
                     plugin.launch(plugin.globalRegionDispatcher) {
                         val blockedMessage = messageFormattingService.getConfigMessage(
-                            "swearFilter.blockedMessage", 
+                            MessageKey.SWEAR_FILTER_BLOCKED_MESSAGE, 
                             player
                         )
                         player.sendMessage(blockedMessage)

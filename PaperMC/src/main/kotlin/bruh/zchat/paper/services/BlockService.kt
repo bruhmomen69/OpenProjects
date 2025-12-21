@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.database.DBPlayerQueries
 import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.PlayerDataManager
@@ -115,18 +116,18 @@ class BlockService(
         val config = configManager.config.blocks
         
         if (!config.enableBlockSystem) {
-            player.sendMessage(messageFormattingService.getConfigMessage("blocks.system_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.BLOCKS_SYSTEM_DISABLED, player))
             return
         }
         
         val blockedList = getBlockedPlayersSync(player)
         
         if (blockedList.isEmpty()) {
-            player.sendMessage(messageFormattingService.getConfigMessage("blocks.block_list_empty", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.BLOCKS_BLOCK_LIST_EMPTY, player))
         } else {
             val listString = blockedList.joinToString(", ")
             player.sendMessage(messageFormattingService.getConfigMessage(
-                "blocks.block_list",
+                MessageKey.BLOCKS_BLOCK_LIST,
                 player,
                 mapOf("list" to listString)
             ))

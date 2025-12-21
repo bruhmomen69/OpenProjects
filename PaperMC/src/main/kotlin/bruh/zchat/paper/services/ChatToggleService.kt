@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.database.PlayerDataManager
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +28,7 @@ class ChatToggleService(
         val config = configManager.config.chatToggle
         
         if (!config.enableChatToggle) {
-            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.system_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_TOGGLE_SYSTEM_DISABLED, player))
             return false
         }
         
@@ -39,7 +40,7 @@ class ChatToggleService(
             if (config.linkChatAndMessages) {
                 playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
             }
-            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.chat_enabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_TOGGLE_CHAT_ENABLED, player))
             logger.info("${player.name} enabled their chat")
         } else {
             playerDataManager.setChatDisabledCached(player.uniqueId, true)
@@ -47,7 +48,7 @@ class ChatToggleService(
             if (config.linkChatAndMessages) {
                 playerDataManager.setMessagesDisabledCached(player.uniqueId, true)
             }
-            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.chat_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_TOGGLE_CHAT_DISABLED, player))
             logger.info("${player.name} disabled their chat")
         }
 
@@ -68,7 +69,7 @@ class ChatToggleService(
         val config = configManager.config.chatToggle
         
         if (!config.enableMessageToggle) {
-            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.message_toggle_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_TOGGLE_MESSAGE_TOGGLE_DISABLED, player))
             return false
         }
         
@@ -76,11 +77,11 @@ class ChatToggleService(
         
         if (wasDisabled) {
             playerDataManager.setMessagesDisabledCached(player.uniqueId, false)
-            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.messages_enabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_TOGGLE_MESSAGES_ENABLED, player))
             logger.info("${player.name} enabled their private messages")
         } else {
             playerDataManager.setMessagesDisabledCached(player.uniqueId, true)
-            player.sendMessage(messageFormattingService.getConfigMessage("chat_toggle.messages_disabled", player))
+            player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.CHAT_TOGGLE_MESSAGES_DISABLED, player))
             logger.info("${player.name} disabled their private messages")
         }
 

@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.enums.MessageKey
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
@@ -47,7 +48,7 @@ class PrivateMessageService(
         
         // Check if private messages are enabled
         if (!config.enablePrivateMessages) {
-            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.system_disabled"))
+            sender.sendMessage(messageFormattingService.getConfigMessage(MessageKey.PRIVATE_MESSAGES_SYSTEM_DISABLED))
             return false
         }
         
@@ -60,7 +61,7 @@ class PrivateMessageService(
             if (currentTime - lastMessage < cooldownTime) {
                 val remainingTime = ceil((cooldownTime - (currentTime - lastMessage)) / 1000.0).roundToLong()
                 sender.sendMessage(messageFormattingService.getConfigMessage(
-                    "private_messages.cooldown", 
+                    MessageKey.PRIVATE_MESSAGES_COOLDOWN, 
                     sender, 
                     mapOf("time" to remainingTime.toString())
                 ))
@@ -96,7 +97,7 @@ class PrivateMessageService(
                         if (toggleState?.messagesDisabled == true) {
                             sender.sendMessage(
                                 messageFormattingService.getConfigMessage(
-                                    "private_messages.target_messages_disabled",
+                                    MessageKey.PRIVATE_MESSAGES_TARGET_MESSAGES_DISABLED,
                                     sender,
                                     mapOf("player" to recipientName)
                                 )
@@ -108,7 +109,7 @@ class PrivateMessageService(
                     // Check blocks (basic DB check)
                     if (blockService?.isBlocked(targetUuid, sender.uniqueId) == true) {
                         sender.sendMessage(messageFormattingService.getConfigMessage(
-                            "blocks.target_blocked_you",
+                            MessageKey.BLOCKS_TARGET_BLOCKED_YOU,
                             sender,
                             mapOf("player" to recipientName)
                         ))
@@ -153,7 +154,7 @@ class PrivateMessageService(
                         return true
                     } else {
                         sender.sendMessage(messageFormattingService.getConfigMessage(
-                            "private_messages.delivery_failed",
+                            MessageKey.PRIVATE_MESSAGES_DELIVERY_FAILED,
                             sender,
                             mapOf("player" to recipientName)
                         ))
@@ -166,7 +167,7 @@ class PrivateMessageService(
         
         // Player not found / not online
         sender.sendMessage(messageFormattingService.getConfigMessage(
-            "private_messages.player_not_found",
+            MessageKey.PRIVATE_MESSAGES_PLAYER_NOT_FOUND,
             sender,
             mapOf("recipient" to recipientName)
         ))
@@ -176,14 +177,14 @@ class PrivateMessageService(
     private suspend fun sendLocalPrivateMessage(sender: Player, recipient: Player, message: String, config: bruh.zchat.paper.config.PrivateMessageConfig): Boolean {
         // Check if recipient is the same as sender
         if (recipient.uniqueId == sender.uniqueId) {
-            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.self_message", sender))
+            sender.sendMessage(messageFormattingService.getConfigMessage(MessageKey.PRIVATE_MESSAGES_SELF_MESSAGE, sender))
             return false
         }
         
         // Check if recipient has messages disabled
         if (!chatToggleService.canReceiveMessages(recipient)) {
             sender.sendMessage(messageFormattingService.getConfigMessage(
-                "private_messages.target_messages_disabled",
+                MessageKey.PRIVATE_MESSAGES_TARGET_MESSAGES_DISABLED,
                 sender,
                 mapOf("player" to recipient.name)
             ))
@@ -193,7 +194,7 @@ class PrivateMessageService(
         // Check if sender is blocked by recipient
         if (blockService?.isBlocked(recipient.uniqueId, sender.uniqueId) == true) {
             sender.sendMessage(messageFormattingService.getConfigMessage(
-                "blocks.target_blocked_you",
+                MessageKey.BLOCKS_TARGET_BLOCKED_YOU,
                 sender,
                 mapOf("player" to recipient.name)
             ))
@@ -256,7 +257,7 @@ class PrivateMessageService(
     suspend fun replyToLastSender(sender: Player, message: String): Boolean {
         val lastSenderUUID = lastSenders[sender.uniqueId]
         if (lastSenderUUID == null) {
-            sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.no_reply_target", sender))
+            sender.sendMessage(messageFormattingService.getConfigMessage(MessageKey.PRIVATE_MESSAGES_NO_REPLY_TARGET, sender))
             return false
         }
         
@@ -279,7 +280,7 @@ class PrivateMessageService(
             }
         }
 
-        sender.sendMessage(messageFormattingService.getConfigMessage("private_messages.reply_target_offline", sender))
+        sender.sendMessage(messageFormattingService.getConfigMessage(MessageKey.PRIVATE_MESSAGES_REPLY_TARGET_OFFLINE, sender))
         lastSenders.remove(sender.uniqueId)
         return false
     }
