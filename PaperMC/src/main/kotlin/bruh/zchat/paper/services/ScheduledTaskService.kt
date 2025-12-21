@@ -16,7 +16,8 @@ class ScheduledTaskService(
     private val configManager: ConfigManager,
     private val databaseMaintenanceService: DatabaseMaintenanceService,
     private val playerDataManager: PlayerDataManager,
-    private val crossServerMessageBusService: CrossServerMessageBusService
+    private val crossServerMessageBusService: CrossServerMessageBusService,
+    private val channelService: ChannelService
 ) {
     private val logger = LoggerFactory.getLogger(ScheduledTaskService::class.java)
     private val scheduledTasks = mutableMapOf<String, Int>()
@@ -81,6 +82,24 @@ class ScheduledTaskService(
         scheduledTasks["message-reclaim"] = reclaimTaskId
         
         logger.info("Scheduled cross-server tasks (Instance ID: $serverInstanceId)")
+    }
+
+    fun scheduleChannelIdentifierRefresh() {
+        val channelsConfig = configManager.config.channels
+        if (!channelsConfig.enabled) return
+
+        channelsConfig.channels.forEach { cfg ->
+            if (cfg.identifierCreator.isBlank() || cfg.identifierRefreshTicks <= 0) {
+                return@forEach
+            }
+            val defNameKey = channelService.normalizeName(cfg.name)
+            val taskId = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                channelService.getDefinitionByName(defNameKey)?.let { def ->
+                    channelService.refreshIdentifiersForDefinition(def)
+                }
+            }, cfg.identifierRefreshTicks.toLong(), cfg.identifierRefreshTicks.toLong()).taskId
+            scheduledTasks["channel-id-refresh-${defNameKey}"] = taskId
+        }
     }
 
     private fun scheduleDailyTask(name: String, hour: Int, minute: Int, task: Runnable) {

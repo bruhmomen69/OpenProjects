@@ -255,9 +255,12 @@ data class ChatMessages(
 data class SocialSpyMessages(
     @field:Comment("Format for social spy messages monitoring private messages")
     val socialSpyFormat: String = "<dark_gray>[<red>SPY</red>]</dark_gray> <gray>{sender} -> {recipient}:</gray> <white><message></white>",
-    
+
     @field:Comment("Format for command spy messages monitoring player commands")
     val commandSpyFormat: String = "<dark_gray>[<blue>CMD</blue>]</dark_gray> <gray>{player}:</gray> <yellow>{command}</yellow>",
+
+    @field:Comment("Format for channel spy messages monitoring channel chat")
+    val channelSpyFormat: String = "<dark_gray>[<green>CH-SPY</green>]</dark_gray> <gray>[<channel_name>/<channel_identifier>] {sender}:</gray> <white><message></white>",
     
     @field:Comment("Message shown when social spy is enabled")
     val enabled: String = "<green>Social spy enabled! You can now see private messages.</green>",

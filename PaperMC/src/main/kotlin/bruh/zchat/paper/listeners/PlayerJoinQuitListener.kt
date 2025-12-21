@@ -7,6 +7,7 @@ import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.ChatToggleService
 import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.services.ChannelService
 import bruh.zchat.paper.utils.MessageEnhancer
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,7 @@ class PlayerJoinQuitListener(
     private val messageFormattingService: MessageFormattingService,
     private val playerDataManager: PlayerDataManager,
     private val alertService: AlertService,
+    private val channelService: ChannelService,
     private val plugin: PaperMC
 ) : Listener {
 
@@ -41,6 +43,9 @@ class PlayerJoinQuitListener(
 
         // Initialize alerts for player
         alertService.initializeAlertsForPlayer(event.player)
+
+        // Auto-join channels
+        channelService.handlePlayerJoin(event.player)
 
         // Load player data asynchronously
         plugin.launch(Dispatchers.Unconfined) {
@@ -120,6 +125,7 @@ class PlayerJoinQuitListener(
         // Ensure quit message is set before the event finishes
         chatFormattingService.clearCooldown(event.player)
         chatToggleService.handlePlayerQuit(event.player)
+        channelService.handlePlayerQuit(event.player)
         processQuitMessage(event)
 
         // Save player data asynchronously

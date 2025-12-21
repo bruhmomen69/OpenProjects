@@ -101,6 +101,84 @@ class SocialSpyService(
     }
     
     /**
+     * Broadcast a channel message to all social spy users
+     */
+    fun broadcastChannelMessage(sender: Player, channelName: String, channelIdentifier: String, message: String) {
+        val config = configManager.config.socialSpy
+        
+        if (!config.enableChannelSpy || socialSpyEnabled.isEmpty()) {
+            return
+        }
+        
+        if (config.ignoreModeratorsForChannelSpy && sender.hasPermission("zchat.socialspy")) {
+            return
+        }
+        
+        val spyMessage = messageFormattingService.formatMessage(
+            format = configManager.messages.socialSpy.channelSpyFormat,
+            player = sender,
+            additionalPlaceholders = mapOf(
+                "sender" to sender.name,
+                "channel_name" to channelName,
+                "channel_identifier" to channelIdentifier,
+                "message" to message
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = true,
+            allowFormatting = true
+        )
+        
+        for (spyPlayerUUID in socialSpyEnabled) {
+            val spyPlayer = Bukkit.getPlayer(spyPlayerUUID)
+            if (spyPlayer != null && spyPlayer.isOnline && spyPlayer.uniqueId != sender.uniqueId) {
+                spyPlayer.sendMessage(spyMessage)
+            }
+        }
+        
+        if (config.logToConsole) {
+            logger.info("[CHANNELSPY] ${sender.name} [${channelName}/${channelIdentifier}]: $message")
+        }
+    }
+    
+    /**
+     * Broadcast a remote channel message to all social spy users
+     */
+    fun broadcastRemoteChannelMessage(senderName: String, channelName: String, channelIdentifier: String, message: String) {
+        val config = configManager.config.socialSpy
+        
+        if (!config.enableChannelSpy || socialSpyEnabled.isEmpty()) {
+            return
+        }
+        
+        val spyMessage = messageFormattingService.formatMessage(
+            format = configManager.messages.socialSpy.channelSpyFormat,
+            player = null,
+            additionalPlaceholders = mapOf(
+                "sender" to senderName,
+                "channel_name" to channelName,
+                "channel_identifier" to channelIdentifier,
+                "message" to message
+            ),
+            processUrls = false,
+            processMentions = false,
+            allowColors = true,
+            allowFormatting = true
+        )
+        
+        for (spyPlayerUUID in socialSpyEnabled) {
+            val spyPlayer = Bukkit.getPlayer(spyPlayerUUID)
+            if (spyPlayer != null && spyPlayer.isOnline) {
+                spyPlayer.sendMessage(spyMessage)
+            }
+        }
+        
+        if (config.logToConsole) {
+            logger.info("[CHANNELSPY] $senderName [${channelName}/${channelIdentifier}]: $message")
+        }
+    }
+    
+    /**
      * Broadcast a remote private message to all social spy users
      */
     fun broadcastRemotePrivateMessage(senderName: String, recipient: Player, message: String) {

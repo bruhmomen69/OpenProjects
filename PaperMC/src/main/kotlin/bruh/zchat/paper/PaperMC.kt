@@ -30,6 +30,8 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var placeholderAPIService: PlaceholderAPIService
     private lateinit var chatInventoryPlaceholderService: ChatInventoryPlaceholderService
     private lateinit var messageFormattingService: MessageFormattingService
+    private lateinit var channelService: ChannelService
+    private lateinit var channelFormattingService: ChannelFormattingService
     private lateinit var chatToggleService: ChatToggleService
     private lateinit var socialSpyService: SocialSpyService
     private lateinit var blockService: BlockService
@@ -89,6 +91,8 @@ class PaperMC : SuspendingJavaPlugin() {
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
+        channelService = ChannelService(this, configManager, placeholderAPIService)
+        channelFormattingService = ChannelFormattingService(configManager, messageFormattingService, channelService)
         inventorySnapshotStore = createInventorySnapshotStore()
         chatInventoryPlaceholderService = ChatInventoryPlaceholderService(
             this,
@@ -118,6 +122,8 @@ class PaperMC : SuspendingJavaPlugin() {
             privateMessageService,
             socialSpyService,
             messageFormattingService,
+            channelService,
+            channelFormattingService,
             serverInstanceId
         )
         // Wire up circular dependency
@@ -130,10 +136,11 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Initialize maintenance services
         databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, dbConfig)
-        scheduledTaskService = ScheduledTaskService(this, configManager, databaseMaintenanceService, playerDataManager, crossServerMessageBusService)
+        scheduledTaskService = ScheduledTaskService(this, configManager, databaseMaintenanceService, playerDataManager, crossServerMessageBusService, channelService)
         
         // Schedule maintenance tasks
         scheduledTaskService.scheduleMaintenanceTasks()
+        scheduledTaskService.scheduleChannelIdentifierRefresh()
         
         // Schedule cross-server tasks
         if (configManager.storage.crossServerMessaging.enabled) {
@@ -190,6 +197,7 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
+        lamp.register(bruh.zchat.paper.commands.ChannelCommands(configManager, channelService, messageFormattingService))
 
         // Register private message commands
         lamp.register(MessageCommand(privateMessageService, messageFormattingService, this))
@@ -229,10 +237,15 @@ class PaperMC : SuspendingJavaPlugin() {
             ChatMessageListener(
                 configManager,
                 chatFormattingService,
+                channelFormattingService,
+                channelService,
                 chatToggleService,
                 messageFormattingService,
                 chatInventoryPlaceholderService,
-                swearFilterService
+                swearFilterService,
+                socialSpyService,
+                crossServerMessageBusService,
+                this
             ), this
         )
         server.pluginManager.registerEvents(
@@ -243,7 +256,14 @@ class PaperMC : SuspendingJavaPlugin() {
                 messageFormattingService,
                 playerDataManager,
                 alertService,
+                channelService,
                 this
+            ), this
+        )
+        server.pluginManager.registerEvents(
+            ChannelCommandListener(
+                channelService,
+                messageFormattingService
             ), this
         )
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)

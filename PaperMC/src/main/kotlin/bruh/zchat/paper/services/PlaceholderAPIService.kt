@@ -147,6 +147,13 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
     }
 
     /**
+     * Lightweight helper used for channel identifier resolution.
+     */
+    fun parsePlaceholders(player: Player, text: String): String {
+        return processText(player, text)
+    }
+
+    /**
      * Get available PlaceholderAPI placeholders (for debugging/info purposes)
      */
     fun getAvailablePlaceholders(): List<String> {

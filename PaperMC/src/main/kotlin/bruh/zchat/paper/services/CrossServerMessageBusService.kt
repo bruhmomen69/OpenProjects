@@ -3,11 +3,17 @@ package bruh.zchat.paper.services
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.StorageConfig
-import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.database.DBPlayerQueries
 import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.DatabaseType
 import bruh.zchat.paper.database.PlayerDataManager
+import bruh.zchat.paper.enums.MessageKey
+import bruh.zchat.paper.services.ChannelFormattingService
+import bruh.zchat.paper.services.ChannelInstanceKey
+import bruh.zchat.paper.services.ChannelRouting
+import bruh.zchat.paper.services.ChannelService
+import bruh.zchat.paper.services.MessageFormattingService
+import net.kyori.adventure.text.Component
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +43,8 @@ class CrossServerMessageBusService(
     private val privateMessageService: PrivateMessageService,
     private val socialSpyService: SocialSpyService,
     private val messageFormattingService: MessageFormattingService,
+    private val channelService: ChannelService,
+    private val channelFormattingService: ChannelFormattingService,
     private val serverInstanceId: String
 ) {
     private val logger = LoggerFactory.getLogger(CrossServerMessageBusService::class.java)
@@ -47,12 +55,15 @@ class CrossServerMessageBusService(
     data class MessagePayload(
         val processedMessage: String,
         val originalMessage: String? = null,
-        val reason: String? = null // For failures
+        val reason: String? = null, // For failures
+        val channelName: String? = null,
+        val channelIdentifier: String? = null
     )
 
     enum class MessageType {
         PM_DELIVER,
-        PM_DELIVERY_FAILED
+        PM_DELIVERY_FAILED,
+        CHANNEL_CHAT
     }
 
     @Serializable
@@ -63,7 +74,9 @@ class CrossServerMessageBusService(
         val senderName: String,
         val recipientUuid: String,
         val recipientName: String?,
-        val payload: MessagePayload
+        val payload: MessagePayload,
+        val channelName: String? = null,
+        val channelIdentifier: String? = null
     )
 
     private val backendConfig: StorageConfig = configManager.storage
@@ -76,6 +89,10 @@ class CrossServerMessageBusService(
     private val redisChannel: String by lazy {
         val redisCfg = backendConfig.crossServerMessaging.redis
         "${redisCfg.channelPrefix}:server:$serverInstanceId"
+    }
+    private val redisChannelBroadcast: String by lazy {
+        val redisCfg = backendConfig.crossServerMessaging.redis
+        "${redisCfg.channelPrefix}:channel"
     }
 
     /**
@@ -128,10 +145,10 @@ class CrossServerMessageBusService(
         })
 
         runCatching {
-            pubSub.sync().subscribe(redisChannel)
-            logger.info("Redis message bus subscribed to $redisChannel")
+            pubSub.sync().subscribe(redisChannel, redisChannelBroadcast)
+            logger.info("Redis message bus subscribed to $redisChannel and $redisChannelBroadcast")
         }.onFailure { ex ->
-            logger.error("Failed to subscribe to Redis channel $redisChannel", ex)
+            logger.error("Failed to subscribe to Redis channels $redisChannel / $redisChannelBroadcast", ex)
         }
     }
 
@@ -153,7 +170,7 @@ class CrossServerMessageBusService(
             val id = if (envelope.id > 0L) envelope.id else System.currentTimeMillis()
             val type = envelope.type
             val senderUuid = UUID.fromString(envelope.senderUuid)
-            val recipientUuid = UUID.fromString(envelope.recipientUuid)
+            val recipientUuid = envelope.recipientUuid.takeIf { it.isNotBlank() }?.let { UUID.fromString(it) }
             processMessage(
                 id = id,
                 type = type,
@@ -161,7 +178,9 @@ class CrossServerMessageBusService(
                 senderName = envelope.senderName,
                 recipientUuid = recipientUuid,
                 recipientName = envelope.recipientName,
-                payload = envelope.payload
+                payload = envelope.payload,
+                channelName = envelope.channelName ?: envelope.payload.channelName,
+                channelIdentifier = envelope.channelIdentifier ?: envelope.payload.channelIdentifier
             )
         } catch (ex: Exception) {
             logger.error("Failed to process Redis message bus payload", ex)
@@ -185,7 +204,17 @@ class CrossServerMessageBusService(
                 try {
                     val type = MessageType.valueOf(msg.type)
                     val payload = json.decodeFromString<MessagePayload>(msg.payloadJson)
-                    processMessage(msg.id, type, msg.senderUuid, msg.senderName, msg.recipientUuid, msg.recipientName, payload)
+                    processMessage(
+                        msg.id,
+                        type,
+                        msg.senderUuid,
+                        msg.senderName,
+                        msg.recipientUuid,
+                        msg.recipientName,
+                        payload,
+                        channelName = payload.channelName,
+                        channelIdentifier = payload.channelIdentifier
+                    )
                 } catch (e: Exception) {
                     logger.error("Failed to process message bus item ${msg.id}", e)
                     updateMessageStatus(msg.id, "FAILED", e.message)
@@ -202,12 +231,15 @@ class CrossServerMessageBusService(
         type: MessageType,
         senderUuid: UUID,
         senderName: String,
-        recipientUuid: UUID,
+        recipientUuid: UUID?,
         recipientName: String?,
-        payload: MessagePayload
+        payload: MessagePayload,
+        channelName: String? = null,
+        channelIdentifier: String? = null
     ) {
         when (type) {
             MessageType.PM_DELIVER -> {
+                if (recipientUuid == null) return
                 val recipient = Bukkit.getPlayer(recipientUuid)
                 if (recipient != null && recipient.isOnline) {
                     // Respect recipient message toggle on delivery server (prevents bypass)
@@ -277,6 +309,36 @@ class CrossServerMessageBusService(
                     // Sender also offline, just mark done
                     updateMessageStatus(id, "FAILED", "Original sender offline")
                 }
+            }
+            MessageType.CHANNEL_CHAT -> {
+                val resolvedChannelName = channelName ?: payload.channelName
+                val resolvedChannelIdentifier = channelIdentifier ?: payload.channelIdentifier
+                if (resolvedChannelName == null || resolvedChannelIdentifier == null) return
+                val instance = ChannelInstanceKey(resolvedChannelName, resolvedChannelIdentifier)
+                val viewers = channelService.getViewersForInstance(instance)
+                val messageComponent = Component.text(payload.processedMessage)
+                val routing = ChannelRouting(instance, channelOnly = true)
+
+                for (viewer in viewers) {
+                    withContext(plugin.entityDispatcher(viewer)) {
+                        val formatted = channelFormattingService.formatChannelMessage(
+                            sender = null,
+                            viewer = viewer,
+                            baseMessageComponent = messageComponent,
+                            routing = routing,
+                            senderNameOverride = senderName
+                        )
+                        viewer.sendMessage(formatted)
+                    }
+                }
+
+                // Channel social spy
+                socialSpyService.broadcastRemoteChannelMessage(
+                    senderName = senderName,
+                    channelName = resolvedChannelName,
+                    channelIdentifier = resolvedChannelIdentifier,
+                    message = payload.originalMessage ?: payload.processedMessage
+                )
             }
         }
     }
@@ -387,6 +449,46 @@ class CrossServerMessageBusService(
         } catch (e: Exception) {
             logger.error("Failed to send cross-server message", e)
             false
+        }
+    }
+
+    suspend fun sendChannelMessage(
+        senderUuid: UUID,
+        senderName: String,
+        instance: ChannelInstanceKey,
+        processedMessage: String,
+        originalMessage: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        val config = configManager.storage.crossServerMessaging
+        if (!config.enabled) return@withContext false
+        val payload = MessagePayload(
+            processedMessage = processedMessage,
+            originalMessage = originalMessage,
+            channelName = instance.nameKey,
+            channelIdentifier = instance.identifier
+        )
+        if (isRedisBackend) {
+            val publisher = publishConnection ?: return@withContext false
+            val channel = redisChannelBroadcast
+            val id = allocateRedisMessageId(publisher)
+            val envelope = RedisEnvelope(
+                id = id,
+                type = MessageType.CHANNEL_CHAT,
+                senderUuid = senderUuid.toString(),
+                senderName = senderName,
+                recipientUuid = "", // unused
+                recipientName = null,
+                payload = payload,
+                channelName = instance.nameKey,
+                channelIdentifier = instance.identifier
+            )
+            return@withContext runCatching {
+                publisher.sync().publish(channel, json.encodeToString(envelope))
+            }.onFailure { ex ->
+                logger.error("Failed to publish cross-server channel message to Redis channel $channel", ex)
+            }.isSuccess
+        } else {
+            return@withContext false
         }
     }
 
