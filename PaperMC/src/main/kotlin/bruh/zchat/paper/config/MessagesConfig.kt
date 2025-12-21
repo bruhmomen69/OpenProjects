@@ -39,7 +39,10 @@ data class MessagesConfig(
     val commands: CommandMessages = CommandMessages(),
 
     @field:Comment("Generic system and error messages")
-    val system: SystemMessages = SystemMessages()
+    val system: SystemMessages = SystemMessages(),
+
+    @field:Comment("Channel system messages and notifications")
+    val channels: ChannelMessages = ChannelMessages()
 )
 
 @ConfigSerializable
@@ -432,4 +435,70 @@ data class SystemMessages(
     
     @field:Comment("Message shown for invalid usage")
     val invalidUsage: String = "<red>Usage: <usage></red>"
+)
+
+@ConfigSerializable
+data class ChannelMessages(
+    @field:Comment("Message shown when channel system is disabled")
+    val systemDisabled: String = "<red>Channel system is currently disabled.</red>",
+    
+    @field:Comment("Message shown when a channel is not found")
+    val channelNotFound: String = "<red>Channel not found: <channel_name></red>",
+    
+    @field:Comment("Message shown when a player lacks permission to use channels")
+    val noPermission: String = "<red>You don't have permission to use channels!</red>",
+    
+    @field:Comment("Message shown when a player lacks permission to join a specific channel")
+    val noPermissionChannel: String = "<red>You don't have permission to join channel <channel_display_name>!</red>",
+    
+    @field:Comment("Message shown when a channel identifier is missing")
+    val identifierMissing: String = "<red>Unable to join channel <channel_display_name>: identifier missing.</red>",
+    
+    @field:Comment("Message shown when successfully joining a channel")
+    val channelJoined: String = "<green>Joined channel <channel_display_name> [<channel_identifier>]</green>",
+    
+    @field:Comment("Message shown when failing to join a channel")
+    val channelJoinFailed: String = "<red>Could not join channel <channel_display_name></red>",
+    
+    @field:Comment("Message shown when successfully leaving a channel")
+    val channelLeft: String = "<yellow>Left channel <channel_display_name></yellow>",
+    
+    @field:Comment("Message shown when failing to leave a channel")
+    val channelLeaveFailed: String = "<red>Failed to leave channel <channel_display_name></red>",
+    
+    @field:Comment("Message shown when player is not in a channel")
+    val notInChannel: String = "<red>You are not in channel <channel_display_name></red>",
+    
+    @field:Comment("Message shown when setting active channel successfully")
+    val activeChannelSet: String = "<green>Active channel set to <channel_display_name></green>",
+    
+    @field:Comment("Message shown when there are no active instances for a channel")
+    val noActiveInstances: String = "<yellow>No active instances for <channel_display_name></yellow>",
+    
+    @field:Comment("Header for channel member list")
+    val membersListHeader: String = "<gold>Members for <channel_display_name></gold>",
+    
+    @field:Comment("Format for individual channel instance in member list")
+    val membersListInstance: String = "<gray>- [<channel_identifier>]</gray> <white><member_names></white>",
+    
+    @field:Comment("Text shown when no members are in a channel instance")
+    val noMembers: String = "none",
+    
+    @field:Comment("Header for channel list")
+    val listHeader: String = "<gold>Channels:</gold>",
+    
+    @field:Comment("Format for individual channel in list")
+    val listFormat: String = "<gray>- <white><channel_display_name></white> (<yellow><channel_name_key></yellow>) cmds=<commands> allMsg=<all_messages> cs=<cross_server></gray>",
+    
+    @field:Comment("Message shown when trying to focus on a channel not joined")
+    val focusNotJoined: String = "<red>You are not in channel <channel_display_name></red>",
+    
+    @field:Comment("Message shown when successfully switching to channel-only mode")
+    val channelOnlyEnabled: String = "<green>Channel-only mode enabled. Messages will only go to your active channel.</green>",
+    
+    @field:Comment("Message shown when disabling channel-only mode")
+    val channelOnlyDisabled: String = "<green>Channel-only mode disabled. Messages will go to global chat.</green>",
+    
+    @field:Comment("Message shown when channel-only mode is not available (no active channel)")
+    val channelOnlyNoChannel: String = "<red>You must have an active channel to use channel-only mode.</red>"
 )

@@ -105,12 +105,17 @@ class ChannelCommandListener(
             if (success) {
                 val status = if (joinedBefore) "<red>left</red>" else "<green>joined</green>"
                 player.sendMessage(
-                    messageFormattingService.formatMessage(
+                    messageFormattingService.formatMessageComponent(
                         "<gray>You $status channel <channel_name> [<channel_identifier>]</gray>",
                         player,
                         mapOf(
-                            "channel_name" to definition.displayName,
-                            "channel_identifier" to instance.identifier
+                            "channel_name" to Component.text(definition.displayName),
+                            "channel_identifier" to messageFormattingService.formatMessage(
+                                instance.identifier,
+                                player,
+                                processUrls = false,
+                                processMentions = false
+                            )
                         ),
                         processUrls = false,
                         processMentions = false

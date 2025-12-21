@@ -69,6 +69,29 @@ enum class MessageKey(
     // Swear filter messages
     SWEAR_FILTER_BLOCKED_MESSAGE("swearFilter.blockedMessage", "swear_filter", Function { it.swearFilter.blockedMessage }),
     
+    // Channel messages
+    CHANNELS_SYSTEM_DISABLED("channels.system_disabled", "channels", Function { it.channels.systemDisabled }),
+    CHANNELS_CHANNEL_NOT_FOUND("channels.channel_not_found", "channels", Function { it.channels.channelNotFound }),
+    CHANNELS_NO_PERMISSION("channels.no_permission", "channels", Function { it.channels.noPermission }),
+    CHANNELS_NO_PERMISSION_CHANNEL("channels.no_permission_channel", "channels", Function { it.channels.noPermissionChannel }),
+    CHANNELS_IDENTIFIER_MISSING("channels.identifier_missing", "channels", Function { it.channels.identifierMissing }),
+    CHANNELS_CHANNEL_JOINED("channels.channel_joined", "channels", Function { it.channels.channelJoined }),
+    CHANNELS_CHANNEL_JOIN_FAILED("channels.channel_join_failed", "channels", Function { it.channels.channelJoinFailed }),
+    CHANNELS_CHANNEL_LEFT("channels.channel_left", "channels", Function { it.channels.channelLeft }),
+    CHANNELS_CHANNEL_LEAVE_FAILED("channels.channel_leave_failed", "channels", Function { it.channels.channelLeaveFailed }),
+    CHANNELS_NOT_IN_CHANNEL("channels.not_in_channel", "channels", Function { it.channels.notInChannel }),
+    CHANNELS_ACTIVE_CHANNEL_SET("channels.active_channel_set", "channels", Function { it.channels.activeChannelSet }),
+    CHANNELS_NO_ACTIVE_INSTANCES("channels.no_active_instances", "channels", Function { it.channels.noActiveInstances }),
+    CHANNELS_MEMBERS_LIST_HEADER("channels.members_list_header", "channels", Function { it.channels.membersListHeader }),
+    CHANNELS_MEMBERS_LIST_INSTANCE("channels.members_list_instance", "channels", Function { it.channels.membersListInstance }),
+    CHANNELS_NO_MEMBERS("channels.no_members", "channels", Function { it.channels.noMembers }),
+    CHANNELS_LIST_HEADER("channels.list_header", "channels", Function { it.channels.listHeader }),
+    CHANNELS_LIST_FORMAT("channels.list_format", "channels", Function { it.channels.listFormat }),
+    CHANNELS_FOCUS_NOT_JOINED("channels.focus_not_joined", "channels", Function { it.channels.focusNotJoined }),
+    CHANNELS_CHANNEL_ONLY_ENABLED("channels.channel_only_enabled", "channels", Function { it.channels.channelOnlyEnabled }),
+    CHANNELS_CHANNEL_ONLY_DISABLED("channels.channel_only_disabled", "channels", Function { it.channels.channelOnlyDisabled }),
+    CHANNELS_CHANNEL_ONLY_NO_CHANNEL("channels.channel_only_no_channel", "channels", Function { it.channels.channelOnlyNoChannel }),
+    
     // System messages
     SYSTEM_ERROR("system.error", "system", Function { it.system.error }),
     SYSTEM_SUCCESS("system.success", "system", Function { it.system.success }),
