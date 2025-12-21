@@ -500,5 +500,29 @@ data class ChannelMessages(
     val channelOnlyDisabled: String = "<green>Channel-only mode disabled. Messages will go to global chat.</green>",
     
     @field:Comment("Message shown when channel-only mode is not available (no active channel)")
-    val channelOnlyNoChannel: String = "<red>You must have an active channel to use channel-only mode.</red>"
+    val channelOnlyNoChannel: String = "<red>You must have an active channel to use channel-only mode.</red>",
+    
+    @field:Comment("Message shown when a player toggles and joins a channel")
+    val channelJoinedToggle: String = "<gray>You <green>joined</green> channel <channel_display_name> [<channel_identifier>]</gray>",
+    
+    @field:Comment("Message shown when a player toggles and leaves a channel")
+    val channelLeftToggle: String = "<gray>You <red>left</red> channel <channel_display_name> [<channel_identifier>]</gray>",
+    
+    @field:Comment("Message shown when failing to join a channel via toggle")
+    val channelToggleJoinFailed: String = "<red>Could not join channel <channel_display_name>.</red>",
+    
+    @field:Comment("Message shown when failing to leave a channel via toggle")
+    val channelToggleLeaveFailed: String = "<red>Could not leave channel <channel_display_name>.</red>",
+    
+    @field:Comment("Tab completion tooltip for message argument")
+    val tabMessageTooltip: String = "Send a message to this channel",
+    
+    @field:Comment("Tab completion tooltip for toggle option")
+    val tabToggleTooltip: String = "Toggle joining/leaving this channel",
+    
+    @field:Comment("Tab completion tooltip for channel commands")
+    val tabChannelTooltip: String = "Channel command",
+    
+    @field:Comment("Tab completion tooltip for online players")
+    val tabPlayerTooltip: String = "Online player"
 )

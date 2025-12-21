@@ -265,6 +265,7 @@ class PaperMC : SuspendingJavaPlugin() {
                 channelService,
                 messageFormattingService,
                 configManager.channels,
+                configManager.messages,
                 this
             ), this
         )

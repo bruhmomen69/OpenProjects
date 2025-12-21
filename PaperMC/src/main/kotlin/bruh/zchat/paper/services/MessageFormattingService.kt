@@ -343,7 +343,7 @@ class MessageFormattingService(
     /**
      * Get message text from config using MessageKey enum
      */
-    private fun getMessageByKey(messages: MessagesConfig, messageKey: MessageKey): String? {
+    fun getMessageByKey(messages: MessagesConfig, messageKey: MessageKey): String? {
         return messageKey.resolveMessage(messages)
     }
 

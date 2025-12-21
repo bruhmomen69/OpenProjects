@@ -1,8 +1,10 @@
 package bruh.zchat.paper.listeners
 
 import bruh.zchat.paper.config.ChannelsConfig
+import bruh.zchat.paper.config.MessagesConfig
 import bruh.zchat.paper.services.ChannelService
 import bruh.zchat.paper.services.MessageFormattingService
+import bruh.zchat.paper.enums.MessageKey
 import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
@@ -31,6 +33,7 @@ class ChannelCommandListener(
     private val channelService: ChannelService,
     private val messageFormattingService: MessageFormattingService,
     private val channelsConfig: ChannelsConfig,
+    private val messagesConfig: MessagesConfig,
     private val plugin: JavaPlugin
 ) : Listener {
 
@@ -82,11 +85,12 @@ class ChannelCommandListener(
         val instance = channelService.resolveInstanceForPlayer(player, definition)
         if (instance == null) {
             player.sendMessage(
-                messageFormattingService.formatMessage(
-                    "<red>Unable to join channel ${definition.displayName}: identifier missing.</red>",
+                messageFormattingService.getConfigMessage(
+                    MessageKey.CHANNELS_IDENTIFIER_MISSING,
                     player,
-                    processUrls = false,
-                    processMentions = false
+                    mapOf(
+                        "channel_display_name" to definition.displayName
+                    )
                 )
             )
             event.isCancelled = true
@@ -103,31 +107,33 @@ class ChannelCommandListener(
                     explicit = true
                 )
             if (success) {
-                val status = if (joinedBefore) "<red>left</red>" else "<green>joined</green>"
+                val messageKey = if (joinedBefore) MessageKey.CHANNELS_CHANNEL_LEFT_TOGGLE else MessageKey.CHANNELS_CHANNEL_JOINED_TOGGLE
+                val channelDisplayName = messageFormattingService.formatMessage(
+                    definition.displayName,
+                    player,
+                    processUrls = false,
+                    processMentions = false
+                )
                 player.sendMessage(
                     messageFormattingService.formatMessageComponent(
-                        "<gray>You $status channel <channel_name> [<channel_identifier>]</gray>",
+                        messageFormattingService.getMessageByKey(messagesConfig, messageKey)!!,
                         player,
                         mapOf(
-                            "channel_name" to Component.text(definition.displayName),
-                            "channel_identifier" to messageFormattingService.formatMessage(
-                                instance.identifier,
-                                player,
-                                processUrls = false,
-                                processMentions = false
-                            )
+                            "channel_name" to channelDisplayName,
+                            "channel_display_name" to channelDisplayName,
+                            "channel_identifier" to Component.text(instance.identifier)
                         ),
                         processUrls = false,
                         processMentions = false
                     )
                 )
             } else {
+                val messageKey = if (joinedBefore) MessageKey.CHANNELS_CHANNEL_TOGGLE_LEAVE_FAILED else MessageKey.CHANNELS_CHANNEL_TOGGLE_JOIN_FAILED
                 player.sendMessage(
-                    messageFormattingService.formatMessage(
-                        "<red>Could not ${if (joinedBefore) "leave" else "join"} channel ${definition.displayName}.</red>",
+                    messageFormattingService.getConfigMessage(
+                        messageKey,
                         player,
-                        processUrls = false,
-                        processMentions = false
+                        mapOf("channel_display_name" to definition.displayName)
                     )
                 )
             }
@@ -234,11 +240,11 @@ class ChannelCommandListener(
                     mutableListOf(
                         AsyncTabCompleteEvent.Completion.completion(
                             "<message>",
-                            Component.text("Send a message to this channel", NamedTextColor.GRAY)
+                            messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_MESSAGE_TOOLTIP, player)
                         ),
                         AsyncTabCompleteEvent.Completion.completion(
                             "toggle",
-                            Component.text("Toggle joining/leaving this channel", NamedTextColor.YELLOW)
+                            messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_TOGGLE_TOOLTIP, player)
                         )
                     )
                 } else if (secondArg.startsWith("<") || secondArg.length > 2) {
@@ -274,7 +280,11 @@ class ChannelCommandListener(
                 .map { cmd ->
                     AsyncTabCompleteEvent.Completion.completion(
                         cmd,
-                        Component.text("Channel command", NamedTextColor.GREEN)
+                        Component.text(
+                            messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_CHANNEL_TOOLTIP, player)
+                                .toString().replace(Regex("<[^>]*>"), ""), // Strip MiniMessage tags for tooltip
+                            NamedTextColor.GREEN
+                        )
                     )
                 }
                 .toMutableList()
@@ -327,7 +337,11 @@ class ChannelCommandListener(
                 .map { name ->
                     AsyncTabCompleteEvent.Completion.completion(
                         name,
-                        Component.text("Online player", NamedTextColor.AQUA)
+                        Component.text(
+                            messageFormattingService.getConfigMessage(MessageKey.CHANNELS_TAB_PLAYER_TOOLTIP, player)
+                                .toString().replace(Regex("<[^>]*>"), ""), // Strip MiniMessage tags for tooltip
+                            NamedTextColor.AQUA
+                        )
                     )
                 }
                 .toMutableList()

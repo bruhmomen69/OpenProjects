@@ -91,6 +91,14 @@ enum class MessageKey(
     CHANNELS_CHANNEL_ONLY_ENABLED("channels.channel_only_enabled", "channels", Function { it.channels.channelOnlyEnabled }),
     CHANNELS_CHANNEL_ONLY_DISABLED("channels.channel_only_disabled", "channels", Function { it.channels.channelOnlyDisabled }),
     CHANNELS_CHANNEL_ONLY_NO_CHANNEL("channels.channel_only_no_channel", "channels", Function { it.channels.channelOnlyNoChannel }),
+    CHANNELS_CHANNEL_JOINED_TOGGLE("channels.channel_joined_toggle", "channels", Function { it.channels.channelJoinedToggle }),
+    CHANNELS_CHANNEL_LEFT_TOGGLE("channels.channel_left_toggle", "channels", Function { it.channels.channelLeftToggle }),
+    CHANNELS_CHANNEL_TOGGLE_JOIN_FAILED("channels.channel_toggle_join_failed", "channels", Function { it.channels.channelToggleJoinFailed }),
+    CHANNELS_CHANNEL_TOGGLE_LEAVE_FAILED("channels.channel_toggle_leave_failed", "channels", Function { it.channels.channelToggleLeaveFailed }),
+    CHANNELS_TAB_MESSAGE_TOOLTIP("channels.tab_message_tooltip", "channels", Function { it.channels.tabMessageTooltip }),
+    CHANNELS_TAB_TOGGLE_TOOLTIP("channels.tab_toggle_tooltip", "channels", Function { it.channels.tabToggleTooltip }),
+    CHANNELS_TAB_CHANNEL_TOOLTIP("channels.tab_channel_tooltip", "channels", Function { it.channels.tabChannelTooltip }),
+    CHANNELS_TAB_PLAYER_TOOLTIP("channels.tab_player_tooltip", "channels", Function { it.channels.tabPlayerTooltip }),
     
     // System messages
     SYSTEM_ERROR("system.error", "system", Function { it.system.error }),
