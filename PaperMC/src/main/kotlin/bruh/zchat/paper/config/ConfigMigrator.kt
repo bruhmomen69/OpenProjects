@@ -19,7 +19,6 @@ class ConfigMigrator {
                 enableWorldFormats = legacy.chatFormat.enableWorldFormats,
                 formatPriority = legacy.chatFormat.formatPriority,
                 enableRankedFormats = legacy.chatFormat.enableRankedFormats,
-                rankedFormatPriority = legacy.chatFormat.rankedFormatPriority,
                 enableHoverMessages = legacy.chatFormat.enableHoverMessages,
                 enableClickActions = legacy.chatFormat.enableClickActions,
                 applyInteractiveToEntireMessage = legacy.chatFormat.applyInteractiveToEntireMessage
@@ -134,6 +133,7 @@ class ConfigMigrator {
         val messages = MessagesConfig(
             chatFormat = ChatFormatMessages(
                 defaultFormat = legacy.chatFormat.defaultFormat,
+                groupFormatPriority = legacy.chatFormat.rankedFormatPriority,
                 groupFormats = legacy.chatFormat.groupFormats,
                 worldFormats = legacy.chatFormat.worldFormats,
                 hoverMessages = legacy.chatFormat.hoverMessages,

@@ -46,7 +46,10 @@ data class MessagesConfig(
 data class ChatFormatMessages(
     @field:Comment("Default chat format used when no group or world format applies")
     val defaultFormat: String = "<gray>[<gradient:white:aqua><player_name></gradient>]</gray> <gray><message></gray>",
-    
+
+    @field:Comment("Priority order for group/ranked formats. Higher ranks should be listed first. Only used when enableRankedFormats is true.")
+    val groupFormatPriority: List<String> = listOf("owner", "admin", "moderator", "helper", "vip", "premium", "donor", "member", "default"),
+
     @field:Comment("Group-based chat formats mapped by group/rank name")
     val groupFormats: Map<String, String> = mapOf(
         "owner" to "<gradient:red:gold>[OWNER]</gradient> <gradient:gold:yellow><player_name></gradient> <gray>»</gray> <white><message></white>",
@@ -59,7 +62,7 @@ data class ChatFormatMessages(
         "member" to "<gray>[MEMBER]</gray> <white><player_name></white> <gray>»</gray> <gray><message></gray>",
         "default" to "<gray>[<white><player_name></white>]</gray> <gray><message></gray>"
     ),
-    
+
     @field:Comment("World-specific chat formats")
     val worldFormats: Map<String, String> = mapOf(
         "world" to "<green>[Overworld]</green> <gray>[<white><player_name></white>]</gray> <gray><message></gray>",

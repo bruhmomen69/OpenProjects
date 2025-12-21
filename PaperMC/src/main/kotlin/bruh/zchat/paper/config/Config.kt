@@ -59,9 +59,6 @@ data class ChatFormatConfig(
     @field:Comment("Enable ranked format system with automatic priority based on rankedFormatPriority list.")
     val enableRankedFormats: Boolean = true,
     
-    @field:Comment("Priority order for ranked formats. Higher ranks should be listed first. Only used when enableRankedFormats is true.")
-    val rankedFormatPriority: List<String> = listOf("owner", "admin", "moderator", "helper", "vip", "premium", "donor", "member", "default"),
-    
     @field:Comment("Enable hover messages when players hover over names in chat.")
     val enableHoverMessages: Boolean = true,
     

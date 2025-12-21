@@ -143,7 +143,7 @@ class ChatFormattingService(
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
             val messages = configManager.messages.chatFormat
-            for (rank in config.rankedFormatPriority) {
+            for (rank in messages.groupFormatPriority) {
                 if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank")) {
                     return messages.groupFormats[rank]
                 }
@@ -167,7 +167,8 @@ class ChatFormattingService(
 
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
-            for (rank in config.rankedFormatPriority) {
+            val messages = configManager.messages.chatFormat
+            for (rank in messages.groupFormatPriority) {
                 if (player.hasPermission("group.$rank") || player.hasPermission(rank)) {
                     return groupFormats[rank]
                 }
@@ -258,7 +259,8 @@ class ChatFormattingService(
 
         // Check ranked formats if enabled
         if (config.enableRankedFormats) {
-            for (rank in config.rankedFormatPriority) {
+            val messages = configManager.messages.chatFormat
+            for (rank in messages.groupFormatPriority) {
                 if (player.hasPermission("${configManager.config.permissions.formatPermissionPrefix}$rank") ||
                     player.hasPermission("group.$rank") ||
                     player.hasPermission(rank)
