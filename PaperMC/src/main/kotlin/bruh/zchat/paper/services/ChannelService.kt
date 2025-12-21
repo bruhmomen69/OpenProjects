@@ -65,7 +65,7 @@ class ChannelService(
 
     fun rebuildDefinitions() {
         definitionsByName.clear()
-        val channelsConfig: ChannelsConfig = configManager.config.channels
+        val channelsConfig: ChannelsConfig = configManager.channels
         channelsConfig.channels.forEach { cfg ->
             val def = buildDefinition(cfg)
             definitionsByName[def.nameKey] = def
@@ -108,14 +108,14 @@ class ChannelService(
 
     private fun resolveIdentifier(player: Player, definition: ChannelDefinition): String? {
         if (definition.identifierCreator.isBlank()) {
-            return "default"
+            return "default" + definition.name.replace(" ", "_").lowercase()
         }
         val raw = placeholderAPIService.parsePlaceholders(player, definition.identifierCreator)
-        val normalized = normalizeIdentifier(raw)
-        if (normalized.isBlank() && definition.requireIdentifierToJoin) {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank() && definition.requireIdentifierToJoin) {
             return null
         }
-        return normalized.ifBlank { if (definition.requireIdentifierToJoin) null else "default" }
+        return trimmed.ifBlank { "default" + definition.name.replace(" ", "_").lowercase() }
     }
 
     fun joinChannel(player: Player, definition: ChannelDefinition, explicit: Boolean = true): Boolean {
@@ -219,7 +219,7 @@ class ChannelService(
      * Auto join channels for a player on login based on configuration order.
      */
     fun handlePlayerJoin(player: Player) {
-        val channelsConfig = configManager.config.channels
+        val channelsConfig = configManager.channels
         if (!channelsConfig.enabled) return
 
         val state = playerStateByUuid.computeIfAbsent(player.uniqueId) { PlayerChannelState() }

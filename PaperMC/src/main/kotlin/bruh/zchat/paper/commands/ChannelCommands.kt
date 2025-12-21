@@ -115,13 +115,4 @@ class ChannelCommands(
         }
         actor.reply(messageFormattingService.formatMessage(lines, player, processUrls = false, processMentions = false))
     }
-
-    private fun BukkitCommandActor.requirePlayer(): Player {
-        val sender = sender()
-        if (sender !is Player) {
-            reply(messageFormattingService.formatMessage("<red>This command can only be used by players!</red>", null, processUrls = false, processMentions = false))
-            throw IllegalStateException("Player required")
-        }
-        return sender
-    }
 }

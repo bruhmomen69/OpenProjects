@@ -263,7 +263,9 @@ class PaperMC : SuspendingJavaPlugin() {
         server.pluginManager.registerEvents(
             ChannelCommandListener(
                 channelService,
-                messageFormattingService
+                messageFormattingService,
+                configManager.channels,
+                this
             ), this
         )
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)

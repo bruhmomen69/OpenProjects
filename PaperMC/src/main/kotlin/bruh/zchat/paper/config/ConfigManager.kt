@@ -14,6 +14,7 @@ class ConfigManager(private val dataFolder: Path) {
     private val configFile = dataFolder.resolve("config.conf")
     private val messagesFile = dataFolder.resolve("messages.conf")
     private val storageFile = dataFolder.resolve("storage.conf")
+    private val channelsFile = dataFolder.resolve("channels.conf")
 
     private fun createLoader(path: Path) = HoconConfigurationLoader.builder()
         .path(path)
@@ -24,12 +25,15 @@ class ConfigManager(private val dataFolder: Path) {
     private val configLoader = createLoader(configFile)
     private val messagesLoader = createLoader(messagesFile)
     private val storageLoader = createLoader(storageFile)
+    private val channelsLoader = createLoader(channelsFile)
 
     lateinit var config: Config
         private set
     lateinit var messages: MessagesConfig
         private set
     lateinit var storage: StorageConfig
+        private set
+    lateinit var channels: ChannelsConfig
         private set
 
     fun loadConfig(): Boolean {
@@ -67,10 +71,11 @@ class ConfigManager(private val dataFolder: Path) {
             this.config = newConfig
             this.messages = newMessages
             this.storage = newStorage
+            this.channels = ChannelsConfig() // Default channels config for migration
 
             // Save the new split configs
             saveAll()
-            logger.info("Migration completed successfully. Config split into config.conf, messages.conf, and storage.conf")
+            logger.info("Migration completed successfully. Config split into config.conf, messages.conf, storage.conf, and channels.conf")
         } catch (e: Exception) {
             logger.error("Migration failed! Loading defaults.", e)
             loadDefaults()
@@ -81,6 +86,7 @@ class ConfigManager(private val dataFolder: Path) {
         config = loadFile(configFile, configLoader, Config::class.java)
         messages = loadFile(messagesFile, messagesLoader, MessagesConfig::class.java)
         storage = loadFile(storageFile, storageLoader, StorageConfig::class.java)
+        channels = loadFile(channelsFile, channelsLoader, ChannelsConfig::class.java)
     }
 
     private fun <T : Any> loadFile(path: Path, loader: HoconConfigurationLoader, clazz: Class<T>): T {
@@ -100,6 +106,7 @@ class ConfigManager(private val dataFolder: Path) {
         config = Config()
         messages = MessagesConfig()
         storage = StorageConfig()
+        channels = ChannelsConfig()
     }
 
     fun saveConfig(): Boolean {
@@ -111,6 +118,7 @@ class ConfigManager(private val dataFolder: Path) {
             saveFile(configLoader, Config::class.java, config)
             saveFile(messagesLoader, MessagesConfig::class.java, messages)
             saveFile(storageLoader, StorageConfig::class.java, storage)
+            saveFile(channelsLoader, ChannelsConfig::class.java, channels)
             true
         } catch (e: Exception) {
             logger.error("Failed to save configurations", e)
@@ -140,6 +148,11 @@ class ConfigManager(private val dataFolder: Path) {
 
     fun updateStorage(newStorage: StorageConfig): Boolean {
         storage = newStorage
+        return saveAll()
+    }
+
+    fun updateChannels(newChannels: ChannelsConfig): Boolean {
+        channels = newChannels
         return saveAll()
     }
 }

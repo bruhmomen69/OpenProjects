@@ -11,27 +11,38 @@ data class ChannelsConfig(
     @field:Comment("When the user is in a channel with `allMessagesToChannel` enabled, disabling sending message to the no-channel global chat?")
     val channelOnly: Boolean = false,
 
+    @field:Comment(
+        "Force tab completion placeholder resolution to run on the main thread to avoid async access warnings.\n" +
+                "WARNING: This may cause tab completion delay during high server load.\n" +
+                "Only enable if you experience async access warnings in console logs.\n" +
+                "Default: false (recommended)"
+    )
+    val forceMainThreadForTabCompletion: Boolean = false,
+
     @field:Comment("Configure channel auto joining on login.")
-    val autoJoin: AutoJoinConfig,
+    val autoJoin: AutoJoinConfig = AutoJoinConfig(),
 
     @field:Comment(
         "List of channels in the order that the user should automatically join on login.\n" +
                 "Order in order of most privileged to least privileged. For example, admin chat first, and per world chat last.\n" +
                 "If multiple channels have the same permission and both have acceptable identifier statuses, the first one will be joined."
     )
-    val channels: List<ChannelConfig> = listOf(
-        ChannelConfig(
-            name = "placeholderapi_player_expansion_per_world_example",
-            displayName = "%player_world%",
-            commands = listOf("worldchat"),
-            identifierCreator = "%player_world%",
-            requireIdentifierToJoin = true,
-            identifierRefreshTicks = 10
-        ),
-        ChannelConfig()
-    )
+    val channels: List<ChannelConfig> = ArrayList(
+        listOf(
+            ChannelConfig(
+                name = "placeholderapi_player_expansion_per_world_example",
+                displayName = "%player_world%",
+                commands = listOf("worldchat"),
+                identifierCreator = "%player_world%",
+                requireIdentifierToJoin = true,
+                identifierRefreshTicks = 10
+            ),
+            ChannelConfig()
+        )
+    ),
 )
 
+@ConfigSerializable
 data class ChannelConfig(
     @field:Comment("Name of the channel. Must not contain spaces.")
     val name: String = "Example",
@@ -75,6 +86,7 @@ data class ChannelConfig(
     val groupFormats: List<ChannelChatFormatInstanceConfig> = listOf(ChannelChatFormatInstanceConfig())
 )
 
+@ConfigSerializable
 data class ChannelChatFormatInstanceConfig(
     @field:Comment(
         "Required rank for this. This works by checking if you have either of these permissions: `<formatPermissionPrefix>.<channel_name>`. \n" +
@@ -85,6 +97,7 @@ data class ChannelChatFormatInstanceConfig(
     val chatFormat: String = "<gray>[<gradient:white:aqua><player_name></gradient>]</gray> <gray><message></gray>",
 )
 
+@ConfigSerializable
 data class AutoJoinConfig(
     @field:Comment("Enable auto joining channels on login. Channels are tried (for permission and identifier) in the order they are specified in the channels list.")
     val enabled: Boolean = false,

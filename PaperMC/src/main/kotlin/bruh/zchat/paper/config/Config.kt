@@ -8,9 +8,6 @@ data class Config(
     @field:Comment("Chat formatting configuration including priorities and interactive toggles. For chat format templates, see messages.conf")
     val chatFormat: ChatFormatConfig = ChatFormatConfig(),
 
-    @field:Comment("Channel configuration including per-channel definitions and auto-join behavior")
-    val channels: ChannelsConfig = ChannelsConfig(autoJoin = AutoJoinConfig()),
-
     @field:Comment("Placeholder configuration for built-in placeholders, custom placeholders, and PlaceholderAPI integration")
     val placeholders: PlaceholderConfig = PlaceholderConfig(),
 

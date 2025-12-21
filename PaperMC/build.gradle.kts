@@ -61,6 +61,7 @@ dependencies {
 
     implementation(project(":utils"))
     implementation(libs.kotlinxSerialization)
+    implementation(libs.bundles.caching)
 }
 
 tasks {
