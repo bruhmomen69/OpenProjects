@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "lol.mcplugs.minimessagechatplugin"
-version = "1.2.2"
+version = "1.2.3"
 
 repositories {
     mavenCentral()
@@ -52,6 +52,7 @@ dependencies {
     compileOnly("com.mysql:mysql-connector-j:9.5.0")
     compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
     compileOnly("com.zaxxer:HikariCP:7.0.2")
+    compileOnly(libs.caffeine)
 
     implementation("io.lettuce:lettuce-core:7.2.1.RELEASE")
 
@@ -61,7 +62,6 @@ dependencies {
 
     implementation(project(":utils"))
     implementation(libs.kotlinxSerialization)
-    implementation(libs.bundles.caching)
 }
 
 tasks {

@@ -17,6 +17,7 @@ libraries:
   - com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.22.0
   - com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.22.0
   - io.projectreactor:reactor-core:3.8.1
+  - com.github.ben-manes.caffeine:caffeine:3.1.8
 
 softdepend:
   - PlaceholderAPI

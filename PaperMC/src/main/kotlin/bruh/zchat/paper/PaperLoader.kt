@@ -94,7 +94,8 @@ class PaperMCLoader : PluginLoader {
             "com.mysql:mysql-connector-j:9.5.0",
             "org.xerial:sqlite-jdbc:3.47.1.0",
             "com.zaxxer:HikariCP:7.0.2",
-            "io.projectreactor:reactor-core:3.8.1"
+            "io.projectreactor:reactor-core:3.8.1",
+            "com.github.ben-manes.caffeine:caffeine:3.1.8"
         )
     }
 }

@@ -71,6 +71,8 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onChannelCommand(event: PlayerCommandPreprocessEvent) {
+        if (!channelsConfig.enabled) return
+
         val raw = event.message
         if (!raw.startsWith("/")) return
 
@@ -149,6 +151,8 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.NORMAL)
     fun onAsyncTabComplete(event: AsyncTabCompleteEvent) {
+        if (!channelsConfig.enabled) return
+
         val sender = event.sender
         if (sender !is Player) return
 
