@@ -208,6 +208,11 @@ All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags
 | `zchat.format.moderator`       | false   | Use **Moderator** chat format       |
 | `zchat.format.vip`             | false   | Use **VIP** chat format             |
 | `zchat.message`                | true    | Send & receive private messages     |
+| `zchat.channel.use.list`       | true    | Use the `/channel list` command     |
+| `zchat.channel.use.join`       | true    | Use the `/channel join` command     |
+| `zchat.channel.use.leave`      | true    | Use the `/channel leave` command    |
+| `zchat.channel.use.focus`      | true    | Use the `/channel focus` command    |
+| `zchat.channel.use.who`        | true    | Use the `/channel who` command      |
 | `zchat.toggle`                 | true    | Parent of chat/message toggle perms |
 | `zchat.toggle.chat`            | true    | Toggle public chat                  |
 | `zchat.toggle.messages`        | true    | Toggle private messages             |

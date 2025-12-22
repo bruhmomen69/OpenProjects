@@ -49,8 +49,23 @@ data class ChannelConfig(
     @field:Comment("Display name of the channel. This is the name that will be displayed in the channel list.")
     val displayName: String = "<green>Example</green>",
     @field:Comment(
-        "The commands to use to join/leave this channel ingame (eg `sc` to use `/sc` for staff chat).\n" +
-                "When using these commands, add text after them to send a message to this channel only (eg `/sc hello this message ones goes to staff chat`."
+        """
+        The commands to interact with this channel (e.g., `sc` for `/sc` staff chat).
+
+        Behavior:
+        - Without arguments: Toggles channel membership (join/leave)
+        - With arguments: Sends message to channel without changing membership
+
+        Active Channel Rules:
+        1. Players can be in multiple channels but only one active at a time
+        2. Messages go to active channel when allMessagesToChannel=true
+        3. Active channel is automatically set when:
+           - First joining a channel with allMessagesToChannel=true
+           - During auto-join on login
+        4. Players can change active channel using channel commands
+        
+        Players can also switch their active channel channel using `/channel focus <channel_name>`.
+        """
     )
     val commands: List<String> = listOf("examplechat"),
     @field:Comment(
@@ -73,7 +88,8 @@ data class ChannelConfig(
     val identifierCreator: String = "",
     @field:Comment("Require the (placeholderapi replaced) identifier to be not blank to join the channel. Disabled if the raw identifier creator is empty.")
     val requireIdentifierToJoin: Boolean = false,
-    @field:Comment("Use the cross server messaging features from storage.conf to bridge this across servers. Redis transport is recommended if you use this.")
+    @field:Comment("Use the cross server messaging features from storage.conf to bridge this across servers. \n" +
+            "Redis transport is required to be setup for cross server messaging in storage.conf if you use this.")
     val crossServerBridge: Boolean = false,
     @field:Comment(
         "How often to refresh the identifier (in ticks). Set to 0 to disable. This is used to update the identifier when the player joins a new world, for example.\n" +

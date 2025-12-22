@@ -20,6 +20,7 @@ class ChannelCommands(
 ) {
 
     @Subcommand("list")
+    @CommandPermission("zchat.channel.use.list")
     fun list(actor: BukkitCommandActor) {
         val definitions = channelService.getDefinitions()
         if (definitions.isEmpty()) {
@@ -49,7 +50,7 @@ class ChannelCommands(
     }
 
     @Subcommand("join")
-    @CommandPermission("zchat.channel.use")
+    @CommandPermission("zchat.channel.use.join")
     fun join(actor: BukkitCommandActor, name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
@@ -79,7 +80,7 @@ class ChannelCommands(
     }
 
     @Subcommand("leave")
-    @CommandPermission("zchat.channel.use")
+    @CommandPermission("zchat.channel.use.leave")
     fun leave(actor: BukkitCommandActor, name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
@@ -101,7 +102,7 @@ class ChannelCommands(
     }
 
     @Subcommand("focus")
-    @CommandPermission("zchat.channel.use")
+    @CommandPermission("zchat.channel.use.focus")
     fun focus(actor: BukkitCommandActor, name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
@@ -119,7 +120,7 @@ class ChannelCommands(
     }
 
     @Subcommand("who")
-    @CommandPermission("zchat.channel.use")
+    @CommandPermission("zchat.channel.use.who")
     fun who(actor: BukkitCommandActor, name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
