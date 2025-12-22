@@ -81,6 +81,13 @@ data class ChannelConfig(
                 "On (per world chat) Example: Every message you sent is sent to the per world chat channel."
     )
     val allMessagesToChannel: Boolean = false,
+    @field:Comment(
+        "When sending a message to this channel using a command (e.g., `/sc message here`), should this channel automatically become your active channel?\n" +
+                "If enabled, sending a message to this channel will set it as your active channel, meaning subsequent messages (if allMessagesToChannel is enabled) will go to this channel.\n" +
+                "This only affects message sending via commands, not channel toggle behavior.\n" +
+                "Default: false"
+    )
+    val autoFocusOnMessage: Boolean = false,
     @field:Comment("Required permission to join this channel. Leave empty for no permission.")
     val requiredPermission: String = "",
     @field:Comment(
