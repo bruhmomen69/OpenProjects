@@ -109,7 +109,7 @@ class ChannelCommandListener(
         // Message provided -> force one-shot channel-only route
         channelService.forceNextMessageToChannel(player, instance, channelOnly = true)
         // Set as active channel if autoFocusOnMessage is enabled
-        if (definition.autoFocusOnMessage) {
+        if (definition.autoFocusOnMessage && channelService.isMember(player, instance)) {
             channelService.setActiveInstance(player, instance)
         }
         event.isCancelled = true
