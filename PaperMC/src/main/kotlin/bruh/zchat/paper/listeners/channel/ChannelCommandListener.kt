@@ -1,14 +1,16 @@
-package bruh.zchat.paper.listeners
+package bruh.zchat.paper.listeners.channel
 
 import bruh.zchat.paper.config.ChannelsConfig
 import bruh.zchat.paper.config.MessagesConfig
+import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.ChannelService
 import bruh.zchat.paper.services.MessageFormattingService
-import bruh.zchat.paper.enums.MessageKey
+import com.destroystokyo.paper.event.brigadier.AsyncPlayerSendSuggestionsEvent
 import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
+import com.mojang.brigadier.suggestion.Suggestion
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
@@ -18,6 +20,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerCommandPreprocessEvent
+import org.bukkit.event.player.PlayerCommandSendEvent
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -34,7 +37,7 @@ class ChannelCommandListener(
     private val messageFormattingService: MessageFormattingService,
     private val channelsConfig: ChannelsConfig,
     private val messagesConfig: MessagesConfig,
-    private val plugin: JavaPlugin
+    private val plugin: JavaPlugin,
 ) : Listener {
 
     // Caffeine caches for performance
@@ -109,7 +112,8 @@ class ChannelCommandListener(
                     explicit = true
                 )
             if (success) {
-                val messageKey = if (joinedBefore) MessageKey.CHANNELS_CHANNEL_LEFT_TOGGLE else MessageKey.CHANNELS_CHANNEL_JOINED_TOGGLE
+                val messageKey =
+                    if (joinedBefore) MessageKey.CHANNELS_CHANNEL_LEFT_TOGGLE else MessageKey.CHANNELS_CHANNEL_JOINED_TOGGLE
                 val channelDisplayName = messageFormattingService.formatMessage(
                     definition.displayName,
                     player,
@@ -130,7 +134,8 @@ class ChannelCommandListener(
                     )
                 )
             } else {
-                val messageKey = if (joinedBefore) MessageKey.CHANNELS_CHANNEL_TOGGLE_LEAVE_FAILED else MessageKey.CHANNELS_CHANNEL_TOGGLE_JOIN_FAILED
+                val messageKey =
+                    if (joinedBefore) MessageKey.CHANNELS_CHANNEL_TOGGLE_LEAVE_FAILED else MessageKey.CHANNELS_CHANNEL_TOGGLE_JOIN_FAILED
                 player.sendMessage(
                     messageFormattingService.getConfigMessage(
                         messageKey,
@@ -150,14 +155,29 @@ class ChannelCommandListener(
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
-    fun onAsyncTabComplete(event: AsyncTabCompleteEvent) {
+    fun onCommandList(event: PlayerCommandSendEvent) {
         if (!channelsConfig.enabled) return
 
-        val sender = event.sender
-        if (sender !is Player) return
+        channelService
+            .getDefinitions()
+            .filter { it.requiredPermission.isBlank() || event.player.hasPermission(it.requiredPermission) }
+            .forEach { definition ->
+                definition.commands.forEach { cmdStr ->
+                    event.commands.add(cmdStr)
+                }
+            }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL)
+    fun onCommandList(event: AsyncPlayerSendSuggestionsEvent) {
+        if (!channelsConfig.enabled) return
+        
+        val sender = event.player
 
         val buffer = event.buffer
-        if (!event.isCommand || !buffer.startsWith("/")) return
+        if (!buffer.startsWith("/")) {
+            return
+        }
 
         // Parse command buffer safely
         val parts = parseCommandBuffer(buffer)
@@ -169,12 +189,10 @@ class ChannelCommandListener(
         if (!isChannelCommand(command)) return
 
         // Generate appropriate completions
-        val completions = generateCompletions(sender, parts)
-        completions.addAll(event.completions())
-
-        // Set rich completions with tooltips
-        event.completions(completions)
-        event.isHandled = true
+        val completions = generateCompletions(sender, parts).map {
+            Suggestion(event.suggestions.range, it.suggestion())
+        }
+        event.suggestions.list.addAll(completions)
     }
 
     private fun parseCommandBuffer(buffer: String): List<String> {

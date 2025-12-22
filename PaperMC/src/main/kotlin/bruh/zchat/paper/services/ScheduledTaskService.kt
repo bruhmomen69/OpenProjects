@@ -56,7 +56,7 @@ class ScheduledTaskService(
         if (!config.enabled) return
         val isRedisBackend = config.backend.equals("redis", ignoreCase = true)
         if (isRedisBackend) {
-            logger.info("Cross-server messaging using Redis backend; skipping SQL poll/reclaim tasks")
+            logger.debug("Cross-server messaging using Redis backend; skipping SQL poll/reclaim tasks")
             return
         }
         

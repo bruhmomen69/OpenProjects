@@ -1,4 +1,4 @@
-package bruh.zchat.paper.listeners
+package bruh.zchat.paper.listeners.playerstatus
 
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager

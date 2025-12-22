@@ -146,7 +146,7 @@ class CrossServerMessageBusService(
 
         runCatching {
             pubSub.sync().subscribe(redisChannel, redisChannelBroadcast)
-            logger.info("Redis message bus subscribed to $redisChannel and $redisChannelBroadcast")
+            logger.debug("Redis message bus subscribed to $redisChannel and $redisChannelBroadcast")
         }.onFailure { ex ->
             logger.error("Failed to subscribe to Redis channels $redisChannel / $redisChannelBroadcast", ex)
         }
