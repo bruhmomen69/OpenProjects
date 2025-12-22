@@ -116,12 +116,11 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
     /**
      * Process a single PlaceholderAPI placeholder
      */
-    private fun processPlaceholderAPI(player: Player, placeholder: String): String {
+    fun processPlaceholderAPI(player: Player, placeholder: String): String {
         return try {
-            // Use reflection to call PlaceholderAPI.setPlaceholders safely
             PlaceholderAPI.setPlaceholders(player, placeholder)
         } catch (e: Exception) {
-            logger.debug("Failed to process PlaceholderAPI placeholder '$placeholder' for player ${player.name}: ${e.message}")
+            logger.warn("Failed to process PlaceholderAPI placeholder '$placeholder' for player ${player.name}: ${e.message}")
             placeholder // Return original if processing fails
         }
     }

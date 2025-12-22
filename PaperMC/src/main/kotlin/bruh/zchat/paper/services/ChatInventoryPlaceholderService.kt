@@ -35,7 +35,8 @@ class ChatInventoryPlaceholderService(
     private val configManager: ConfigManager,
     private val messageFormattingService: MessageFormattingService,
     private val snapshotStore: InventorySnapshotStore,
-    private val serverInstanceId: String
+    private val serverInstanceId: String,
+    private val placeholderAPIService: PlaceholderAPIService? = null
 ) {
     private val logger = LoggerFactory.getLogger(ChatInventoryPlaceholderService::class.java)
 
@@ -224,8 +225,24 @@ class ChatInventoryPlaceholderService(
         val hoverText = getHoverText(player, type)
 
         val clickAction = when (type) {
-            PlaceholderType.POS -> ClickEvent.suggestCommand("/tp ${player.location.blockX} ${player.location.blockY} ${player.location.blockZ}")
-            PlaceholderType.HEALTH -> ClickEvent.suggestCommand("/effect give ${player.name} ")
+            PlaceholderType.POS -> {
+                val config = configManager.config.inventoryPlaceholders.clickActions
+                val command = replacePlaceholders(config.positionCommand, player)
+                if (config.positionActionType == "suggest") {
+                    ClickEvent.suggestCommand(command)
+                } else {
+                    ClickEvent.runCommand(command)
+                }
+            }
+            PlaceholderType.HEALTH -> {
+                val config = configManager.config.inventoryPlaceholders.clickActions
+                val command = replacePlaceholders(config.healthCommand, player)
+                if (config.healthActionType == "suggest") {
+                    ClickEvent.suggestCommand(command)
+                } else {
+                    ClickEvent.runCommand(command)
+                }
+            }
             else -> null
         }
 
@@ -516,6 +533,26 @@ class ChatInventoryPlaceholderService(
             expiresAtEpochMs = expiresAt,
             snapshot = snapshot
         )
+    }
+
+    /**
+     * Replaces placeholders in click command strings
+     */
+    private fun replacePlaceholders(command: String, player: Player): String {
+        val loc = player.location
+        var result = command
+            .replace("{player}", player.name)
+            .replace("{x}", loc.blockX.toString())
+            .replace("{y}", loc.blockY.toString())
+            .replace("{z}", loc.blockZ.toString())
+            .replace("{world}", loc.world?.name ?: "Unknown")
+        
+        // Process PlaceholderAPI placeholders if available
+        if (placeholderAPIService != null && placeholderAPIService.isEnabled()) {
+            result = placeholderAPIService.processPlaceholderAPI(player, result)
+        }
+        
+        return result
     }
 
     private fun cloneItems(items: Array<ItemStack?>): Array<ItemStack?> {

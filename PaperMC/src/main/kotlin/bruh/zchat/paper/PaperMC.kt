@@ -106,7 +106,8 @@ class PaperMC : SuspendingJavaPlugin() {
             configManager,
             messageFormattingService,
             inventorySnapshotStore,
-            serverInstanceId
+            serverInstanceId,
+            placeholderAPIService
         )
         chatToggleService = ChatToggleService(this, configManager, messageFormattingService, playerDataManager)
         socialSpyService = SocialSpyService(configManager, messageFormattingService)

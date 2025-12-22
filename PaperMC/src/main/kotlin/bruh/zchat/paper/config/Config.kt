@@ -237,7 +237,10 @@ data class InventoryPlaceholderConfig(
     val snapshotRetentionMinutes: Int = 60,
     
     @field:Comment("Maximum number of items to show in hover preview.")
-    val maxPreviewItems: Int = 5
+    val maxPreviewItems: Int = 5,
+    
+    @field:Comment("Click action configuration for different placeholder types.")
+    val clickActions: ClickActionsConfig = ClickActionsConfig()
 )
 
 @ConfigSerializable
@@ -368,6 +371,23 @@ data class AlertConfig(
     
     @field:Comment("Maximum alerts per minute per player.")
     val maxAlertsPerMinute: Int = 3
+)
+
+@ConfigSerializable
+data class ClickActionsConfig(
+    @field:Comment("Click command for position placeholder. Built-in placeholders: {player}, {x}, {y}, {z}, {world}. " +
+            "If PlaceholderAPI is enabled, you can also use any %placeholder% from PlaceholderAPI (e.g., %player_health%, %player_level%).")
+    val positionCommand: String = "/tp {x} {y} {z}",
+    
+    @field:Comment("Click command for health placeholder. Built-in placeholders: {player}. " +
+            "If PlaceholderAPI is enabled, you can also use any %placeholder% from PlaceholderAPI (e.g., %player_health%, %player_food%).")
+    val healthCommand: String = "/effect give {player} ",
+    
+    @field:Comment("Click action type for position. Can be 'suggest' (places command in chat) or 'run' (executes command directly).")
+    val positionActionType: String = "suggest",
+    
+    @field:Comment("Click action type for health. Can be 'suggest' (places command in chat) or 'run' (executes command directly).")
+    val healthActionType: String = "suggest"
 )
 
 @ConfigSerializable
