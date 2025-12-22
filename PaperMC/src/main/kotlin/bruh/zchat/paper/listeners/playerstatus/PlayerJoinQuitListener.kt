@@ -7,7 +7,7 @@ import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.ChatToggleService
 import bruh.zchat.paper.services.MessageFormattingService
-import bruh.zchat.paper.services.ChannelService
+import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.utils.MessageEnhancer
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers

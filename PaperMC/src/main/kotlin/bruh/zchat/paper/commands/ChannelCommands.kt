@@ -1,12 +1,9 @@
 package bruh.zchat.paper.commands
 
 import bruh.zchat.paper.config.ConfigManager
-import bruh.zchat.paper.services.ChannelService
+import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.services.MessageFormattingService
-import bruh.zchat.paper.services.ChannelRouting
-import bruh.zchat.paper.services.ChannelInstanceKey
 import bruh.zchat.paper.enums.MessageKey
-import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor

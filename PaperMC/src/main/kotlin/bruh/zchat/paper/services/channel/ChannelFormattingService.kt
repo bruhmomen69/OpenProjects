@@ -1,6 +1,7 @@
-package bruh.zchat.paper.services
+package bruh.zchat.paper.services.channel
 
 import bruh.zchat.paper.config.ConfigManager
+import bruh.zchat.paper.services.MessageFormattingService
 import net.kyori.adventure.audience.Audience
 import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player

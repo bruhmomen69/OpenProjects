@@ -3,6 +3,7 @@ package bruh.zchat.paper.services
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.DatabaseMaintenanceService
 import bruh.zchat.paper.database.PlayerDataManager
+import bruh.zchat.paper.services.channel.ChannelService
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
 import org.bukkit.Bukkit

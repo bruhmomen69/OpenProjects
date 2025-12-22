@@ -10,6 +10,8 @@ import bruh.zchat.paper.listeners.playerstatus.PlayerDeathListener
 import bruh.zchat.paper.listeners.playerstatus.PlayerJoinQuitListener
 import bruh.zchat.paper.services.*
 import bruh.zchat.paper.services.AlertService
+import bruh.zchat.paper.services.channel.ChannelFormattingService
+import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.services.snapshots.FileInventorySnapshotStore
 import bruh.zchat.paper.services.snapshots.InventorySnapshotStore
 import bruh.zchat.paper.services.snapshots.RedisInventorySnapshotStore
@@ -48,6 +50,7 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var blockMigrationService: BlockMigrationService
     private lateinit var inventorySnapshotStore: InventorySnapshotStore
     private lateinit var lamp: Lamp<*>
+    private lateinit var channelCommandService: ChannelCommandService
     
     // Server instance ID for cross-server messaging
     val serverInstanceId = java.util.UUID.randomUUID().toString()
@@ -138,6 +141,15 @@ class PaperMC : SuspendingJavaPlugin() {
         swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
         blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
 
+        // Initialize ChannelCommandService
+        channelCommandService = ChannelCommandService(
+            channelService,
+            messageFormattingService,
+            configManager.channels,
+            configManager.messages,
+            this
+        )
+
         // Initialize maintenance services
         databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, dbConfig)
         scheduledTaskService = ScheduledTaskService(this, configManager, databaseMaintenanceService, playerDataManager, crossServerMessageBusService, channelService)
@@ -195,7 +207,7 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Initialize command framework
         lamp = BukkitLamp.builder(this).build()
-
+        
         // Register commands
         val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService, alertService)
         lamp.register(commands)
@@ -270,6 +282,7 @@ class PaperMC : SuspendingJavaPlugin() {
                 messageFormattingService,
                 configManager.channels,
                 configManager.messages,
+                channelCommandService,
                 this
             ), this
         )

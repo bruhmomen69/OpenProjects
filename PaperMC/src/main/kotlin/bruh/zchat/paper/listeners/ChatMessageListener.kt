@@ -5,6 +5,9 @@ import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.*
 import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.services.CrossServerMessageBusService
+import bruh.zchat.paper.services.channel.ChannelFormattingService
+import bruh.zchat.paper.services.channel.ChannelRouting
+import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.swearfilter.SwearFilterService
 import com.github.shynixn.mccoroutine.folia.launch
 import io.papermc.paper.event.player.AsyncChatEvent

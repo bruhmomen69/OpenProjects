@@ -1,9 +1,10 @@
-package bruh.zchat.paper.services
+package bruh.zchat.paper.services.channel
 
 import bruh.zchat.paper.config.ChannelConfig
 import bruh.zchat.paper.config.ChannelsConfig
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.ChannelChatFormatInstanceConfig
+import bruh.zchat.paper.services.PlaceholderAPIService
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
