@@ -206,6 +206,7 @@ The swear filter provides advanced profanity detection with configurable punishm
 2. Edit `plugins/ZealousChat/config.conf` – changes can be reloaded with `/zealouschat reload`.
 3. (Optional) Configure database settings in `plugins/ZealousChat/database.conf` and messages in `plugins/ZealousChat/messages.conf`.
 4. Grant players a format permission such as `zchat.format.vip` or allow colours with `zchat.color`.
+5. Send `[inv]`, `[hand]`, `[ender]`, `[health]` and `[pos]` in chat messages to display inventory information.
 
 ## Placeholders
 All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags when the plugin is present.
