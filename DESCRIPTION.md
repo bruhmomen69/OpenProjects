@@ -1,6 +1,9 @@
 # ZealousChat
 *A modern, MiniMessage-powered chat formatter for Paper & Spigot servers*
 
+<details>
+<summary>Technical introduction</summary>
+
 ZealousChat replaces Vanilla chat with a fully configurable system built on the Paper's high performance **AsyncChatEvent** and **MiniMessage** components.  It ships with rank/world specific formats, private messaging, inventory placeholders and a granular permission model – all while remaining light-weight and production ready.
 
 ---
@@ -13,12 +16,18 @@ ZealousChat replaces Vanilla chat with a fully configurable system built on the 
 - **Chat / Message toggles** per-player (with staff bypass)
 - **Inventory placeholders** `[inv]`, `[ender]`, `[armor]`, `[hand]`, `[pos]`, `[health]`
 - **URL auto-linking** & **@mentions** (configurable)
-- **Advanced swear filter** with regex and fuzzy (Levenshtein) matching
-- **Tiered punishment system** with configurable infraction thresholds
+- **Advanced swear filter** with regex and fuzzy matching, with a tiered punishment system.
 - **Database-backed infraction tracking** with caching for performance
 - **PlaceholderAPI bridge** (optional soft-depend)
 - **Hot-reloadable** plugin configurations (`/zchat reload`)
 - **Customizable Messages** for all messages used within the plugin.
+
+</details>
+
+ZealousChat is a high performance, 1.20.4+ chat plugin that uses configurable MiniMessage-based formats to format chat messages. ZealousChat includes many extra features other plugins leave out, for example the ability to send a read-only view of your inventory in chat, custom /msg messaging, click/hover messages on messages, @messages and more.
+ZealousChat also has special features for server networks, such as cross-server private messaging, and cross server chat channels (for staffchat and similar).
+
+ZealousChat implements all of its features using the Paper API, and is designed to be as efficient as possible.
 
 ## Commands
 

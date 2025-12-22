@@ -1,5 +1,6 @@
 package bruh.zchat.paper.utils.streaming
 
+import org.bukkit.Material
 import org.bukkit.configuration.serialization.ConfigurationSerializable
 import org.bukkit.configuration.serialization.ConfigurationSerialization
 import org.bukkit.inventory.ItemStack
@@ -44,7 +45,10 @@ class BukkitObjectInputStream : ObjectInputStream {
         var obj: Any? = obj
 
         when (obj) {
-            is ItemStackByteWrapper -> obj = ItemStack.deserializeBytes(obj.data)
+            is ItemStackByteWrapper -> {
+                obj = if (obj.data[0] == 255.toByte()) ItemStack.of(Material.AIR)
+                else ItemStack.deserializeBytes(obj.data)
+            }
             is SectionWrapper -> obj = ConfigurationSerialization.deserializeObject(obj.map)
         }
 

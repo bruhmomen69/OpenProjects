@@ -1,5 +1,6 @@
 package bruh.zchat.paper.utils.streaming
 
+import org.bukkit.Material
 import org.bukkit.configuration.serialization.ConfigurationSerializable
 import org.bukkit.configuration.serialization.ConfigurationSerialization
 import org.bukkit.inventory.ItemStack
@@ -46,7 +47,17 @@ class BukkitObjectOutputStream : ObjectOutputStream {
 
         if (obj !is Serializable ) {
             when (obj) {
-                is ItemStack -> obj = ItemStackByteWrapper(obj.serializeAsBytes())
+                is ItemStack -> {
+                    if (obj.type == Material.AIR) {
+                        obj = ByteArray(1)
+                        obj[0] = 255.toByte()
+                        obj = ItemStackByteWrapper(obj)
+                    } else {
+                        obj = ItemStackByteWrapper(
+                            obj.serializeAsBytes()
+                        )
+                    }
+                }
                 is ConfigurationSerializable -> obj = SectionWrapper(obj.serialize())
             }
         }

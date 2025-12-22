@@ -171,7 +171,7 @@ data class DeathMessages(
 data class AdvancementMessages(
     @field:Comment("Custom advancement message formats mapped by advancement key")
     val messages: Map<String, String> = mapOf(
-        "story/mine_stone" to "<player_name> just mined their first stone!"
+        "story/mine_stone" to "<gray>🎯</gray> <green><player_name></green> just mined their first stone!"
     ),
     
     @field:Comment("Default advancement message format")
@@ -293,7 +293,7 @@ data class InventoryPlaceholderMessages(
     val inventoryHoverFormat: String = "<gradient:gold:yellow><b><player>'s <type></b></gradient>\n<gradient:gray:dark_gray>Click to view</gradient>\n\n<preview>",
     
     @field:Comment("Hover text format for position placeholder")
-    val positionHoverFormat: String = "<gradient:yellow:gold><b><player>'s Location</b></gradient>\n<gradient:gray:dark_gray>World: <gradient:aqua:light_purple><world></gradient></gradient>\n<gradient:gray:dark_gray>Biome: <gradient:green:dark_green><biome></gradient></gradient>\n<gradient:gray:dark_gray>Coordinates: <gradient:white:gray><x>, <y>, <z></gradient></gradient>\n<gradient:gray:dark_gray>Click to get directions</gradient>",
+    val positionHoverFormat: String = "<gradient:yellow:gold><b><player>'s Location</b></gradient>\n<gradient:gray:dark_gray>World: <gradient:aqua:light_purple><world></gradient></gradient>\n<gradient:gray:dark_gray>Biome: <gradient:green:dark_green><biome></gradient></gradient>\n<gradient:gray:dark_gray>Coordinates: <gradient:white:gray><x>, <y>, <z></gradient></gradient>\n<gradient:gray:dark_gray>Click to to tpa</gradient>",
     
     @field:Comment("Hover text format for health placeholder")
     val healthHoverFormat: String = "<gradient:yellow:gold><b><player>'s Status</b></gradient>\n<gradient:red:dark_red>❤ <gradient:white:gray><health>/<max_health></gradient> Health</gradient>\n<gradient:gold:yellow>🍖 <gradient:white:gray><food>/20</gradient> Food</gradient>\n<gradient:yellow:gold>⚡ <gradient:white:gray><saturation></gradient> Saturation</gradient>\n<effects>",
