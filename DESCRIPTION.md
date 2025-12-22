@@ -78,7 +78,7 @@ ZealousChat replaces Vanilla chat with a fully configurable system built on the 
 
 #### Cross-server private messages
 
-When using a **MySQL** database, ZealousChat can deliver private messages across multiple Paper servers on the same network.
+When you enable cross-server messaging in storage.conf (requires a MySQL or Redis database), ZealousChat can deliver private messages across multiple Paper servers on the same network.
 
 - `/msg` will attempt cross-server delivery when the target is online on another server
 - `/reply` also supports cross-server targets
@@ -93,6 +93,26 @@ When using a **MySQL** database, ZealousChat can deliver private messages across
   - Permission: `zchat.socialspy`
 - `/zealouschat toggle status` — View your current chat & private message status
   - Permission: `zchat.status`
+
+### Channel Commands
+- `/channel list` — List all available channels
+  - Permission: `zchat.channel.use.list`
+- `/channel join <channel>` — Join a channel
+  - Permission: `zchat.channel.use.join`
+  - Parameters:
+    - `<channel>`: Channel name
+- `/channel leave <channel>` — Leave a channel
+  - Permission: `zchat.channel.use.leave`
+  - Parameters:
+    - `<channel>`: Channel name
+- `/channel focus <channel>` — Set a channel as the active channel (where your messages go by default)
+  - Permission: `zchat.channel.use.focus`
+  - Parameters:
+    - `<channel>`: Channel name
+- `/channel who <channel>` — List members in a channel
+  - Permission: `zchat.channel.use.who`
+  - Parameters:
+    - `<channel>`: Channel name
 
 ## Swear Filter System
 

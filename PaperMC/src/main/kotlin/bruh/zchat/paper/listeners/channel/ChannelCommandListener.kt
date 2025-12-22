@@ -14,7 +14,6 @@ import com.mojang.brigadier.suggestion.Suggestion
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -171,7 +170,7 @@ class ChannelCommandListener(
     @EventHandler(priority = EventPriority.NORMAL)
     fun onCommandList(event: AsyncPlayerSendSuggestionsEvent) {
         if (!channelsConfig.enabled) return
-        
+
         val sender = event.player
 
         val buffer = event.buffer
@@ -193,6 +192,37 @@ class ChannelCommandListener(
             Suggestion(event.suggestions.range, it.suggestion())
         }
         event.suggestions.list.addAll(completions)
+    }
+
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun onAsyncTabComplete(event: AsyncTabCompleteEvent) {
+        if (!channelsConfig.enabled) return
+
+        val sender = event.sender
+        if (sender !is Player) return
+
+        val buffer = event.buffer
+        if (!event.isCommand || !buffer.startsWith("/")) return
+
+        // Parse command buffer safely
+        val parts = parseCommandBuffer(buffer)
+        if (parts.isEmpty()) return
+
+        val command = parts[0].lowercase()
+
+        // Check if this is a channel command we handle
+        if (!isChannelCommand(command)) return
+
+        // Generate appropriate completions
+        val completions = generateCompletions(sender, parts)
+        completions.addAll(event.completions())
+
+        // Set rich completions with tooltips
+        event.completions(completions)
+        if (completions.isNotEmpty()) {
+            event.isHandled = true
+        }
     }
 
     private fun parseCommandBuffer(buffer: String): List<String> {
@@ -317,12 +347,17 @@ class ChannelCommandListener(
             }
             .flatMap { def ->
                 def.commands.map { cmd ->
-                    AsyncTabCompleteEvent.Completion.completion(
-                        cmd, Component.text()
-                            .append(Component.text(def.displayName, NamedTextColor.GREEN))
-                            .append(Component.text(" - ${def.nameKey}", NamedTextColor.GRAY))
-                            .build()
+                    val tooltip = messageFormattingService.formatMessage(
+                        messagesConfig.channels.tabChannelTooltipFormat,
+                        player,
+                        mapOf(
+                            "channel_display_name" to def.displayName,
+                            "channel_name_key" to def.nameKey
+                        ),
+                        processUrls = false,
+                        processMentions = false
                     )
+                    AsyncTabCompleteEvent.Completion.completion(cmd, tooltip)
                 }
             }
             .filter { completion -> completion.suggestion().startsWith(partial) }
@@ -365,19 +400,18 @@ class ChannelCommandListener(
         val completions = player.server.onlinePlayers
             .filter { other -> player.canSee(other) }
             .map { onlinePlayer ->
-                AsyncTabCompleteEvent.Completion.completion(
-                    onlinePlayer.name, Component.text()
-                        .append(Component.text(onlinePlayer.name, NamedTextColor.WHITE))
-                        .append(Component.text(" - ", NamedTextColor.GRAY))
-                        .append(Component.text(onlinePlayer.location.world.name, NamedTextColor.AQUA))
-                        .append(
-                            if (onlinePlayer.isOp) Component.text(
-                                " [OP]",
-                                NamedTextColor.RED
-                            ) else Component.empty()
-                        )
-                        .build()
+                val tooltip = messageFormattingService.formatMessage(
+                    messagesConfig.channels.tabPlayerTooltipFormat,
+                    player,
+                    mapOf(
+                        "player_name" to onlinePlayer.name,
+                        "world" to onlinePlayer.location.world.name,
+                        "op" to if (onlinePlayer.isOp) " [OP]" else ""
+                    ),
+                    processUrls = false,
+                    processMentions = false
                 )
+                AsyncTabCompleteEvent.Completion.completion(onlinePlayer.name, tooltip)
             }
             .filter { completion -> completion.suggestion().lowercase().startsWith(partial.lowercase()) }
             .sortedBy { it.suggestion() }

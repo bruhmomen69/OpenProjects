@@ -524,5 +524,11 @@ data class ChannelMessages(
     val tabChannelTooltip: String = "Channel command",
     
     @field:Comment("Tab completion tooltip for online players")
-    val tabPlayerTooltip: String = "Online player"
+    val tabPlayerTooltip: String = "Online player",
+    
+    @field:Comment("Tab completion tooltip format for channel commands")
+    val tabChannelTooltipFormat: String = "<green><channel_display_name></green> - <gray><channel_name_key></gray>",
+    
+    @field:Comment("Tab completion tooltip format for online players")
+    val tabPlayerTooltipFormat: String = "<white><player_name></white> - <aqua><world></aqua><op>",
 )
