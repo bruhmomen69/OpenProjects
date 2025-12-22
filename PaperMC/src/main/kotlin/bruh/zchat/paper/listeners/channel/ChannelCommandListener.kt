@@ -1,6 +1,6 @@
 package bruh.zchat.paper.listeners.channel
 
-import bruh.zchat.paper.config.ChannelsConfig
+import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.MessagesConfig
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.ChannelCommandService
@@ -20,12 +20,11 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerCommandPreprocessEvent
 import org.bukkit.event.player.PlayerCommandSendEvent
 import org.bukkit.plugin.java.JavaPlugin
-import java.util.*
 
 class ChannelCommandListener(
     private val channelService: ChannelService,
     private val messageFormattingService: MessageFormattingService,
-    private val channelsConfig: ChannelsConfig,
+    private val configManager: ConfigManager,
     private val messagesConfig: MessagesConfig,
     private val channelCommandService: ChannelCommandService,
     private val plugin: JavaPlugin,
@@ -33,7 +32,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onChannelCommand(event: PlayerCommandPreprocessEvent) {
-        if (!channelsConfig.enabled) return
+        if (!configManager.channels.enabled) return
 
         val raw = event.message
         if (!raw.startsWith("/")) return
@@ -115,7 +114,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.NORMAL)
     fun onCommandList(event: PlayerCommandSendEvent) {
-        if (!channelsConfig.enabled) return
+        if (!configManager.channels.enabled) return
 
         channelService
             .getDefinitions()
@@ -129,7 +128,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.NORMAL)
     fun onCommandList(event: AsyncPlayerSendSuggestionsEvent) {
-        if (!channelsConfig.enabled) return
+        if (!configManager.channels.enabled) return
 
         val sender = event.player
 
@@ -156,7 +155,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.MONITOR)
     fun onAsyncTabComplete(event: AsyncTabCompleteEvent) {
-        if (!channelsConfig.enabled) return
+        if (!configManager.channels.enabled) return
 
         val sender = event.sender
         if (sender !is Player) return
@@ -188,7 +187,7 @@ class ChannelCommandListener(
         player: Player,
         parts: List<String>
     ): MutableList<AsyncTabCompleteEvent.Completion> {
-        return if (channelsConfig.forceMainThreadForTabCompletion && parts.size == 1) {
+        return if (configManager.channels.forceMainThreadForTabCompletion && parts.size == 1) {
             runBlocking {
                 withContext(plugin.entityDispatcher(player)) {
                     channelCommandService.generateCompletions(player, parts)

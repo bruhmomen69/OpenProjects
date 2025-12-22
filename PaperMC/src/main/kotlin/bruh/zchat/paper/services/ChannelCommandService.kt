@@ -1,6 +1,7 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.config.ChannelsConfig
+import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.MessagesConfig
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.channel.ChannelService
@@ -19,7 +20,7 @@ import java.util.concurrent.TimeUnit
 class ChannelCommandService(
     private val channelService: ChannelService,
     private val messageFormattingService: MessageFormattingService,
-    val channelsConfig: ChannelsConfig,
+    private val configManager: ConfigManager,
     private val messagesConfig: MessagesConfig,
     private val plugin: JavaPlugin
 ) {
@@ -242,7 +243,7 @@ class ChannelCommandService(
     }
 
     fun updateChannelsCommandAlias() {
-        val allCommands = channelsConfig.channels.flatMap { it.commands }
-        Bukkit.getServer().commandAliases.set("channels", allCommands.toTypedArray())
+        val allCommands = configManager.channels.channels.flatMap { it.commands }
+        Bukkit.getServer().commandAliases.put("channels", allCommands.toTypedArray())
     }
 }
