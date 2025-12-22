@@ -9,6 +9,8 @@ import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent.Completion
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import net.kyori.adventure.text.Component
+import org.bukkit.Bukkit
+import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.*
@@ -237,5 +239,10 @@ class ChannelCommandService(
         )
 
         return completions.toMutableList()
+    }
+
+    fun updateChannelsCommandAlias() {
+        val allCommands = channelsConfig.channels.flatMap { it.commands }
+        Bukkit.getServer().commandAliases.set("channels", allCommands.toTypedArray())
     }
 }

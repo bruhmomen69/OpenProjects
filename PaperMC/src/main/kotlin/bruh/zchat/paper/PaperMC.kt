@@ -149,6 +149,9 @@ class PaperMC : SuspendingJavaPlugin() {
             configManager.messages,
             this
         )
+        
+        // Set channel command aliases
+        channelCommandService.updateChannelsCommandAlias()
 
         // Initialize maintenance services
         databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, dbConfig)
@@ -209,7 +212,7 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp = BukkitLamp.builder(this).build()
 
         // Register commands
-        val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService, alertService)
+        val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService, alertService, channelCommandService)
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))

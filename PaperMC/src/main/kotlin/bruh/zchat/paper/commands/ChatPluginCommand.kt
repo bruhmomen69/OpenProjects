@@ -3,6 +3,7 @@ package bruh.zchat.paper.commands
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.AlertService
+import bruh.zchat.paper.services.ChannelCommandService
 import bruh.zchat.paper.services.ChatFormattingService
 import bruh.zchat.paper.services.MessageFormattingService
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -17,7 +18,8 @@ class ChatPluginCommands(
     private val configManager: ConfigManager,
     private val chatFormattingService: ChatFormattingService,
     private val messageFormattingService: MessageFormattingService,
-    private val alertService: AlertService
+    private val alertService: AlertService,
+    private val channelCommandService: ChannelCommandService
 ) {
 
     @Subcommand("reload")
@@ -27,6 +29,7 @@ class ChatPluginCommands(
         if (success) {
             chatFormattingService.reloadPlaceholders()
             alertService.reload()
+            channelCommandService.updateChannelsCommandAlias()
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_SUCCESS))
         } else {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_FAILED))
