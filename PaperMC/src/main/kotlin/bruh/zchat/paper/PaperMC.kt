@@ -207,13 +207,16 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Initialize command framework
         lamp = BukkitLamp.builder(this).build()
-        
+
         // Register commands
         val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService, alertService)
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
-        lamp.register(bruh.zchat.paper.commands.ChannelCommands(configManager, channelService, messageFormattingService))
+
+        if (configManager.channels.enabled) {
+            lamp.register(ChannelCommands(configManager, channelService, messageFormattingService))
+        }
 
         // Register private message commands
         lamp.register(MessageCommand(privateMessageService, messageFormattingService, this))

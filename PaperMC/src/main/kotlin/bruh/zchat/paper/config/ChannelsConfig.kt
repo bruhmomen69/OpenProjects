@@ -5,7 +5,8 @@ import org.spongepowered.configurate.objectmapping.meta.Comment
 
 @ConfigSerializable
 data class ChannelsConfig(
-    @field:Comment("Use channels at all? Disabled by default as most servers do not need them.")
+    @field:Comment("Use channels at all? Disabled by default as most servers do not need them.\n" +
+            "WARNING: You must reboot your server for changes to this setting to take effect.")
     val enabled: Boolean = false,
 
     @field:Comment("When the user is in a channel with `allMessagesToChannel` enabled, disabling sending message to the no-channel global chat?")
