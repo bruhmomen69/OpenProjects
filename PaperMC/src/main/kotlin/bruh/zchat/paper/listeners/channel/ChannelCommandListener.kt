@@ -32,7 +32,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onChannelCommand(event: PlayerCommandPreprocessEvent) {
-        if (!configManager.channels.enabled) return
+        if (!configManager.channels.settings.enabled) return
 
         val raw = event.message
         if (!raw.startsWith("/")) return
@@ -114,7 +114,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.NORMAL)
     fun onCommandList(event: PlayerCommandSendEvent) {
-        if (!configManager.channels.enabled) return
+        if (!configManager.channels.settings.enabled) return
 
         channelService
             .getDefinitions()
@@ -128,7 +128,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.NORMAL)
     fun onCommandList(event: AsyncPlayerSendSuggestionsEvent) {
-        if (!configManager.channels.enabled) return
+        if (!configManager.channels.settings.enabled) return
 
         val sender = event.player
 
@@ -155,7 +155,7 @@ class ChannelCommandListener(
 
     @EventHandler(priority = EventPriority.MONITOR)
     fun onAsyncTabComplete(event: AsyncTabCompleteEvent) {
-        if (!configManager.channels.enabled) return
+        if (!configManager.channels.settings.enabled) return
 
         val sender = event.sender
         if (sender !is Player) return
@@ -187,7 +187,7 @@ class ChannelCommandListener(
         player: Player,
         parts: List<String>
     ): MutableList<AsyncTabCompleteEvent.Completion> {
-        return if (configManager.channels.forceMainThreadForTabCompletion && parts.size == 1) {
+        return if (configManager.channels.settings.forceMainThreadForTabCompletion && parts.size == 1) {
             runBlocking {
                 withContext(plugin.entityDispatcher(player)) {
                     channelCommandService.generateCompletions(player, parts)

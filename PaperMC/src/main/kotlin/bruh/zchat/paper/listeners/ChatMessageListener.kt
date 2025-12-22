@@ -52,8 +52,8 @@ class ChatMessageListener(
         }
 
         val channelsConfig = configManager.channels
-        val routing = if (channelsConfig.enabled) {
-            channelService.peekRoutingForMessage(event.player, channelsConfig.channelOnly)
+        val routing = if (channelsConfig.settings.enabled) {
+            channelService.peekRoutingForMessage(event.player, channelsConfig.settings.channelOnly)
         } else {
             ChannelRouting(null, false)
         }
@@ -94,8 +94,8 @@ class ChatMessageListener(
             }
 
             val channelsConfig = configManager.channels
-            val routing = if (channelsConfig.enabled) {
-                channelService.consumeRoutingForMessage(player, channelsConfig.channelOnly)
+            val routing = if (channelsConfig.settings.enabled) {
+                channelService.consumeRoutingForMessage(player, channelsConfig.settings.channelOnly)
             } else {
                 ChannelRouting(null, false)
             }

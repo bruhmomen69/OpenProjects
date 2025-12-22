@@ -4,7 +4,7 @@ import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
 
 @ConfigSerializable
-data class ChannelsConfig(
+data class GeneralChannelSettings(
     @field:Comment("Use channels at all? Disabled by default as most servers do not need them.\n" +
             "WARNING: You must reboot your server for changes to this setting to take effect.")
     val enabled: Boolean = false,
@@ -19,6 +19,12 @@ data class ChannelsConfig(
                 "Default: false (recommended)"
     )
     val forceMainThreadForTabCompletion: Boolean = false,
+)
+
+@ConfigSerializable
+data class ChannelsConfig(
+    @field:Comment("General channel settings")
+    val settings: GeneralChannelSettings = GeneralChannelSettings(),
 
     @field:Comment("Configure channel auto joining on login.")
     val autoJoin: AutoJoinConfig = AutoJoinConfig(),

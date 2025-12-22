@@ -221,7 +221,7 @@ class ChannelService(
      */
     fun handlePlayerJoin(player: Player) {
         val channelsConfig = configManager.channels
-        if (!channelsConfig.enabled) return
+        if (!channelsConfig.settings.enabled) return
 
         val state = playerStateByUuid.computeIfAbsent(player.uniqueId) { PlayerChannelState() }
         var firstJoined: ChannelInstanceKey? = null

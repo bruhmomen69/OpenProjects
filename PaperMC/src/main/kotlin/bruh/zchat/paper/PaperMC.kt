@@ -145,7 +145,7 @@ class PaperMC : SuspendingJavaPlugin() {
         channelCommandService = ChannelCommandService(
             channelService,
             messageFormattingService,
-            configManager.channels,
+            configManager,
             configManager.messages,
             this
         )
@@ -217,7 +217,7 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
 
-        if (configManager.channels.enabled) {
+        if (configManager.channels.settings.enabled) {
             lamp.register(ChannelCommands(configManager, channelService, messageFormattingService))
         }
 
@@ -286,7 +286,7 @@ class PaperMC : SuspendingJavaPlugin() {
             ChannelCommandListener(
                 channelService,
                 messageFormattingService,
-                configManager.channels,
+                configManager,
                 configManager.messages,
                 channelCommandService,
                 this

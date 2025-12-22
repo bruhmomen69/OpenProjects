@@ -87,7 +87,7 @@ class ScheduledTaskService(
 
     fun scheduleChannelIdentifierRefresh() {
         val channelsConfig = configManager.channels
-        if (!channelsConfig.enabled) return
+        if (!channelsConfig.settings.enabled) return
 
         channelsConfig.channels.forEach { cfg ->
             if (cfg.identifierCreator.isBlank() || cfg.identifierRefreshTicks <= 0) {
