@@ -377,11 +377,11 @@ data class AlertConfig(
 data class ClickActionsConfig(
     @field:Comment("Click command for position placeholder. Built-in placeholders: {player}, {x}, {y}, {z}, {world}. " +
             "If PlaceholderAPI is enabled, you can also use any %placeholder% from PlaceholderAPI (e.g., %player_health%, %player_level%).")
-    val positionCommand: String = "/tp {x} {y} {z}",
+    val positionCommand: String = "/tpa {player}",
     
     @field:Comment("Click command for health placeholder. Built-in placeholders: {player}. " +
             "If PlaceholderAPI is enabled, you can also use any %placeholder% from PlaceholderAPI (e.g., %player_health%, %player_food%).")
-    val healthCommand: String = "/effect give {player} ",
+    val healthCommand: String = "/tpa {player}",
     
     @field:Comment("Click action type for position. Can be 'suggest' (places command in chat) or 'run' (executes command directly).")
     val positionActionType: String = "suggest",

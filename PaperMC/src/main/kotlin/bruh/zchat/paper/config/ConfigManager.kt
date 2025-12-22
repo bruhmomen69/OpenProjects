@@ -43,7 +43,7 @@ class ConfigManager(private val dataFolder: Path) {
             }
 
             // Check for migration
-            if (Files.exists(configFile) && !Files.exists(messagesFile)) {
+            if (Files.exists(configFile) && !Files.exists(messagesFile) && !Files.exists(storageFile)) {
                 handleMigration()
             } else {
                 loadAll()

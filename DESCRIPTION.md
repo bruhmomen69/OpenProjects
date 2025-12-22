@@ -24,10 +24,12 @@ ZealousChat replaces Vanilla chat with a fully configurable system built on the 
 
 </details>
 
-ZealousChat is a high performance, 1.20.4+ chat plugin that uses configurable MiniMessage-based formats to format chat messages. ZealousChat includes many extra features other plugins leave out, for example the ability to send a read-only view of your inventory in chat, custom /msg messaging, click/hover messages on messages, @messages and more.
+ZealousChat is a high performance, 1.20.4+ chat formatting plugin that uses configurable MiniMessage-based chat formats to format chat messages. ZealousChat includes many extra features other plugins leave out, like the ability to send a read-only view of your inventory/hand/armor/enderchest in chat, formatted /msg and /reply commands, click/hover messages on messages, @mentions and more.
 ZealousChat also has special features for server networks, such as cross-server private messaging, and cross server chat channels (for staffchat and similar).
 
 ZealousChat implements all of its features using the Paper API, and is designed to be as efficient as possible.
+
+[Showcase Images](https://modrinth.com/plugin/zealouschat/gallery)
 
 ## Commands
 

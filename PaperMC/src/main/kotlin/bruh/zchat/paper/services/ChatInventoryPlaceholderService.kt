@@ -6,25 +6,27 @@ import bruh.zchat.paper.services.snapshots.InventorySnapshotSerializer
 import bruh.zchat.paper.services.snapshots.InventorySnapshotStore
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.Material
+import org.bukkit.attribute.Attribute
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.attribute.Attribute
 import org.slf4j.LoggerFactory
 import java.io.Serializable
 import java.util.*
 import java.util.regex.Pattern
+import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 
 /**
  * Service for processing inventory placeholders in chat messages.
@@ -73,8 +75,7 @@ class ChatInventoryPlaceholderService(
                 player.sendMessage(
                     messageFormattingService.formatMessage(
                         configManager.messages.inventoryPlaceholders.noPermission,
-                        player
-                        ,
+                        player,
                         processUrls = false,
                         processMentions = false
                     )
@@ -234,6 +235,7 @@ class ChatInventoryPlaceholderService(
                     ClickEvent.runCommand(command)
                 }
             }
+
             PlaceholderType.HEALTH -> {
                 val config = configManager.config.inventoryPlaceholders.clickActions
                 val command = replacePlaceholders(config.healthCommand, player)
@@ -243,6 +245,7 @@ class ChatInventoryPlaceholderService(
                     ClickEvent.runCommand(command)
                 }
             }
+
             else -> null
         }
 
@@ -285,6 +288,7 @@ class ChatInventoryPlaceholderService(
                     processMentions = false
                 )
             }
+
             PlaceholderType.POS -> {
                 val loc = player.location
                 val placeholders = mapOf(
@@ -301,9 +305,16 @@ class ChatInventoryPlaceholderService(
                     processMentions = false
                 )
             }
+
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
-                val maxHealth = player.getAttribute(Attribute.MAX_HEALTH)?.value?.roundToInt() ?: 20
+                val maxHealth = {
+                    try {
+                        player.getAttribute(Attribute.MAX_HEALTH)?.value?.roundToInt() ?: 20
+                    } catch (e: NoSuchFieldError) {
+                        maxHealthBridgeFn(player).roundToInt()
+                    }
+                }.invoke()
                 val food = player.foodLevel
                 val saturation = player.saturation.roundToInt()
                 val placeholders = mapOf(
@@ -321,6 +332,10 @@ class ChatInventoryPlaceholderService(
                 )
             }
         }
+    }
+
+    private fun maxHealthBridgeFn(player: Player): Double {
+        return player.maxHealth
     }
 
     /**
@@ -351,10 +366,12 @@ class ChatInventoryPlaceholderService(
                     allowFormatting = true
                 )
             }
+
             PlaceholderType.POS -> {
                 val loc = player.location
                 val biome = try {
-                    loc.world?.getBiome(loc)?.toString()?.replace("_", " ")?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Unknown"
+                    loc.world?.getBiome(loc)?.toString()?.replace("_", " ")?.lowercase()
+                        ?.replaceFirstChar { it.uppercase() } ?: "Unknown"
                 } catch (e: Exception) {
                     "Unknown"
                 }
@@ -374,9 +391,16 @@ class ChatInventoryPlaceholderService(
                     processMentions = false
                 )
             }
+
             PlaceholderType.HEALTH -> {
                 val health = player.health.roundToInt()
-                val maxHealth = player.getAttribute(Attribute.MAX_HEALTH)?.value?.roundToInt() ?: 20
+                val maxHealth = {
+                    try {
+                        player.getAttribute(Attribute.MAX_HEALTH)?.value?.roundToInt() ?: 20
+                    } catch (e: NoSuchFieldError) {
+                        maxHealthBridgeFn(player).roundToInt()
+                    }
+                }.invoke()
                 val food = player.foodLevel
                 val saturation = player.saturation.roundToInt()
                 val effects = getEffectsText(player)
@@ -415,6 +439,7 @@ class ChatInventoryPlaceholderService(
                 if (offHand != null && offHand.type != Material.AIR) count++
                 count
             }
+
             else -> 0
         }
     }
@@ -546,12 +571,12 @@ class ChatInventoryPlaceholderService(
             .replace("{y}", loc.blockY.toString())
             .replace("{z}", loc.blockZ.toString())
             .replace("{world}", loc.world?.name ?: "Unknown")
-        
+
         // Process PlaceholderAPI placeholders if available
         if (placeholderAPIService != null && placeholderAPIService.isEnabled()) {
             result = placeholderAPIService.processPlaceholderAPI(player, result)
         }
-        
+
         return result
     }
 
@@ -572,8 +597,7 @@ class ChatInventoryPlaceholderService(
                 viewer.sendMessage(
                     messageFormattingService.formatMessage(
                         configManager.messages.inventoryPlaceholders.snapshotNotFound,
-                        viewer
-                        ,
+                        viewer,
                         processUrls = false,
                         processMentions = false
                     )
@@ -587,8 +611,7 @@ class ChatInventoryPlaceholderService(
                 viewer.sendMessage(
                     messageFormattingService.formatMessage(
                         configManager.messages.inventoryPlaceholders.snapshotNotFound,
-                        viewer
-                        ,
+                        viewer,
                         processUrls = false,
                         processMentions = false
                     )
@@ -605,8 +628,7 @@ class ChatInventoryPlaceholderService(
                 viewer.sendMessage(
                     messageFormattingService.formatMessage(
                         configManager.messages.inventoryPlaceholders.viewFailed,
-                        viewer
-                        ,
+                        viewer,
                         processUrls = false,
                         processMentions = false
                     )
@@ -633,8 +655,7 @@ class ChatInventoryPlaceholderService(
                 viewer.sendMessage(
                     messageFormattingService.formatMessage(
                         configManager.messages.inventoryPlaceholders.viewFailed,
-                        viewer
-                        ,
+                        viewer,
                         processUrls = false,
                         processMentions = false
                     )
@@ -643,32 +664,32 @@ class ChatInventoryPlaceholderService(
             false
         }
     }
-    
+
     /**
      * Creates a read-only inventory from a snapshot
      */
     private fun createReadOnlyInventory(snapshot: InventorySnapshot): Inventory {
         val title = "${snapshot.playerName}'s ${snapshot.type.displayName}"
         val size = when (snapshot.type) {
-            PlaceholderType.INV -> 54 // 6 rows for main inventory
-            PlaceholderType.ENDER -> 27 // 3 rows for ender chest
+            PlaceholderType.INV -> max(ceil((snapshot.items.size - 1) / 9.0) * 9, 45.0).roundToInt()  // 6 rows for main inventory
+            PlaceholderType.ENDER -> max(ceil((snapshot.items.size - 1) / 9.0) * 9, 27.0).roundToInt() // 3-6 rows for ender chest
             PlaceholderType.ARMOR -> 9 // 1 row for armor
             PlaceholderType.HAND -> 9 // 1 row for hand items
             else -> 9
         }
-        
+
         val inventory = Bukkit.createInventory(null, size, Component.text(title))
-        
+
         // Add items to inventory
         for (i in snapshot.items.indices) {
             if (i < inventory.size && snapshot.items[i] != null) {
                 inventory.setItem(i, snapshot.items[i])
             }
         }
-        
+
         return inventory
     }
-    
+
     /**
      * Represents different types of placeholders
      */
@@ -680,7 +701,7 @@ class ChatInventoryPlaceholderService(
         POS("Position"),
         HEALTH("Health")
     }
-    
+
     /**
      * Data class for placeholder replacements
      */
@@ -690,7 +711,7 @@ class ChatInventoryPlaceholderService(
         val placeholder: String,
         val component: Component
     )
-    
+
     /**
      * Serializable snapshot of an inventory
      */
@@ -704,22 +725,22 @@ class ChatInventoryPlaceholderService(
         companion object {
             private const val serialVersionUID = 1L
         }
-        
+
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (javaClass != other?.javaClass) return false
-            
+
             other as InventorySnapshot
-            
+
             if (playerId != other.playerId) return false
             if (playerName != other.playerName) return false
             if (type != other.type) return false
             if (!items.contentEquals(other.items)) return false
             if (timestamp != other.timestamp) return false
-            
+
             return true
         }
-        
+
         override fun hashCode(): Int {
             var result = playerId.hashCode()
             result = 31 * result + playerName.hashCode()
