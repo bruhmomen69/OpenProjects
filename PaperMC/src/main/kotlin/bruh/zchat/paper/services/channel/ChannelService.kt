@@ -176,32 +176,24 @@ class ChannelService(
      * Used by chat handlers to determine routing for the next message.
      * If a forced routing is present, it is consumed here.
      */
-    fun peekRoutingForMessage(player: Player, channelOnlyToggle: Boolean): ChannelRouting {
+    fun peekRoutingForMessage(player: Player): ChannelRouting {
         val state = playerStateByUuid[player.uniqueId] ?: return ChannelRouting(null, false)
         val forced = forcedRouting[player.uniqueId]
         if (forced != null) return forced
 
         val active = state.activeInstance ?: return ChannelRouting(null, false)
         val def = definitionsByName[active.nameKey] ?: return ChannelRouting(null, false)
-        return if (def.allMessagesToChannel) {
-            ChannelRouting(active, channelOnlyToggle)
-        } else {
-            ChannelRouting(null, false)
-        }
+        return ChannelRouting(active, def.allMessagesToChannel)
     }
 
-    fun consumeRoutingForMessage(player: Player, channelOnlyToggle: Boolean): ChannelRouting {
+    fun consumeRoutingForMessage(player: Player): ChannelRouting {
         val state = playerStateByUuid[player.uniqueId] ?: return ChannelRouting(null, false)
         val forced = forcedRouting.remove(player.uniqueId)
         if (forced != null) return forced
 
         val active = state.activeInstance ?: return ChannelRouting(null, false)
         val def = definitionsByName[active.nameKey] ?: return ChannelRouting(null, false)
-        return if (def.allMessagesToChannel) {
-            ChannelRouting(active, channelOnlyToggle)
-        } else {
-            ChannelRouting(null, false)
-        }
+        return ChannelRouting(active, def.allMessagesToChannel)
     }
 
     private val forcedRouting = ConcurrentHashMap<UUID, ChannelRouting>()

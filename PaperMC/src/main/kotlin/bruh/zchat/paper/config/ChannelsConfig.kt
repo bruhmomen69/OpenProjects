@@ -9,9 +9,6 @@ data class GeneralChannelSettings(
             "WARNING: You must reboot your server for changes to this setting to take effect.")
     val enabled: Boolean = false,
 
-    @field:Comment("When the user is in a channel with `allMessagesToChannel` enabled, disabling sending message to the no-channel global chat?")
-    val channelOnly: Boolean = false,
-
     @field:Comment(
         "Force tab completion placeholder resolution to run on the main thread to avoid async access warnings.\n" +
                 "WARNING: This may cause tab completion delay during high server load.\n" +
