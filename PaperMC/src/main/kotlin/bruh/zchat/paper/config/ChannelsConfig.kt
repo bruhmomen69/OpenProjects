@@ -129,5 +129,7 @@ data class AutoJoinConfig(
     @field:Comment("Enable auto joining channels on login. Channels are tried (for permission and identifier) in the order they are specified in the channels list.")
     val enabled: Boolean = false,
     @field:Comment("If auto joining is enabled, also enable the auto joining of multiple channels on login?")
-    val multiple: Boolean = true
+    val multiple: Boolean = true,
+    @field:Comment("If enabled, automatically set an active channel when auto-joining. If disabled, players must manually set their active channel (e.g., via /channel focus).")
+    val setActiveOnJoin: Boolean = false
 )

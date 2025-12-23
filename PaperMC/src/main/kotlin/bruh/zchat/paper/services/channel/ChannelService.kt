@@ -121,7 +121,7 @@ class ChannelService(
         return trimmed.ifBlank { "default" + definition.name.replace(" ", "_").lowercase() }
     }
 
-    fun joinChannel(player: Player, definition: ChannelDefinition, explicit: Boolean = true): Boolean {
+    fun joinChannel(player: Player, definition: ChannelDefinition, explicit: Boolean = true, setActive: Boolean = true): Boolean {
         if (definition.requiredPermission.isNotBlank() && !player.hasPermission(definition.requiredPermission)) {
             return false
         }
@@ -134,7 +134,7 @@ class ChannelService(
         state.joinedInstances.add(instance)
         state.resolvedIdentifiers[definition.nameKey] = identifier
         membersByInstance.computeIfAbsent(instance) { ConcurrentHashMap.newKeySet() }.add(player.uniqueId)
-        if (state.activeInstance == null || (explicit && definition.allMessagesToChannel)) {
+        if (setActive && (state.activeInstance == null || (explicit && definition.allMessagesToChannel))) {
             state.activeInstance = instance
         }
         return true
@@ -227,7 +227,7 @@ class ChannelService(
             if (def.requiredPermission.isNotBlank() && !player.hasPermission(def.requiredPermission)) {
                 continue
             }
-            val joined = joinChannel(player, def, explicit = false)
+            val joined = joinChannel(player, def, explicit = false, setActive = channelsConfig.autoJoin.setActiveOnJoin)
             if (joined) {
                 if (firstJoined == null) firstJoined = instance
                 if (def.allMessagesToChannel && firstAllMessages == null) {
@@ -239,7 +239,7 @@ class ChannelService(
             }
         }
 
-        if (state.activeInstance == null) {
+        if (channelsConfig.autoJoin.setActiveOnJoin && state.activeInstance == null) {
             state.activeInstance = firstAllMessages ?: firstJoined
         }
     }
