@@ -210,6 +210,7 @@ class PaperMC : SuspendingJavaPlugin() {
         }
 
         // Initialize command framework
+        ChannelSuggestionProviders.initialize(channelService)
         lamp = BukkitLamp.builder(this).build()
 
         // Register commands

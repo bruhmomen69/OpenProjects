@@ -5,6 +5,7 @@ import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.enums.MessageKey
 import revxrsal.commands.annotation.Command
+import revxrsal.commands.annotation.SuggestWith
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import revxrsal.commands.bukkit.annotation.CommandPermission
@@ -48,7 +49,7 @@ class ChannelCommands(
 
     @Subcommand("join")
     @CommandPermission("zchat.channel.use.join")
-    fun join(actor: BukkitCommandActor, name: String) {
+    fun join(actor: BukkitCommandActor, @SuggestWith(ChannelSuggestionProviders.AvailableChannels::class) name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
         if (def == null) {
@@ -78,7 +79,7 @@ class ChannelCommands(
 
     @Subcommand("leave")
     @CommandPermission("zchat.channel.use.leave")
-    fun leave(actor: BukkitCommandActor, name: String) {
+    fun leave(actor: BukkitCommandActor, @SuggestWith(ChannelSuggestionProviders.JoinedChannels::class) name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
         if (def == null) {
@@ -100,7 +101,7 @@ class ChannelCommands(
 
     @Subcommand("focus")
     @CommandPermission("zchat.channel.use.focus")
-    fun focus(actor: BukkitCommandActor, name: String) {
+    fun focus(actor: BukkitCommandActor, @SuggestWith(ChannelSuggestionProviders.JoinedChannels::class) name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
         if (def == null) {
@@ -118,7 +119,7 @@ class ChannelCommands(
 
     @Subcommand("who")
     @CommandPermission("zchat.channel.use.who")
-    fun who(actor: BukkitCommandActor, name: String) {
+    fun who(actor: BukkitCommandActor, @SuggestWith(ChannelSuggestionProviders.AvailableChannels::class) name: String) {
         val player = actor.requirePlayer()
         val def = channelService.getDefinitionByName(name)
         if (def == null) {
