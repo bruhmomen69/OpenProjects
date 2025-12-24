@@ -16,6 +16,13 @@ data class GeneralChannelSettings(
                 "Default: false (recommended)"
     )
     val forceMainThreadForTabCompletion: Boolean = false,
+
+    @field:Comment(
+        "Enable full tab completion for per-channel commands by registering them as Bukkit commands.\n" +
+                "WARNING: When enabled, channel commands will NOT update on config reload. A full server restart is required.\n" +
+                "This provides better tab completion in clients that don't support the event-based tab completion system."
+    )
+    val enableFullTabCompletion: Boolean = false,
 )
 
 @ConfigSerializable

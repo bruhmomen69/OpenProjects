@@ -24,6 +24,11 @@ class ChannelCommandService(
     private val messagesConfig: MessagesConfig,
     private val plugin: JavaPlugin
 ) {
+
+    data class CommandExecutionResult(
+        val handled: Boolean,
+        val shouldCancelEvent: Boolean = true
+    )
     // Caffeine caches for performance
     val commandCache: Cache<UUID, CachedCommands> = Caffeine.newBuilder()
         .expireAfterWrite(30, TimeUnit.SECONDS)
@@ -245,5 +250,79 @@ class ChannelCommandService(
     fun updateChannelsCommandAlias() {
         val allCommands = configManager.channels.channels.flatMap { it.commands }
         Bukkit.getServer().commandAliases.put("channels", allCommands.toTypedArray())
+    }
+
+    fun executeChannelCommand(player: Player, commandAlias: String, message: String): CommandExecutionResult {
+        if (!configManager.channels.settings.enabled) {
+            return CommandExecutionResult(handled = false, shouldCancelEvent = false)
+        }
+
+        val definition = channelService.getDefinitions().firstOrNull { def -> def.commands.contains(commandAlias.lowercase()) }
+            ?: return CommandExecutionResult(handled = false, shouldCancelEvent = false)
+
+        val instance = channelService.resolveInstanceForPlayer(player, definition)
+        if (instance == null) {
+            player.sendMessage(
+                messageFormattingService.getConfigMessage(
+                    MessageKey.CHANNELS_IDENTIFIER_MISSING,
+                    player,
+                    mapOf(
+                        "channel_display_name" to definition.displayName
+                    )
+                )
+            )
+            return CommandExecutionResult(handled = true, shouldCancelEvent = true)
+        }
+
+        if (message.isBlank()) {
+            val joinedBefore = channelService.isMember(player, instance)
+            val success =
+                if (joinedBefore) channelService.leaveChannel(player, instance) else channelService.joinChannel(
+                    player,
+                    definition,
+                    explicit = true
+                )
+            if (success) {
+                val messageKey =
+                    if (joinedBefore) MessageKey.CHANNELS_CHANNEL_LEFT_TOGGLE else MessageKey.CHANNELS_CHANNEL_JOINED_TOGGLE
+                val channelDisplayName = messageFormattingService.formatMessage(
+                    definition.displayName,
+                    player,
+                    processUrls = false,
+                    processMentions = false
+                )
+                player.sendMessage(
+                    messageFormattingService.formatMessageComponent(
+                        messageFormattingService.getMessageByKey(messagesConfig, messageKey)!!,
+                        player,
+                        mapOf(
+                            "channel_name" to channelDisplayName,
+                            "channel_display_name" to channelDisplayName,
+                            "channel_identifier" to Component.text(instance.identifier)
+                        ),
+                        processUrls = false,
+                        processMentions = false
+                    )
+                )
+            } else {
+                val messageKey =
+                    if (joinedBefore) MessageKey.CHANNELS_CHANNEL_TOGGLE_LEAVE_FAILED else MessageKey.CHANNELS_CHANNEL_TOGGLE_JOIN_FAILED
+                player.sendMessage(
+                    messageFormattingService.getConfigMessage(
+                        messageKey,
+                        player,
+                        mapOf("channel_display_name" to definition.displayName)
+                    )
+                )
+            }
+            return CommandExecutionResult(handled = true, shouldCancelEvent = true)
+        }
+
+        channelService.forceNextMessageToChannel(player, instance, channelOnly = true)
+        if (definition.autoFocusOnMessage && channelService.isMember(player, instance)) {
+            channelService.setActiveInstance(player, instance)
+        }
+        player.chat(message)
+        return CommandExecutionResult(handled = true, shouldCancelEvent = true)
     }
 }

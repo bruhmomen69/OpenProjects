@@ -1,10 +1,7 @@
 package bruh.zchat.paper.listeners.channel
 
 import bruh.zchat.paper.config.ConfigManager
-import bruh.zchat.paper.config.MessagesConfig
-import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.ChannelCommandService
-import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.services.channel.ChannelService
 import com.destroystokyo.paper.event.brigadier.AsyncPlayerSendSuggestionsEvent
 import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent
@@ -12,7 +9,6 @@ import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.mojang.brigadier.suggestion.Suggestion
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import net.kyori.adventure.text.Component
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -23,17 +19,13 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ChannelCommandListener(
     private val channelService: ChannelService,
-    private val messageFormattingService: MessageFormattingService,
     private val configManager: ConfigManager,
-    private val messagesConfig: MessagesConfig,
     private val channelCommandService: ChannelCommandService,
     private val plugin: JavaPlugin,
 ) : Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     fun onChannelCommand(event: PlayerCommandPreprocessEvent) {
-        if (!configManager.channels.settings.enabled) return
-
         val raw = event.message
         if (!raw.startsWith("/")) return
 
@@ -42,78 +34,11 @@ class ChannelCommandListener(
         val alias = split[0].lowercase()
         val message = if (split.size > 1) split[1] else ""
 
-        val definition = channelService.getDefinitions().firstOrNull { def -> def.commands.contains(alias) } ?: return
-        val player = event.player
+        val result = channelCommandService.executeChannelCommand(event.player, alias, message)
 
-        val instance = channelService.resolveInstanceForPlayer(player, definition)
-        if (instance == null) {
-            player.sendMessage(
-                messageFormattingService.getConfigMessage(
-                    MessageKey.CHANNELS_IDENTIFIER_MISSING,
-                    player,
-                    mapOf(
-                        "channel_display_name" to definition.displayName
-                    )
-                )
-            )
+        if (result.handled && result.shouldCancelEvent) {
             event.isCancelled = true
-            return
         }
-
-        // No args -> toggle membership
-        if (message.isBlank()) {
-            val joinedBefore = channelService.isMember(player, instance)
-            val success =
-                if (joinedBefore) channelService.leaveChannel(player, instance) else channelService.joinChannel(
-                    player,
-                    definition,
-                    explicit = true
-                )
-            if (success) {
-                val messageKey =
-                    if (joinedBefore) MessageKey.CHANNELS_CHANNEL_LEFT_TOGGLE else MessageKey.CHANNELS_CHANNEL_JOINED_TOGGLE
-                val channelDisplayName = messageFormattingService.formatMessage(
-                    definition.displayName,
-                    player,
-                    processUrls = false,
-                    processMentions = false
-                )
-                player.sendMessage(
-                    messageFormattingService.formatMessageComponent(
-                        messageFormattingService.getMessageByKey(messagesConfig, messageKey)!!,
-                        player,
-                        mapOf(
-                            "channel_name" to channelDisplayName,
-                            "channel_display_name" to channelDisplayName,
-                            "channel_identifier" to Component.text(instance.identifier)
-                        ),
-                        processUrls = false,
-                        processMentions = false
-                    )
-                )
-            } else {
-                val messageKey =
-                    if (joinedBefore) MessageKey.CHANNELS_CHANNEL_TOGGLE_LEAVE_FAILED else MessageKey.CHANNELS_CHANNEL_TOGGLE_JOIN_FAILED
-                player.sendMessage(
-                    messageFormattingService.getConfigMessage(
-                        messageKey,
-                        player,
-                        mapOf("channel_display_name" to definition.displayName)
-                    )
-                )
-            }
-            event.isCancelled = true
-            return
-        }
-
-        // Message provided -> force one-shot channel-only route
-        channelService.forceNextMessageToChannel(player, instance, channelOnly = true)
-        // Set as active channel if autoFocusOnMessage is enabled
-        if (definition.autoFocusOnMessage && channelService.isMember(player, instance)) {
-            channelService.setActiveInstance(player, instance)
-        }
-        event.isCancelled = true
-        player.chat(message)
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
