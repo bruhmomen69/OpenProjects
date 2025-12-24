@@ -102,6 +102,8 @@ When you enable cross-server messaging in storage.conf (requires a MySQL or Redi
   - Permission: `zchat.toggle.messages`
 - `/zealouschat toggle socialspy` — Enable/disable social spy for private messages
   - Permission: `zchat.socialspy`
+- `/zealouschat alerts` — Toggle alerts on/off
+  - Permission: `zchat.alerts.toggle`
 - `/zealouschat toggle status` — View your current chat & private message status
   - Permission: `zchat.status`
 
@@ -161,31 +163,36 @@ The swear filter provides advanced profanity detection with configurable punishm
 
 ### Administrator Controls
 - `/zealouschat admin clear <type>` — Clear various chat-related data
-  - Permission: `zchat.admin`
+  - Permission: `zchat.admin.clear`
   - Parameters:
-    - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), `blocks` (clears all block lists), or `all` (clears all data)
+    - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), `blocks` (clears all block lists), `alerts` (clears all alert states), or `all` (clears all data)
 - `/zealouschat admin toggle chat <player> <true|false>` — Force toggle public chat for a player
-  - Permission: `zchat.admin`
+  - Permission: `zchat.admin.toggle.chat`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable chat
 - `/zealouschat admin toggle messages <player> <true|false>` — Force toggle private messages for a player
-  - Permission: `zchat.admin`
+  - Permission: `zchat.admin.toggle.messages`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable private messages
 - `/zealouschat admin toggle all <player> <true|false>` — Force toggle both chat & private messages
-  - Permission: `zchat.admin`
+  - Permission: `zchat.admin.toggle.all`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable both
 - `/zealouschat admin socialspy <player> <true|false>` — Force toggle social spy for a player
-  - Permission: `zchat.admin`
+  - Permission: `zchat.admin.socialspy`
   - Parameters:
     - `<player>`: Target player name
     - `<true|false>`: Enable or disable social spy
 - `/zealouschat admin stats` — Display server-wide chat and private message toggle statistics
-  - Permission: `zchat.admin`
+  - Permission: `zchat.admin.stats`
+- `/zealouschat admin alerts <player> <true|false>` — Force toggle alerts for a player
+  - Permission: `zchat.admin.alerts`
+  - Parameters:
+    - `<player>`: Target player name
+    - `<true|false>`: Enable or disable alerts
 - `/zealouschat admin block <player> <target>` — Force a player to block another player
   - Permission: `zchat.admin.block`
   - Parameters:
@@ -249,12 +256,20 @@ All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags
 | `zchat.toggle.chat`            | true    | Toggle public chat                  |
 | `zchat.toggle.messages`        | true    | Toggle private messages             |
 | `zchat.status`                 | true    | View own chat status                |
+| `zchat.alerts.toggle`          | true    | Toggle alerts on/off               |
 | `zchat.socialspy`              | op      | Monitor private messages            |
 | `zchat.commandspy`             | op      | Monitor player commands             |
 | `zchat.bypass.chattoggle`      | op      | Chat even when disabled             |
 | `zchat.bypass.messagetoggle`   | op      | PM even when disabled               |
 | `zchat.viewinventory`          | true    | View shared inventories             |
 | `zchat.inventory.placeholders` | true    | Use inventory placeholders          |
+| `zchat.admin.toggle.chat`      | op      | Force toggle chat for a player      |
+| `zchat.admin.toggle.messages`  | op      | Force toggle messages for a player  |
+| `zchat.admin.toggle.all`       | op      | Force toggle both chat & messages    |
+| `zchat.admin.socialspy`        | op      | Force toggle social spy for player   |
+| `zchat.admin.stats`            | op      | View server-wide statistics         |
+| `zchat.admin.alerts`           | op      | Force toggle alerts for a player     |
+| `zchat.admin.clear`            | op      | Clear various chat-related data     |
 
 </details>
 

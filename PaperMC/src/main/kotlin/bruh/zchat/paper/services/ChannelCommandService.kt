@@ -260,6 +260,20 @@ class ChannelCommandService(
         val definition = channelService.getDefinitions().firstOrNull { def -> def.commands.contains(commandAlias.lowercase()) }
             ?: return CommandExecutionResult(handled = false, shouldCancelEvent = false)
 
+        // Check permission before resolving instance
+        if (definition.requiredPermission.isNotBlank() && !player.hasPermission(definition.requiredPermission)) {
+            player.sendMessage(
+                messageFormattingService.getConfigMessage(
+                    MessageKey.CHANNELS_NO_PERMISSION_CHANNEL,
+                    player,
+                    mapOf(
+                        "channel_display_name" to definition.displayName
+                    )
+                )
+            )
+            return CommandExecutionResult(handled = true, shouldCancelEvent = true)
+        }
+
         val instance = channelService.resolveInstanceForPlayer(player, definition)
         if (instance == null) {
             player.sendMessage(

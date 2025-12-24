@@ -63,6 +63,13 @@ permissions:
       zchat.admin.format: true
       zchat.admin.toggle: true
       zchat.admin.block: true
+      zchat.admin.toggle.chat: true
+      zchat.admin.toggle.messages: true
+      zchat.admin.toggle.all: true
+      zchat.admin.socialspy: true
+      zchat.admin.stats: true
+      zchat.admin.alerts: true
+      zchat.admin.clear: true
     default: op
   
   zchat.admin.reload:
@@ -87,6 +94,34 @@ permissions:
   
   zchat.admin.block:
     description: Manage player block lists
+    default: op
+  
+  zchat.admin.toggle.chat:
+    description: Force toggle public chat for a player
+    default: op
+  
+  zchat.admin.toggle.messages:
+    description: Force toggle private messages for a player
+    default: op
+  
+  zchat.admin.toggle.all:
+    description: Force toggle both chat and private messages for a player
+    default: op
+  
+  zchat.admin.socialspy:
+    description: Force toggle social spy for a player
+    default: op
+  
+  zchat.admin.stats:
+    description: View server-wide chat statistics
+    default: op
+  
+  zchat.admin.alerts:
+    description: Force toggle alerts for a player
+    default: op
+  
+  zchat.admin.clear:
+    description: Clear various chat-related data
     default: op
   
   zchat.color:
@@ -149,6 +184,11 @@ permissions:
   
   zchat.status:
     description: Permission to view chat status
+    default: true
+  
+  # Alert permissions
+  zchat.alerts.toggle:
+    description: Permission to toggle alerts on/off
     default: true
   
   # Social spy permissions

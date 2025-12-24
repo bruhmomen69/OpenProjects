@@ -121,6 +121,7 @@ class ChatToggleCommands(
 ) {
 
     @Subcommand("chat")
+    @CommandPermission("zchat.toggle.chat")
     fun toggleChat(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -139,6 +140,7 @@ class ChatToggleCommands(
      * @param actor The command actor executing the command
      */
     @Subcommand("messages")
+    @CommandPermission("zchat.toggle.messages")
     fun toggleMessages(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -150,6 +152,7 @@ class ChatToggleCommands(
     }
 
     @Subcommand("socialspy")
+    @CommandPermission("zchat.socialspy")
     fun toggleSocialSpy(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -161,6 +164,7 @@ class ChatToggleCommands(
     }
 
     @Subcommand("status")
+    @CommandPermission("zchat.status")
     fun status(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -197,6 +201,7 @@ class ChatAdminCommands(
     private val plugin: JavaPlugin
 ) {
     @Subcommand("toggle chat")
+    @CommandPermission("zchat.admin.toggle.chat")
     fun adminToggleChat(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -214,6 +219,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("toggle messages")
+    @CommandPermission("zchat.admin.toggle.messages")
     fun adminToggleMessages(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -236,6 +242,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("toggle all")
+    @CommandPermission("zchat.admin.toggle.all")
     fun adminToggleAll(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -258,6 +265,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("socialspy")
+    @CommandPermission("zchat.admin.socialspy")
     fun adminSocialSpy(actor: BukkitCommandActor, playerName: String, enable: Boolean) {
         val targetPlayer = org.bukkit.Bukkit.getPlayer(playerName)
         if (targetPlayer == null) {
@@ -285,6 +293,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("stats")
+    @CommandPermission("zchat.admin.stats")
     fun adminStats(actor: BukkitCommandActor) {
         val toggleStats = chatToggleService.getToggleStats()
         val spyStats = socialSpyService.getSocialSpyStats()
@@ -344,6 +353,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("alerts")
+    @CommandPermission("zchat.admin.alerts")
     fun adminAlerts(
         actor: BukkitCommandActor, 
         playerName: String, 
@@ -365,6 +375,7 @@ class ChatAdminCommands(
     }
 
     @Subcommand("clear")
+    @CommandPermission("zchat.admin.clear")
     fun adminClear(
         actor: BukkitCommandActor,
         @Values("toggles", "socialspy", "cooldowns", "blocks", "alerts", "all") type: String
