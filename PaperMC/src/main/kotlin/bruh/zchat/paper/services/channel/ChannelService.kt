@@ -110,6 +110,9 @@ class ChannelService(
     }
 
     private fun resolveIdentifier(player: Player, definition: ChannelDefinition): String? {
+        if (definition.requiredPermission.isNotBlank() && !player.hasPermission(definition.requiredPermission)) {
+            return null
+        }
         if (definition.identifierCreator.isBlank()) {
             return "default" + definition.name.replace(" ", "_").lowercase()
         }
