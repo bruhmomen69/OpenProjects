@@ -137,7 +137,14 @@ class ChannelCommands(
             val viewers = channelService.getViewersForInstance(inst)
             val names = viewers.joinToString(", ") { it.name }
             if (names.isBlank()) {
-                messageFormattingService.getConfigMessage(MessageKey.CHANNELS_NO_MEMBERS, player)
+                messageFormattingService.getConfigMessage(
+                    MessageKey.CHANNELS_NO_MEMBERS,
+                    player,
+                    mapOf(
+                        "channel_identifier" to inst.identifier,
+                        "member_names" to names
+                    )
+                )
             } else {
                 messageFormattingService.getConfigMessage(
                     MessageKey.CHANNELS_MEMBERS_LIST_INSTANCE,

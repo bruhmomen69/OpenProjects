@@ -252,7 +252,7 @@ class AlertService(
      */
     fun forceEnableAlerts(player: Player) {
         alertsEnabled.add(player.uniqueId)
-        player.sendMessage(messageFormattingService.getConfigMessage("alerts.enabled", player))
+        player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.ALERTS_ENABLED, player))
         logger.info("Admin forced alerts enabled for ${player.name}")
     }
     
@@ -261,7 +261,7 @@ class AlertService(
      */
     fun forceDisableAlerts(player: Player) {
         alertsEnabled.remove(player.uniqueId)
-        player.sendMessage(messageFormattingService.getConfigMessage("alerts.disabled", player))
+        player.sendMessage(messageFormattingService.getConfigMessage(MessageKey.ALERTS_DISABLED, player))
         logger.info("Admin forced alerts disabled for ${player.name}")
     }
     

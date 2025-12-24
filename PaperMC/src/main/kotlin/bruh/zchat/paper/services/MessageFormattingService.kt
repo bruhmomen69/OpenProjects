@@ -325,19 +325,25 @@ class MessageFormattingService(
     }
 
     /**
-     * Get a configurable message with placeholder processing (backward compatibility)
+     * Get a configurable message using MessageKey enum with placeholder processing
      */
-    fun getConfigMessage(
-        messageKey: String,
+    fun getConfigMessageComponent(
+        messageKey: MessageKey,
         player: Player? = null,
-        additionalPlaceholders: Map<String, String> = emptyMap()
+        additionalPlaceholders: Map<String, Component> = emptyMap()
     ): Component {
-        val enumKey = MessageKey.fromKey(messageKey) ?: run {
-            logger.warn("Unknown message key: $messageKey")
-            return miniMessage.deserialize("<red>Message not found: $messageKey</red>")
-        }
-        
-        return getConfigMessage(enumKey, player, additionalPlaceholders)
+        val messages = configManager.messages
+        val messageText = getMessageByKey(messages, messageKey) ?: "<red>Message not found: ${messageKey.key}</red>"
+
+        return formatMessageComponent(
+            format = messageText,
+            player = player,
+            additionalPlaceholders = additionalPlaceholders,
+            processUrls = false, // Config messages typically don't need URL processing
+            processMentions = false, // Config messages typically don't need mention processing
+            allowColors = true,
+            allowFormatting = true
+        )
     }
 
     /**
