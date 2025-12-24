@@ -174,12 +174,27 @@ class AlertService(
         if (config.alertGroups.isNotEmpty() && group.name !in config.alertGroups) {
             return false
         }
-        
-        // Check severity threshold (using distance as a proxy for severity for Levenshtein)
-        if (group.type.lowercase() == "levenshtein" && group.distance > config.minimumSeverity) {
-            return false
+
+        // Check severity threshold based on filter type
+        when (group.type.lowercase()) {
+            "levenshtein", "smart", "mixed", "auto" -> {
+                // For Levenshtein and smart: higher distance = more lenient = less severe
+                // Alert if distance is not too lenient (lower distance = more severe)
+                if (group.distance > config.minimumSeverity) {
+                    return false
+                }
+            }
+            "dice-sorensen", "dice" -> {
+                // For Dice-Sorensen coefficient: higher threshold = more strict = more severe
+                // Convert minimumSeverity (1-5) to a percentage (20-100)
+                // Higher threshold requires higher similarity to match, which is more severe
+                val severityThreshold = config.minimumSeverity * 20
+                if (group.distance < severityThreshold) {
+                    return false
+                }
+            }
         }
-        
+
         return true
     }
     

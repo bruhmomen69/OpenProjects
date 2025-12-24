@@ -307,10 +307,10 @@ data class SwearFilterConfig(
             )
         ),
         FilterGroup(
-            name = "Default Levenshtein",
-            type = "levenshtein",
-            distance = 3,
-            filters = listOf("shit", "fuck"),
+            name = "Default Smart",
+            type = "smart",
+            distance = 2,
+            filters = listOf("shit", "fuck", "boobs"),
             punishments = mapOf(
                 1 to listOf("warn {player} You are not allowed to use that word."),
                 3 to listOf("kick {player} You have been warned about your language."),
@@ -395,10 +395,14 @@ data class FilterGroup(
     @field:Comment("The name of the filter group.")
     val name: String = "default",
 
-    @field:Comment("The type of filter. Can be 'regex' or 'levenshtein'.")
+    @field:Comment("The type of filter. Can be 'regex', 'levenshtein', 'dice-sorensen', or 'smart' (also accepts 'mixed', 'auto').")
     val type: String = "regex",
 
-    @field:Comment("For Levenshtein type, this is the maximum distance to consider a word a match.")
+    @field:Comment("For Levenshtein type, this is the maximum edit distance to consider a word a match. " +
+            "For dice-sorensen type, this is the minimum similarity threshold as a percentage (e.g., 75 for 0.75 threshold). " +
+            "For smart type, this is the Levenshtein distance (e.g., 3). Smart mode automatically computes " +
+            "an equivalent Dice-Sorensen threshold and scales for longer words. Matches if either algorithm " +
+            "reaches its threshold (OR logic).")
     val distance: Int = 2,
 
     @field:Comment("The list of words or regex patterns to filter.")

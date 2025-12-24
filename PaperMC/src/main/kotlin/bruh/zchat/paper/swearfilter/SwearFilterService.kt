@@ -7,6 +7,7 @@ import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.utils.Levenshtein
+import bruh.zchat.paper.utils.DiceSorensen
 import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
@@ -14,6 +15,8 @@ import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import java.util.concurrent.ConcurrentHashMap
 import java.util.regex.PatternSyntaxException
+import kotlin.math.ceil
+import kotlin.math.max
 
 class SwearFilterService(
     private val plugin: PaperMC,
@@ -75,6 +78,39 @@ class SwearFilterService(
                 words.any { word ->
                     group.filters.any { filterWord ->
                         Levenshtein.distance(word.lowercase(), filterWord.lowercase()) <= group.distance
+                    }
+                }
+            }
+
+            "dice-sorensen", "dice" -> {
+                val threshold = group.distance / 100.0
+                val words = message.split(Regex("\\s+"))
+                words.any { word ->
+                    group.filters.any { filterWord ->
+                        DiceSorensen.coefficient(word.lowercase(), filterWord.lowercase()) >= threshold
+                    }
+                }
+            }
+
+            "smart", "mixed", "auto" -> {
+                val diceThreshold = (1.0 - (group.distance / 7.0)).coerceIn(0.20, 0.95)
+                val scalingFactor = group.distance / 5.0
+
+                val words = message.split(Regex("\\s+"))
+                words.any { word ->
+                    group.filters.any { filterWord ->
+                        val lowerWord = word.lowercase()
+                        val lowerFilter = filterWord.lowercase()
+
+                        val scaledLevenshtein = max(
+                            group.distance,
+                            ceil(lowerFilter.length * scalingFactor).toInt()
+                        )
+
+                        val levenshteinMatch = Levenshtein.distance(lowerWord, lowerFilter) <= scaledLevenshtein
+                        val diceMatch = DiceSorensen.coefficient(lowerWord, lowerFilter) >= diceThreshold
+
+                        levenshteinMatch || diceMatch
                     }
                 }
             }
