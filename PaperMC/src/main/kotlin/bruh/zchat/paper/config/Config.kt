@@ -395,7 +395,10 @@ data class FilterGroup(
     @field:Comment("The name of the filter group.")
     val name: String = "default",
 
-    @field:Comment("The type of filter. Can be 'regex', 'levenshtein', 'dice-sorensen', or 'smart' (also accepts 'mixed', 'auto').")
+    @field:Comment("The type of filter. Options: regex, smart.\n" +
+            "regex - matches exact patterns using regular expressions\n" +
+            "smart - uses fuzzy matching combining Levenshtein and Dice-Sorensen algorithms\n" +
+            "Other options: levenshtein, dice-sorensen, mixed, auto")
     val type: String = "regex",
 
     @field:Comment("For Levenshtein type, this is the maximum edit distance to consider a word a match. " +
