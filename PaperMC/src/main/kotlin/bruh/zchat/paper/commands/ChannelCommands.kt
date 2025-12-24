@@ -4,6 +4,7 @@ import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.enums.MessageKey
+import net.kyori.adventure.text.Component
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.SuggestWith
 import revxrsal.commands.annotation.Subcommand
@@ -25,26 +26,25 @@ class ChannelCommands(
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.CHANNELS_NO_ACTIVE_INSTANCES, actor.asPlayer()))
             return
         }
-        
-        val lines = buildString {
-            append(messageFormattingService.getConfigMessage(MessageKey.CHANNELS_LIST_HEADER, actor.asPlayer()).toString().replace("\n", ""))
-            append("\n")
-            definitions.forEach { def ->
-                val channelLine = messageFormattingService.getConfigMessage(
-                    MessageKey.CHANNELS_LIST_FORMAT, 
-                    actor.asPlayer(),
-                    mapOf(
-                        "channel_display_name" to def.displayName,
-                        "channel_name_key" to def.nameKey,
-                        "commands" to def.commands.joinToString(","),
-                        "all_messages" to def.allMessagesToChannel.toString(),
-                        "cross_server" to def.crossServerBridge.toString()
-                    )
-                ).toString().replace("\n", "")
-                append("$channelLine\n")
-            }
+
+        val header = messageFormattingService.getConfigMessage(MessageKey.CHANNELS_LIST_HEADER, actor.asPlayer())
+        val lines = definitions.map { def ->
+            messageFormattingService.getConfigMessage(
+                MessageKey.CHANNELS_LIST_FORMAT,
+                actor.asPlayer(),
+                mapOf(
+                    "channel_display_name" to def.displayName,
+                    "channel_name_key" to def.nameKey,
+                    "commands" to def.commands.joinToString(","),
+                    "all_messages" to def.allMessagesToChannel.toString(),
+                    "cross_server" to def.crossServerBridge.toString()
+                )
+            )
         }
-        actor.reply(messageFormattingService.formatMessage(lines, null, processUrls = false, processMentions = false))
+        val message = lines.fold(header) { acc, line ->
+            acc.append(Component.newline()).append(line)
+        }
+        actor.reply(message)
     }
 
     @Subcommand("join")
@@ -131,27 +131,27 @@ class ChannelCommands(
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.CHANNELS_NO_ACTIVE_INSTANCES, player, mapOf("channel_display_name" to def.displayName)))
             return
         }
-        val lines = buildString {
-            append(messageFormattingService.getConfigMessage(MessageKey.CHANNELS_MEMBERS_LIST_HEADER, player, mapOf("channel_display_name" to def.displayName)).toString().replace("\n", ""))
-            append("\n")
-            for (inst in instances) {
-                val viewers = channelService.getViewersForInstance(inst)
-                val names = viewers.joinToString(", ") { it.name }
-                val memberNames = names.ifBlank {
-                    messageFormattingService.getConfigMessage(MessageKey.CHANNELS_NO_MEMBERS, player).toString()
-                        .replace("\n", "")
-                }
-                append(messageFormattingService.getConfigMessage(
+
+        val header = messageFormattingService.getConfigMessage(MessageKey.CHANNELS_MEMBERS_LIST_HEADER, player, mapOf("channel_display_name" to def.displayName))
+        val instanceLines = instances.map { inst ->
+            val viewers = channelService.getViewersForInstance(inst)
+            val names = viewers.joinToString(", ") { it.name }
+            if (names.isBlank()) {
+                messageFormattingService.getConfigMessage(MessageKey.CHANNELS_NO_MEMBERS, player)
+            } else {
+                messageFormattingService.getConfigMessage(
                     MessageKey.CHANNELS_MEMBERS_LIST_INSTANCE,
                     player,
                     mapOf(
                         "channel_identifier" to inst.identifier,
-                        "member_names" to memberNames
+                        "member_names" to names
                     )
-                ).toString().replace("\n", ""))
-                append("\n")
+                )
             }
         }
-        actor.reply(messageFormattingService.formatMessage(lines, player, processUrls = false, processMentions = false))
+        val message = instanceLines.fold(header) { acc, line ->
+            acc.append(Component.newline()).append(line)
+        }
+        actor.reply(message)
     }
 }
