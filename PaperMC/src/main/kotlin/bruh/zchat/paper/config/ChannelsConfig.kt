@@ -10,19 +10,9 @@ data class GeneralChannelSettings(
     val enabled: Boolean = false,
 
     @field:Comment(
-        "Force tab completion placeholder resolution to run on the main thread to avoid async access warnings.\n" +
-                "WARNING: This may cause tab completion delay during high server load.\n" +
-                "Only enable if you experience async access warnings in console logs.\n" +
-                "Default: false (recommended)"
+        "Enable full tab completion for per-channel commands."
     )
-    val forceMainThreadForTabCompletion: Boolean = false,
-
-    @field:Comment(
-        "Enable full tab completion for per-channel commands by registering them as Bukkit commands.\n" +
-                "WARNING: When enabled, channel commands will NOT update on config reload. A full server restart is required.\n" +
-                "This provides better tab completion in clients that don't support the event-based tab completion system."
-    )
-    val enableFullTabCompletion: Boolean = false,
+    val enableFullTabCompletion: Boolean = true,
 )
 
 @ConfigSerializable

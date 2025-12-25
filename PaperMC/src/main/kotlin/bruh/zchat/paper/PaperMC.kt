@@ -156,7 +156,7 @@ class PaperMC : SuspendingJavaPlugin() {
         channelCommandService.updateChannelsCommandAlias()
 
         // Register dynamic channel commands if full tab completion is enabled
-        if (configManager.channels.settings.enableFullTabCompletion) {
+        if (configManager.channels.settings.enableFullTabCompletion && configManager.channels.settings.enabled) {
             channelCommandService.registerDynamicChannelCommands()
         }
 
@@ -318,10 +318,7 @@ class PaperMC : SuspendingJavaPlugin() {
         )
         server.pluginManager.registerEvents(
             ChannelCommandListener(
-                channelService,
-                configManager,
                 channelCommandService,
-                this
             ), this
         )
         server.pluginManager.registerEvents(PlayerDeathListener(configManager, messageFormattingService), this)

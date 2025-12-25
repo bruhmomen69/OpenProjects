@@ -31,7 +31,7 @@ class ChatPluginCommands(
             alertService.reload()
             channelCommandService.updateChannelsCommandAlias()
             channelCommandService.unregisterDynamicChannelCommands()
-            if (configManager.channels.settings.enableFullTabCompletion) {
+            if (configManager.channels.settings.enableFullTabCompletion && configManager.channels.settings.enabled) {
                 channelCommandService.registerDynamicChannelCommands()
             }
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_SUCCESS))

@@ -66,48 +66,6 @@ class ChannelCommandService(
         val timestamp: Long,
     )
 
-    fun parseCommandBuffer(buffer: String): List<String> {
-        return try {
-            val parts = buffer.substring(1).split(" ")
-            // Preserve trailing empty string to detect trailing space (user ready for next argument)
-            if (parts.lastOrNull()?.isEmpty() == true) {
-                parts.dropLast(1).filter { it.isNotEmpty() } + ""
-            } else {
-                parts.filter { it.isNotEmpty() }
-            }
-        } catch (e: Exception) {
-            plugin.slF4JLogger.warn("Failed to parse command buffer: ", e)
-            emptyList()
-        }
-    }
-
-    fun isChannelCommand(command: String): Boolean {
-        // Check cache first
-        val cached = channelCommandCache.getIfPresent(command)
-
-        if (cached != null) {
-            return cached.isChannelCommand
-        }
-
-        // Compute fresh result
-        val result = channelService.getDefinitions()
-            .any { def ->
-                def.commands.any {
-                    it.startsWith(command)
-                }
-            }
-
-        // Update cache
-        channelCommandCache.put(
-            command, CachedChannelCommandResult(
-                isChannelCommand = result,
-                timestamp = System.currentTimeMillis(),
-            )
-        )
-
-        return result
-    }
-
     fun generateCompletions(
         player: Player,
         parts: List<String>
@@ -348,9 +306,11 @@ class ChannelCommandService(
     fun registerDynamicChannelCommands() {
         try {
             val commandMap = getCommandMap() ?: run {
-                plugin.slF4JLogger.warn("Failed to get CommandMap - dynamic channel commands will not be registered")
+                plugin.slF4JLogger.warn("Failed to load CommandMap - dynamic channel commands will not be registered")
                 return
             }
+
+            channelService.rebuildDefinitions()
 
             channelService.getDefinitions().forEach { definition ->
                 definition.commands.forEach { commandName ->
@@ -361,11 +321,11 @@ class ChannelCommandService(
 
                     commandMap.register("zealouschat", dynamicCommand)
                     dynamicChannelCommands.add(commandName)
-                    plugin.slF4JLogger.info("Registered dynamic channel command: /$commandName")
+                    plugin.slF4JLogger.debug("Registered dynamic channel command: /$commandName")
                 }
             }
 
-            plugin.slF4JLogger.info("Registered ${dynamicChannelCommands.size} dynamic channel commands for full tab completion")
+            plugin.slF4JLogger.info("Registered ${dynamicChannelCommands.size} dynamic channel commands.")
         } catch (e: Exception) {
             plugin.slF4JLogger.error("Failed to register dynamic channel commands: ${e.message}", e)
         }
@@ -383,7 +343,7 @@ class ChannelCommandService(
                     plugin.slF4JLogger.warn("Failed to unregister dynamic command: $commandName")
                 }
             }
-            plugin.slF4JLogger.info("Unregistered ${dynamicChannelCommands.size} dynamic channel commands")
+            plugin.slF4JLogger.debug("Unregistered ${dynamicChannelCommands.size} dynamic channel commands")
             dynamicChannelCommands.clear()
         }
     }
