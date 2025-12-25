@@ -66,16 +66,9 @@ class InventoryProtectionListener : Listener {
      */
     private fun isReadOnlyInventory(title: Component): Boolean {
         val titleText = Component.text().append(title).build().toString()
-        return titleText.contains("'s Inventory") || 
-               titleText.contains("'s Ender Chest") || 
-               titleText.contains("'s Armor") || 
-               titleText.contains("'s Hand")
-    }
-
-    private fun isReadOnlyInventory(titleText: String): Boolean {
-        return titleText.contains("'s Inventory") ||
-                titleText.contains("'s Ender Chest") ||
-                titleText.contains("'s Armor") ||
-                titleText.contains("'s Hand")
+        return titleText.contains("'s Inventory View") ||
+               titleText.contains("'s Ender Chest View") ||
+               titleText.contains("'s Armor View") ||
+               titleText.contains("'s Hand View")
     }
 }

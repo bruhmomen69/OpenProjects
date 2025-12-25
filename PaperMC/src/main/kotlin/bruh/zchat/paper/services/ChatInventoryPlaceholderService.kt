@@ -4,6 +4,8 @@ import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.services.snapshots.FileInventorySnapshotStore
 import bruh.zchat.paper.services.snapshots.InventorySnapshotSerializer
 import bruh.zchat.paper.services.snapshots.InventorySnapshotStore
+import bruh.zchat.paper.utils.ChatInventoryHolder
+import bruh.zchat.paper.utils.ChatInventoryHolderImpl
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
@@ -669,7 +671,7 @@ class ChatInventoryPlaceholderService(
      * Creates a read-only inventory from a snapshot
      */
     private fun createReadOnlyInventory(snapshot: InventorySnapshot): Inventory {
-        val title = "${snapshot.playerName}'s ${snapshot.type.displayName}"
+        val title = "${snapshot.playerName}'s ${snapshot.type.displayName} View"
         val size = when (snapshot.type) {
             PlaceholderType.INV -> max(ceil((snapshot.items.size - 1) / 9.0) * 9, 45.0).roundToInt()  // 6 rows for main inventory
             PlaceholderType.ENDER -> max(ceil((snapshot.items.size - 1) / 9.0) * 9, 27.0).roundToInt() // 3-6 rows for ender chest
@@ -678,7 +680,9 @@ class ChatInventoryPlaceholderService(
             else -> 9
         }
 
-        val inventory = Bukkit.createInventory(null, size, Component.text(title))
+        val holder = ChatInventoryHolderImpl()
+        val inventory = Bukkit.createInventory(holder, size, Component.text(title))
+        holder.innerInventory = inventory
 
         // Add items to inventory
         for (i in snapshot.items.indices) {
