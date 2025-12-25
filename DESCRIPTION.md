@@ -13,7 +13,7 @@ ZealousChat replaces Vanilla chat with a fully configurable system built on the 
 - **Rank, world & permission based formats** with priority system
 - **Private messaging** (`/msg`, `/reply`) with social-spy & cooldowns
 - **Cross-server private messaging** (optional, **MySQL required**) for networks running multiple servers
-- **Chat / Message toggles** per-player (with staff bypass)
+- **Chat / Message toggles** per-player or server-wide (with staff bypass)
 - **Inventory placeholders** `[inv]`, `[ender]`, `[armor]`, `[hand]`, `[pos]`, `[health]`
 - **URL auto-linking** & **@mentions** (configurable)
 - **Advanced swear filter** with regex and fuzzy matching, with a tiered punishment system.
@@ -166,6 +166,10 @@ The swear filter provides advanced profanity detection with configurable punishm
   - Permission: `zchat.admin.clear`
   - Parameters:
     - `<type>`: One of: `toggles` (resets all chat toggles), `socialspy` (resets all social spy states), `cooldowns` (clears message cooldowns), `blocks` (clears all block lists), `alerts` (clears all alert states), or `all` (clears all data)
+- `/zealouschat admin gtoggle <type>` — Toggle global chat features (aliases: `/gtoggle`, `/chatplugin admin gtoggle`, `/zealouschat admin gtoggle`, `/zchat admin gtoggle`)
+  - Permission: `zchat.admin.gtoggle`
+  - Parameters:
+    - `<type>`: One of: `chat`, `privatemessages`, `both`, `all`
 - `/zealouschat admin toggle chat <player> <true|false>` — Force toggle public chat for a player
   - Permission: `zchat.admin.toggle.chat`
   - Parameters:
@@ -207,6 +211,30 @@ The swear filter provides advanced profanity detection with configurable punishm
   - Permission: `zchat.admin.block`
   - Parameters:
     - `<player>`: Player whose block list will be cleared
+
+### Global Toggle Commands
+- `/gtoggle <type>` — Toggle global chat features (aliases: `/chatplugin admin gtoggle`, `/zealouschat admin gtoggle`, `/zchat admin gtoggle`)
+  - Permission: `zchat.admin.gtoggle`
+  - Parameters:
+    - `<type>`: One of: `chat`, `privatemessages`, `both`, `all`
+- `/gtoggle chat` — Toggle global public chat
+  - Permission: `zchat.admin.gtoggle`
+- `/gtoggle privatemessages` — Toggle global private messages
+  - Permission: `zchat.admin.gtoggle`
+- `/gtoggle both` — Toggle both global chat and messages (flips current states)
+  - Permission: `zchat.admin.gtoggle`
+- `/gtoggle all` — Enable all global chat and messaging
+  - Permission: `zchat.admin.gtoggle`
+  - Parameters:
+    - `<type>`: One of: `chat`, `privatemessages`, `both`, `all`
+- `/zealouschat admin gtoggle chat` — Toggle global public chat
+  - Permission: `zchat.admin.gtoggle`
+- `/zealouschat admin gtoggle privatemessages` — Toggle global private messages
+  - Permission: `zchat.admin.gtoggle`
+- `/zealouschat admin gtoggle both` — Toggle both global chat and messages (flips current states)
+  - Permission: `zchat.admin.gtoggle`
+- `/zealouschat admin gtoggle all` — Enable all global chat and messaging
+  - Permission: `zchat.admin.gtoggle`
 
 ## Quick Start
 1. Drop the built jar into `plugins/` and restart.
@@ -261,11 +289,14 @@ All Chat, PM and config strings support MiniMessage plus any PlaceholderAPI tags
 | `zchat.commandspy`             | op      | Monitor player commands             |
 | `zchat.bypass.chattoggle`      | op      | Chat even when disabled             |
 | `zchat.bypass.messagetoggle`   | op      | PM even when disabled               |
+| `zchat.bypass.globalchat`       | op      | Bypass global chat toggle           |
+| `zchat.bypass.globalmessages`   | op      | Bypass global message toggle        |
 | `zchat.viewinventory`          | true    | View shared inventories             |
 | `zchat.inventory.placeholders` | true    | Use inventory placeholders          |
 | `zchat.admin.toggle.chat`      | op      | Force toggle chat for a player      |
 | `zchat.admin.toggle.messages`  | op      | Force toggle messages for a player  |
 | `zchat.admin.toggle.all`       | op      | Force toggle both chat & messages    |
+| `zchat.admin.gtoggle`         | op      | Toggle global chat features          |
 | `zchat.admin.socialspy`        | op      | Force toggle social spy for player   |
 | `zchat.admin.stats`            | op      | View server-wide statistics         |
 | `zchat.admin.alerts`           | op      | Force toggle alerts for a player     |

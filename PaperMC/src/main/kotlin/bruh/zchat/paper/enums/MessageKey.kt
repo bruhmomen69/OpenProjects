@@ -41,7 +41,17 @@ enum class MessageKey(
     CHAT_TOGGLE_CHAT_DISABLED("chat_toggle.chat_disabled", "chat_toggle", Function { it.chat.chatDisabled }),
     CHAT_TOGGLE_MESSAGES_ENABLED("chat_toggle.messages_enabled", "chat_toggle", Function { it.chat.messagesEnabled }),
     CHAT_TOGGLE_MESSAGES_DISABLED("chat_toggle.messages_disabled", "chat_toggle", Function { it.chat.messagesDisabled }),
-    
+
+    // Global toggle messages
+    GLOBAL_CHAT_ENABLED("global_toggle.chat_enabled", "global_toggle", Function { it.globalToggle.chatEnabled }),
+    GLOBAL_CHAT_DISABLED("global_toggle.chat_disabled", "global_toggle", Function { it.globalToggle.chatDisabled }),
+    GLOBAL_MESSAGES_ENABLED("global_toggle.messages_enabled", "global_toggle", Function { it.globalToggle.messagesEnabled }),
+    GLOBAL_MESSAGES_DISABLED("global_toggle.messages_disabled", "global_toggle", Function { it.globalToggle.messagesDisabled }),
+    GLOBAL_BOTH_ENABLED("global_toggle.both_enabled", "global_toggle", Function { it.globalToggle.bothEnabled }),
+    GLOBAL_BOTH_DISABLED("global_toggle.both_disabled", "global_toggle", Function { it.globalToggle.bothDisabled }),
+    GLOBAL_ALL_ENABLED("global_toggle.all_enabled", "global_toggle", Function { it.globalToggle.allEnabled }),
+    GLOBAL_ALL_DISABLED("global_toggle.all_disabled", "global_toggle", Function { it.globalToggle.allDisabled }),
+
     // Social spy messages
     SOCIAL_SPY_SYSTEM_DISABLED("social_spy.system_disabled", "social_spy", Function { it.socialSpy.systemDisabled }),
     SOCIAL_SPY_NO_PERMISSION("social_spy.no_permission", "social_spy", Function { it.socialSpy.noPermission }),

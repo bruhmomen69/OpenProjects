@@ -199,15 +199,21 @@ data class PrivateMessageConfig(
 data class ChatToggleConfig(
     @field:Comment("Enable chat toggle functionality.")
     val enableChatToggle: Boolean = true,
-    
+
     @field:Comment("Enable message toggle functionality.")
     val enableMessageToggle: Boolean = true,
-    
+
     @field:Comment("Persist toggle states across server restarts.")
     val persistToggleState: Boolean = true,
-    
+
     @field:Comment("When toggling chat, also toggle private messages automatically.")
-    val linkChatAndMessages: Boolean = false
+    val linkChatAndMessages: Boolean = false,
+
+    @field:Comment("Enable global chat toggle (stops all chat for all players)")
+    val globalChatDisabled: Boolean = false,
+
+    @field:Comment("Enable global messages toggle (stops all private messaging for all players)")
+    val globalMessagesDisabled: Boolean = false
 )
 
 @ConfigSerializable

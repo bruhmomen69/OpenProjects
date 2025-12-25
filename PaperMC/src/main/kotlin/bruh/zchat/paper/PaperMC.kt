@@ -3,13 +3,13 @@ package bruh.zchat.paper
 import bruh.zchat.paper.commands.*
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.*
-import bruh.zchat.paper.listeners.*
+import bruh.zchat.paper.listeners.ChatMessageListener
+import bruh.zchat.paper.listeners.InventoryProtectionListener
 import bruh.zchat.paper.listeners.channel.ChannelCommandListener
 import bruh.zchat.paper.listeners.playerstatus.PlayerAdvancementListener
 import bruh.zchat.paper.listeners.playerstatus.PlayerDeathListener
 import bruh.zchat.paper.listeners.playerstatus.PlayerJoinQuitListener
 import bruh.zchat.paper.services.*
-import bruh.zchat.paper.services.AlertService
 import bruh.zchat.paper.services.channel.ChannelFormattingService
 import bruh.zchat.paper.services.channel.ChannelService
 import bruh.zchat.paper.services.snapshots.FileInventorySnapshotStore
@@ -25,7 +25,6 @@ import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.withContext
 import org.bukkit.command.CommandMap
-import org.bukkit.command.SimpleCommandMap
 import revxrsal.commands.Lamp
 import revxrsal.commands.bukkit.BukkitLamp
 import java.lang.reflect.Field
@@ -54,7 +53,7 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var inventorySnapshotStore: InventorySnapshotStore
     private lateinit var lamp: Lamp<*>
     private lateinit var channelCommandService: ChannelCommandService
-    
+
     // Server instance ID for cross-server messaging
     val serverInstanceId = java.util.UUID.randomUUID().toString()
 
@@ -80,7 +79,7 @@ class PaperMC : SuspendingJavaPlugin() {
             if (ModrinthUpdateChecker.isNewerVersion(latestVersion, currentVersion)) {
                 logger.warning(
                     "A newer version of ZealousChat is available on Modrinth (current=$currentVersion, latest=$latestVersion): " +
-                        "https://modrinth.com/project/zealouschat"
+                            "https://modrinth.com/project/zealouschat"
                 )
             }
         }
@@ -142,10 +141,11 @@ class PaperMC : SuspendingJavaPlugin() {
         )
         // Wire up circular dependency
         privateMessageService.crossServerMessageBusService = crossServerMessageBusService
-        
+
         chatFormattingService = ChatFormattingService(configManager, messageFormattingService)
         infractionManager = InfractionManager(dbPlayerQueries, playerDataManager)
-        swearFilterService = SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
+        swearFilterService =
+            SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
         blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
 
         // Initialize ChannelCommandService
@@ -156,7 +156,7 @@ class PaperMC : SuspendingJavaPlugin() {
             configManager.messages,
             this
         )
-        
+
         // Set channel command aliases
         channelCommandService.updateChannelsCommandAlias()
 
@@ -167,12 +167,19 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Initialize maintenance services
         databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, dbConfig)
-        scheduledTaskService = ScheduledTaskService(this, configManager, databaseMaintenanceService, playerDataManager, crossServerMessageBusService, channelService)
-        
+        scheduledTaskService = ScheduledTaskService(
+            this,
+            configManager,
+            databaseMaintenanceService,
+            playerDataManager,
+            crossServerMessageBusService,
+            channelService
+        )
+
         // Schedule maintenance tasks
         scheduledTaskService.scheduleMaintenanceTasks()
         scheduledTaskService.scheduleChannelIdentifierRefresh()
-        
+
         // Schedule cross-server tasks
         if (configManager.storage.crossServerMessaging.enabled) {
             val isRedisBackend = configManager.storage.crossServerMessaging.backend.equals("redis", ignoreCase = true)
@@ -182,7 +189,10 @@ class PaperMC : SuspendingJavaPlugin() {
                     try {
                         crossServerMessageBusService.start()
                     } catch (e: Exception) {
-                        slF4JLogger.error("Failed to start Redis cross-server message bus; disabling cross-server messaging", e)
+                        slF4JLogger.error(
+                            "Failed to start Redis cross-server message bus; disabling cross-server messaging",
+                            e
+                        )
                         val newStorage = configManager.storage.copy(
                             crossServerMessaging = configManager.storage.crossServerMessaging.copy(enabled = false)
                         )
@@ -225,7 +235,13 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp = BukkitLamp.builder(this).build()
 
         // Register commands
-        val commands = ChatPluginCommands(configManager, chatFormattingService, messageFormattingService, alertService, channelCommandService)
+        val commands = ChatPluginCommands(
+            configManager,
+            chatFormattingService,
+            messageFormattingService,
+            alertService,
+            channelCommandService
+        )
         lamp.register(commands)
         lamp.register(ChatPluginCommands.FormatCommands(configManager))
         lamp.register(ChatPluginCommands.ToggleCommands(configManager))
@@ -254,6 +270,7 @@ class PaperMC : SuspendingJavaPlugin() {
         )
         lamp.register(
             ChatAdminCommands(
+                configManager,
                 chatToggleService,
                 socialSpyService,
                 privateMessageService,
@@ -263,9 +280,18 @@ class PaperMC : SuspendingJavaPlugin() {
                 this
             )
         )
-        
+
         // Register alert commands
-        lamp.register(bruh.zchat.paper.commands.AlertCommands(alertService, messageFormattingService))
+        lamp.register(AlertCommands(alertService, messageFormattingService))
+
+        // Register global toggle commands
+        lamp.register(
+            GlobalToggleCommands(
+                configManager,
+                chatToggleService,
+                messageFormattingService
+            )
+        )
 
         // Register event listeners
         server.pluginManager.registerEvents(
@@ -460,6 +486,7 @@ class PaperMC : SuspendingJavaPlugin() {
                 dataFolder.toPath().resolve("inventory_snapshots"),
                 configManager
             )
+
             "sql" -> SqlInventorySnapshotStore(databaseService)
             "redis" -> {
                 val redisCfg = storageCfg.database.redis
@@ -468,6 +495,7 @@ class PaperMC : SuspendingJavaPlugin() {
                     keyPrefix = storageCfg.inventorySnapshots.redisKeyPrefix
                 )
             }
+
             else -> {
                 logger.warning("Unknown inventorySnapshots backend '$backend', defaulting to fs")
                 FileInventorySnapshotStore(

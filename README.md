@@ -113,12 +113,21 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
 - `/chatplugin format list` - List all formats (`zchat.admin.format`)
 - `/chatplugin toggle colors/formatting/mentions/cooldown` - Toggle features (`zchat.admin.toggle`)
 - `/chatplugin admin toggle chat/messages/all <player> <true/false>` - Force toggle player settings
+- `/chatplugin admin gtoggle <chat|privatemessages|both|all>` - Toggle global chat features (`zchat.admin.gtoggle`)
 - `/chatplugin admin socialspy <player> <true/false>` - Manage social spy access
 - `/chatplugin admin stats` - View system statistics and active users
 - `/chatplugin admin block <player> <target>` - Force a player to block another player
 - `/chatplugin admin unblock <player> <target>` - Force a player to unblock another player
 - `/chatplugin admin clearblocks <player>` - Clear all blocks for a player
 - `/chatplugin admin clear <toggles/socialspy/cooldowns/blocks/all>` - Clear various data types
+
+### 🌍 **Global Toggle Commands** (Admin Only)
+- `/gtoggle <chat|privatemessages|both|all>` - Toggle global chat features (`zchat.admin.gtoggle`)
+  - `chat` - Toggle global public chat on/off
+  - `privatemessages` - Toggle global private messages on/off
+  - `both` - Toggle both global chat and messages (flips current states)
+  - `all` - Enable all global chat and messaging
+- **Aliases**: `/chatplugin admin gtoggle`, `/zealouschat admin gtoggle`, `/zchat admin gtoggle`
 
 ### 🔧 **Technical Excellence**
 - **Modern Paper API** usage (AsyncChatEvent, Adventure Components)
@@ -162,6 +171,12 @@ Result: Entire message shows admin hover/click, but [Inventory: 15 items] and [P
   - Independent or linked toggle behavior (configurable)
   - Persistent state across server restarts
   - Staff bypass permissions
+  - **Global Toggle System** for server-wide control:
+    - `/gtoggle chat` - Toggle global public chat
+    - `/gtoggle privatemessages` - Toggle global private messages
+    - `/gtoggle both` - Toggle both global chat and messages
+    - `/gtoggle all` - Enable all global chat and messaging
+    - Separate bypass permissions for global controls
 - **Social Spy & Moderation Tools**:
   - `/chatplugin toggle socialspy` - Monitor private messages
   - Optional command spy for monitoring player commands
@@ -276,10 +291,11 @@ zchat.inventory.placeholders # Use inventory placeholders in chat
 zchat.viewinventory    # View inventory snapshots
 
 # Staff permissions
-zchat.admin            # All admin commands
-zchat.socialspy        # Monitor private messages
 zchat.bypass.cooldown  # Bypass chat cooldowns
 zchat.bypass.chattoggle # Always able to chat
+zchat.bypass.globalchat   # Bypass global chat toggle
+zchat.bypass.globalmessages # Bypass global message toggle
+zchat.admin.gtoggle   # Use global toggle commands
 ```
 
 ### 🎨 **Rank Format Permissions**

@@ -1,5 +1,6 @@
 package bruh.zchat.paper.commands
 
+import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.*
 import com.github.shynixn.mccoroutine.folia.launch
@@ -192,6 +193,7 @@ class ChatToggleCommands(
  */
 @Command("chatplugin admin", "zealouschat admin", "zchat admin")
 class ChatAdminCommands(
+    private val configManager: ConfigManager,
     private val chatToggleService: ChatToggleService,
     private val socialSpyService: SocialSpyService,
     private val privateMessageService: PrivateMessageService,
@@ -421,6 +423,91 @@ class ChatAdminCommands(
                         .deserialize("<red>Usage: /chatplugin admin clear <toggles|socialspy|cooldowns|blocks|alerts|all></red>")
                 )
             }
+        }
+    }
+
+    @Subcommand("gtoggle chat")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun gtoggleChat(actor: BukkitCommandActor) {
+        val newState = chatToggleService.toggleGlobalChat()
+        val key = if (newState) MessageKey.GLOBAL_CHAT_DISABLED else MessageKey.GLOBAL_CHAT_ENABLED
+        actor.reply(messageFormattingService.getConfigMessage(key))
+    }
+
+    @Subcommand("gtoggle privatemessages")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun gtoggleMessages(actor: BukkitCommandActor) {
+        val newState = chatToggleService.toggleGlobalMessages()
+        val key = if (newState) MessageKey.GLOBAL_MESSAGES_DISABLED else MessageKey.GLOBAL_MESSAGES_ENABLED
+        actor.reply(messageFormattingService.getConfigMessage(key))
+    }
+
+    @Subcommand("gtoggle both")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun gtoggleBoth(actor: BukkitCommandActor) {
+        val newState = chatToggleService.toggleGlobalBoth()
+        val key = if (newState) MessageKey.GLOBAL_BOTH_DISABLED else MessageKey.GLOBAL_BOTH_ENABLED
+        actor.reply(messageFormattingService.getConfigMessage(key))
+    }
+
+    @Subcommand("gtoggle all")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun gtoggleAll(actor: BukkitCommandActor) {
+        val newConfig = configManager.config.copy(
+            chatToggle = configManager.config.chatToggle.copy(
+                globalChatDisabled = true,
+                globalMessagesDisabled = true
+            )
+        )
+
+        if (configManager.updateConfig(newConfig)) {
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.GLOBAL_ALL_DISABLED))
+        }
+    }
+}
+
+@Command("gtoggle")
+class GlobalToggleCommands(
+    private val configManager: ConfigManager,
+    private val chatToggleService: ChatToggleService,
+    private val messageFormattingService: MessageFormattingService
+) {
+    @Subcommand("chat")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun chat(actor: BukkitCommandActor) {
+        val newState = chatToggleService.toggleGlobalChat()
+        val key = if (newState) MessageKey.GLOBAL_CHAT_DISABLED else MessageKey.GLOBAL_CHAT_ENABLED
+        actor.reply(messageFormattingService.getConfigMessage(key))
+    }
+
+    @Subcommand("privatemessages")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun messages(actor: BukkitCommandActor) {
+        val newState = chatToggleService.toggleGlobalMessages()
+        val key = if (newState) MessageKey.GLOBAL_MESSAGES_DISABLED else MessageKey.GLOBAL_MESSAGES_ENABLED
+        actor.reply(messageFormattingService.getConfigMessage(key))
+    }
+
+    @Subcommand("both")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun both(actor: BukkitCommandActor) {
+        val newState = chatToggleService.toggleGlobalBoth()
+        val key = if (newState) MessageKey.GLOBAL_BOTH_DISABLED else MessageKey.GLOBAL_BOTH_ENABLED
+        actor.reply(messageFormattingService.getConfigMessage(key))
+    }
+
+    @Subcommand("all")
+    @CommandPermission("zchat.admin.gtoggle")
+    fun all(actor: BukkitCommandActor) {
+        val newConfig = configManager.config.copy(
+            chatToggle = configManager.config.chatToggle.copy(
+                globalChatDisabled = false,
+                globalMessagesDisabled = false
+            )
+        )
+
+        if (configManager.updateConfig(newConfig)) {
+            actor.reply(messageFormattingService.getConfigMessage(MessageKey.GLOBAL_ALL_ENABLED))
         }
     }
 }

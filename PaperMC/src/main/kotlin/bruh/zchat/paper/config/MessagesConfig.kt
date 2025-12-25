@@ -42,7 +42,10 @@ data class MessagesConfig(
     val system: SystemMessages = SystemMessages(),
 
     @field:Comment("Channel system messages and notifications")
-    val channels: ChannelMessages = ChannelMessages()
+    val channels: ChannelMessages = ChannelMessages(),
+
+    @field:Comment("Global toggle messages")
+    val globalToggle: GlobalToggleMessages = GlobalToggleMessages()
 )
 
 @ConfigSerializable
@@ -531,4 +534,31 @@ data class ChannelMessages(
     
     @field:Comment("Tab completion tooltip format for online players")
     val tabPlayerTooltipFormat: String = "<white><player_name></white> - <aqua><world></aqua><op>",
+)
+
+@ConfigSerializable
+data class GlobalToggleMessages(
+    @field:Comment("Message shown when global chat is enabled")
+    val chatEnabled: String = "<green>Global chat has been enabled!</green>",
+
+    @field:Comment("Message shown when global chat is disabled")
+    val chatDisabled: String = "<red>Global chat has been disabled!</red>",
+
+    @field:Comment("Message shown when global messaging is enabled")
+    val messagesEnabled: String = "<green>Global messaging has been enabled!</green>",
+
+    @field:Comment("Message shown when global messaging is disabled")
+    val messagesDisabled: String = "<red>Global messaging has been disabled!</red>",
+
+    @field:Comment("Message shown when both global chat and messaging are enabled")
+    val bothEnabled: String = "<green>Global chat and messaging have been enabled!</green>",
+
+    @field:Comment("Message shown when both global chat and messaging are disabled")
+    val bothDisabled: String = "<red>Global chat and messaging have been disabled!</red>",
+
+    @field:Comment("Message shown when all global toggles are enabled")
+    val allEnabled: String = "<green>All global chat toggles have been enabled!</green>",
+
+    @field:Comment("Message shown when all global toggles are disabled")
+    val allDisabled: String = "<red>All global chat toggles have been disabled!</red>"
 )

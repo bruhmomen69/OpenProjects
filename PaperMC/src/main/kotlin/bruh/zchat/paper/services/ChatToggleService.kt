@@ -100,11 +100,19 @@ class ChatToggleService(
             return true
         }
 
-        // Staff can always bypass chat toggle
+        // Check global toggle first
+        if (configManager.config.chatToggle.globalChatDisabled) {
+            if (player.hasPermission("zchat.bypass.globalchat")) {
+                return true
+            }
+            return false
+        }
+
+        // Staff can always bypass personal chat toggle
         if (player.hasPermission("zchat.bypass.chattoggle")) {
             return true
         }
-        
+
         return !playerDataManager.isChatDisabledOnline(player.uniqueId)
     }
     
@@ -127,11 +135,19 @@ class ChatToggleService(
             return true
         }
 
-        // Staff can always bypass message toggle
+        // Check global toggle first
+        if (configManager.config.chatToggle.globalMessagesDisabled) {
+            if (player.hasPermission("zchat.bypass.globalmessages")) {
+                return true
+            }
+            return false
+        }
+
+        // Staff can always bypass personal message toggle
         if (player.hasPermission("zchat.bypass.messagetoggle")) {
             return true
         }
-        
+
         return !playerDataManager.isMessagesDisabledOnline(player.uniqueId)
     }
     
@@ -220,6 +236,57 @@ class ChatToggleService(
         }
     }
     
+    /**
+     * Check if global chat is disabled
+     */
+    fun isGlobalChatDisabled(): Boolean {
+        return configManager.config.chatToggle.globalChatDisabled
+    }
+
+    /**
+     * Check if global messages are disabled
+     */
+    fun isGlobalMessagesDisabled(): Boolean {
+        return configManager.config.chatToggle.globalMessagesDisabled
+    }
+
+    /**
+     * Toggle global chat (admin command)
+     */
+    fun toggleGlobalChat(): Boolean {
+        val newState = !configManager.config.chatToggle.globalChatDisabled
+        val newConfig = configManager.config.copy(
+            chatToggle = configManager.config.chatToggle.copy(globalChatDisabled = newState)
+        )
+        return configManager.updateConfig(newConfig)
+    }
+
+    /**
+     * Toggle global messages (admin command)
+     */
+    fun toggleGlobalMessages(): Boolean {
+        val newState = !configManager.config.chatToggle.globalMessagesDisabled
+        val newConfig = configManager.config.copy(
+            chatToggle = configManager.config.chatToggle.copy(globalMessagesDisabled = newState)
+        )
+        return configManager.updateConfig(newConfig)
+    }
+
+    /**
+     * Toggle both global chat and messages (admin command)
+     */
+    fun toggleGlobalBoth(): Boolean {
+        val newChatState = !configManager.config.chatToggle.globalChatDisabled
+        val newMessageState = !configManager.config.chatToggle.globalMessagesDisabled
+        val newConfig = configManager.config.copy(
+            chatToggle = configManager.config.chatToggle.copy(
+                globalChatDisabled = newChatState,
+                globalMessagesDisabled = newMessageState
+            )
+        )
+        return configManager.updateConfig(newConfig)
+    }
+
     /**
      * Handle player quit - clean up tracking
      */
