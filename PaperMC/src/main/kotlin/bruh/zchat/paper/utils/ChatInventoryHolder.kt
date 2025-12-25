@@ -8,7 +8,7 @@ interface ChatInventoryHolder: InventoryHolder {
 
 }
 
-class ChatInventoryHolderImpl: InventoryHolder {
+class ChatInventoryHolderImpl: ChatInventoryHolder {
     public lateinit var innerInventory: Inventory
     override fun getInventory(): Inventory {
         return innerInventory
