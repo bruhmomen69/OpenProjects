@@ -24,10 +24,8 @@ import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.withContext
-import org.bukkit.command.CommandMap
 import revxrsal.commands.Lamp
 import revxrsal.commands.bukkit.BukkitLamp
-import java.lang.reflect.Field
 
 class PaperMC : SuspendingJavaPlugin() {
     private lateinit var configManager: ConfigManager
@@ -56,9 +54,6 @@ class PaperMC : SuspendingJavaPlugin() {
 
     // Server instance ID for cross-server messaging
     val serverInstanceId = java.util.UUID.randomUUID().toString()
-
-    // Track dynamically registered channel commands for cleanup
-    private val dynamicChannelCommands = mutableListOf<String>()
 
     override suspend fun onEnableAsync() {
         // Initialize configuration
@@ -162,7 +157,7 @@ class PaperMC : SuspendingJavaPlugin() {
 
         // Register dynamic channel commands if full tab completion is enabled
         if (configManager.channels.settings.enableFullTabCompletion) {
-            registerDynamicChannelCommands()
+            channelCommandService.registerDynamicChannelCommands()
         }
 
         // Initialize maintenance services
@@ -356,72 +351,10 @@ class PaperMC : SuspendingJavaPlugin() {
         }
     }
 
-    private fun registerDynamicChannelCommands() {
-        try {
-            val commandMap = getCommandMap() ?: run {
-                logger.severe("Failed to get CommandMap - dynamic channel commands will not be registered")
-                return
-            }
-
-            channelService.getDefinitions().forEach { definition ->
-                definition.commands.forEach { commandName ->
-                    val dynamicCommand = DynamicChannelCommand(
-                        name = commandName,
-                        channelCommandService = channelCommandService
-                    )
-
-                    commandMap.register("zealouschat", dynamicCommand)
-                    dynamicChannelCommands.add(commandName)
-                    logger.info("Registered dynamic channel command: /$commandName")
-                }
-            }
-
-            logger.info("Registered ${dynamicChannelCommands.size} dynamic channel commands for full tab completion")
-        } catch (e: Exception) {
-            logger.severe("Failed to register dynamic channel commands: ${e.message}")
-            e.printStackTrace()
-        }
-    }
-
-    private fun getCommandMap(): CommandMap? {
-        return try {
-            val server = server
-            val commandMapField: Field = server.javaClass.getDeclaredField("commandMap")
-            if (!commandMapField.trySetAccessible()) throw NoSuchFieldException("commandMap")
-            commandMapField.get(server) as? CommandMap
-        } catch (e: NoSuchFieldException) {
-            logger.warning("Could not find commandMap field - trying alternative method")
-            try {
-                val getCommandMap = server.javaClass.getDeclaredMethod("getCommandMap")
-                getCommandMap.isAccessible = true
-                getCommandMap.invoke(server) as? CommandMap
-            } catch (e2: Exception) {
-                logger.severe("Failed to get CommandMap via reflection: ${e2.message}")
-                e2.printStackTrace()
-                null
-            }
-        } catch (e: Exception) {
-            logger.severe("Failed to get CommandMap: ${e.message}")
-            e.printStackTrace()
-            null
-        }
-    }
-
     override suspend fun onDisableAsync() {
         // Unregister dynamic channel commands
-        if (dynamicChannelCommands.isNotEmpty()) {
-            val commandMap = getCommandMap()
-            if (commandMap != null) {
-                dynamicChannelCommands.forEach { commandName ->
-                    try {
-                        commandMap.getCommand(commandName)?.unregister(commandMap)
-                    } catch (e: Exception) {
-                        logger.warning("Failed to unregister dynamic command: $commandName")
-                    }
-                }
-                logger.info("Unregistered ${dynamicChannelCommands.size} dynamic channel commands")
-                dynamicChannelCommands.clear()
-            }
+        if (::channelCommandService.isInitialized) {
+            channelCommandService.unregisterDynamicChannelCommands()
         }
 
         // Cancel scheduled tasks

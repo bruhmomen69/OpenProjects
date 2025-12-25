@@ -1,5 +1,6 @@
 package bruh.zchat.paper.services
 
+import bruh.zchat.paper.commands.DynamicChannelCommand
 import bruh.zchat.paper.config.ChannelsConfig
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.MessagesConfig
@@ -11,9 +12,11 @@ import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
+import org.bukkit.command.CommandMap
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import java.lang.reflect.Field
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -44,6 +47,8 @@ class ChannelCommandService(
         .expireAfterWrite(60, TimeUnit.SECONDS)
         .maximumSize(500)
         .build()
+
+    private val dynamicChannelCommands = mutableListOf<String>()
 
     data class CachedCommands(
         val commands: List<String>,
@@ -338,5 +343,70 @@ class ChannelCommandService(
         }
         player.chat(message)
         return CommandExecutionResult(handled = true, shouldCancelEvent = true)
+    }
+
+    fun registerDynamicChannelCommands() {
+        try {
+            val commandMap = getCommandMap() ?: run {
+                plugin.slF4JLogger.warn("Failed to get CommandMap - dynamic channel commands will not be registered")
+                return
+            }
+
+            channelService.getDefinitions().forEach { definition ->
+                definition.commands.forEach { commandName ->
+                    val dynamicCommand = DynamicChannelCommand(
+                        name = commandName,
+                        channelCommandService = this
+                    )
+
+                    commandMap.register("zealouschat", dynamicCommand)
+                    dynamicChannelCommands.add(commandName)
+                    plugin.slF4JLogger.info("Registered dynamic channel command: /$commandName")
+                }
+            }
+
+            plugin.slF4JLogger.info("Registered ${dynamicChannelCommands.size} dynamic channel commands for full tab completion")
+        } catch (e: Exception) {
+            plugin.slF4JLogger.error("Failed to register dynamic channel commands: ${e.message}", e)
+        }
+    }
+
+    fun unregisterDynamicChannelCommands() {
+        if (dynamicChannelCommands.isEmpty()) return
+
+        val commandMap = getCommandMap()
+        if (commandMap != null) {
+            dynamicChannelCommands.forEach { commandName ->
+                try {
+                    commandMap.getCommand(commandName)?.unregister(commandMap)
+                } catch (e: Exception) {
+                    plugin.slF4JLogger.warn("Failed to unregister dynamic command: $commandName")
+                }
+            }
+            plugin.slF4JLogger.info("Unregistered ${dynamicChannelCommands.size} dynamic channel commands")
+            dynamicChannelCommands.clear()
+        }
+    }
+
+    private fun getCommandMap(): CommandMap? {
+        val server = Bukkit.getServer()
+        return try {
+            val commandMapField: Field = server.javaClass.getDeclaredField("commandMap")
+            if (!commandMapField.trySetAccessible()) throw NoSuchFieldException("commandMap")
+            commandMapField.get(server) as? CommandMap
+        } catch (e: NoSuchFieldException) {
+            plugin.slF4JLogger.warn("Could not find commandMap field - trying alternative method")
+            try {
+                val getCommandMap = server.javaClass.getDeclaredMethod("getCommandMap")
+                getCommandMap.isAccessible = true
+                getCommandMap.invoke(server) as? CommandMap
+            } catch (e2: Exception) {
+                plugin.slF4JLogger.error("Failed to get CommandMap via reflection: ${e2.message}", e2)
+                null
+            }
+        } catch (e: Exception) {
+            plugin.slF4JLogger.error("Failed to get CommandMap: ${e.message}", e)
+            null
+        }
     }
 }

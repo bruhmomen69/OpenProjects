@@ -30,6 +30,10 @@ class ChatPluginCommands(
             chatFormattingService.reloadPlaceholders()
             alertService.reload()
             channelCommandService.updateChannelsCommandAlias()
+            channelCommandService.unregisterDynamicChannelCommands()
+            if (configManager.channels.settings.enableFullTabCompletion) {
+                channelCommandService.registerDynamicChannelCommands()
+            }
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_SUCCESS))
         } else {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_RELOAD_FAILED))
