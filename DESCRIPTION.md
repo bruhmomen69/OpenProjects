@@ -212,30 +212,6 @@ The swear filter provides advanced profanity detection with configurable punishm
   - Parameters:
     - `<player>`: Player whose block list will be cleared
 
-### Global Toggle Commands
-- `/gtoggle <type>` — Toggle global chat features (aliases: `/chatplugin admin gtoggle`, `/zealouschat admin gtoggle`, `/zchat admin gtoggle`)
-  - Permission: `zchat.admin.gtoggle`
-  - Parameters:
-    - `<type>`: One of: `chat`, `privatemessages`, `both`, `all`
-- `/gtoggle chat` — Toggle global public chat
-  - Permission: `zchat.admin.gtoggle`
-- `/gtoggle privatemessages` — Toggle global private messages
-  - Permission: `zchat.admin.gtoggle`
-- `/gtoggle both` — Toggle both global chat and messages (flips current states)
-  - Permission: `zchat.admin.gtoggle`
-- `/gtoggle all` — Enable all global chat and messaging
-  - Permission: `zchat.admin.gtoggle`
-  - Parameters:
-    - `<type>`: One of: `chat`, `privatemessages`, `both`, `all`
-- `/zealouschat admin gtoggle chat` — Toggle global public chat
-  - Permission: `zchat.admin.gtoggle`
-- `/zealouschat admin gtoggle privatemessages` — Toggle global private messages
-  - Permission: `zchat.admin.gtoggle`
-- `/zealouschat admin gtoggle both` — Toggle both global chat and messages (flips current states)
-  - Permission: `zchat.admin.gtoggle`
-- `/zealouschat admin gtoggle all` — Enable all global chat and messaging
-  - Permission: `zchat.admin.gtoggle`
-
 ## Quick Start
 1. Drop the built jar into `plugins/` and restart.
 2. Edit `plugins/ZealousChat/config.conf` – changes can be reloaded with `/zealouschat reload`.
