@@ -343,7 +343,6 @@ class PaperMC : SuspendingJavaPlugin() {
             logger.info("  - Private messages: ${configManager.config.privateMessages.enablePrivateMessages}")
             logger.info("  - Social spy: ${configManager.config.socialSpy.enableSocialSpy}")
             logger.info("  - Swear filter: ${configManager.config.swearFilter.enabled}")
-            logger.info("  - Swear filter alerts: ${configManager.config.swearFilter.alerts.enableAlerts}")
             logger.info("  - PlaceholderAPI: ${placeholderAPIService.isEnabled()}")
         }
     }

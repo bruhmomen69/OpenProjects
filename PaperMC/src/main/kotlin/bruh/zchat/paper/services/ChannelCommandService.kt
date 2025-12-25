@@ -1,19 +1,16 @@
 package bruh.zchat.paper.services
 
 import bruh.zchat.paper.commands.DynamicChannelCommand
-import bruh.zchat.paper.config.ChannelsConfig
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.MessagesConfig
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.channel.ChannelService
 import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent
-import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent.Completion
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandMap
-import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import java.lang.reflect.Field
@@ -32,6 +29,7 @@ class ChannelCommandService(
         val handled: Boolean,
         val shouldCancelEvent: Boolean = true
     )
+
     // Caffeine caches for performance
     val commandCache: Cache<UUID, CachedCommands> = Caffeine.newBuilder()
         .expireAfterWrite(30, TimeUnit.SECONDS)
@@ -91,6 +89,7 @@ class ChannelCommandService(
                     ArrayList()
                 }
             }
+
             else -> {
                 if (parts.size > 2) {
                     getPlayerNameCompletions(player, parts.last())
@@ -220,8 +219,9 @@ class ChannelCommandService(
             return CommandExecutionResult(handled = false, shouldCancelEvent = false)
         }
 
-        val definition = channelService.getDefinitions().firstOrNull { def -> def.commands.contains(commandAlias.lowercase()) }
-            ?: return CommandExecutionResult(handled = false, shouldCancelEvent = false)
+        val definition =
+            channelService.getDefinitions().firstOrNull { def -> def.commands.contains(commandAlias.lowercase()) }
+                ?: return CommandExecutionResult(handled = false, shouldCancelEvent = false)
 
         // Check permission before resolving instance
         if (definition.requiredPermission.isNotBlank() && !player.hasPermission(definition.requiredPermission)) {
@@ -319,7 +319,7 @@ class ChannelCommandService(
                         channelCommandService = this
                     )
 
-                    commandMap.register("zealouschat", dynamicCommand)
+                    commandMap.register("zealouschat_$commandName", dynamicCommand)
                     dynamicChannelCommands.add(commandName)
                     plugin.slF4JLogger.debug("Registered dynamic channel command: /$commandName")
                 }
