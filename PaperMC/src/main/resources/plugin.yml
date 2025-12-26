@@ -41,6 +41,12 @@ commands:
     permission: zchat.message
     aliases: [r]
 
+  block:
+    description: Block a player from sending you messages
+    usage: /block <player>
+    permission: zchat.block
+    aliases: [unblock, blocklist]
+
 permissions:
   zchat.*:
     description: All ChatPlugin permissions
@@ -52,6 +58,8 @@ permissions:
       zchat.mention: true
       zchat.bypass.cooldown: true
       zchat.bypass.swearfilter: true
+      zchat.message: true
+      zchat.block: true
     default: op
   
   zchat.admin:
@@ -165,7 +173,11 @@ permissions:
   zchat.message:
     description: Permission to send and receive private messages
     default: true
-  
+
+  zchat.block:
+    description: Permission to block and unblock other players
+    default: true
+
   # Chat toggle permissions
   zchat.toggle:
     description: All chat toggle permissions

@@ -28,6 +28,7 @@ class MessageCommand(
     private val plugin: JavaPlugin
 ) {
     @Command("msg", "message", "tell", "whisper", "w")
+    @CommandPermission("zchat.message")
     fun msg(actor: BukkitCommandActor, recipient: String, message: String) = plugin.launch(Dispatchers.Unconfined) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -39,6 +40,7 @@ class MessageCommand(
     }
 
     @Command("reply", "r", "respond")
+    @CommandPermission("zchat.message")
     fun reply(actor: BukkitCommandActor, message: String) = plugin.launch(Dispatchers.Unconfined) {
         if (actor.sender() !is Player) {
             actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -59,6 +61,7 @@ class MessageCommand(
         private val plugin: JavaPlugin
     ) {
         @Command("block")
+        @CommandPermission("zchat.block")
         fun block(actor: BukkitCommandActor, target: OfflinePlayer) = plugin.launch(Dispatchers.Unconfined) {
             if (actor.sender() !is Player) {
                 actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -70,6 +73,7 @@ class MessageCommand(
         }
 
         @Command("unblock")
+        @CommandPermission("zchat.block")
         fun unblock(actor: BukkitCommandActor, target: OfflinePlayer) = plugin.launch(Dispatchers.Unconfined) {
             if (actor.sender() !is Player) {
                 actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
@@ -81,6 +85,7 @@ class MessageCommand(
         }
 
         @Command("blocklist")
+        @CommandPermission("zchat.block")
         fun blockList(actor: BukkitCommandActor) {
             if (actor.sender() !is Player) {
                 actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
