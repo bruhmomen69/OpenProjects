@@ -109,7 +109,7 @@ class ScheduledTaskService(
 
         val taskId = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, initialDelay, period).taskId
         scheduledTasks[name] = taskId
-        logger.info("Scheduled daily task '$name' at ${hour}:${minute}")
+        plugin.slF4JLogger.info("Scheduled daily task '$name' at ${hour}:${minute}")
     }
 
     private fun scheduleHourlyTask(name: String, task: Runnable) {
@@ -119,7 +119,7 @@ class ScheduledTaskService(
             20L * 60 * 60L // 1 hour period
         ).taskId
         scheduledTasks[name] = taskId
-        logger.info("Scheduled hourly task '$name'")
+        plugin.slF4JLogger.info("Scheduled hourly task '$name'")
     }
 
     fun cancelAllTasks() {

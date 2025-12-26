@@ -105,7 +105,7 @@ class PaperMC : SuspendingJavaPlugin() {
         }
 
         // Initialize services
-        placeholderAPIService = PlaceholderAPIService(configManager)
+        placeholderAPIService = PlaceholderAPIService(configManager, this)
         messageFormattingService = MessageFormattingService(configManager, placeholderAPIService)
         channelService = ChannelService(this, configManager, placeholderAPIService)
         channelFormattingService = ChannelFormattingService(configManager, messageFormattingService, channelService)

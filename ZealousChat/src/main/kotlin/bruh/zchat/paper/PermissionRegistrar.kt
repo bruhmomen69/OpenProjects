@@ -40,7 +40,7 @@ class PermissionRegistrar(private val plugin: Plugin) {
             // Register permissions in order (parents before children)
             val registeredCount = registerPermissionsInOrder(permissions)
 
-            logger.info("Successfully registered $registeredCount permissions from plugin.yml")
+            logger.debug("Successfully registered $registeredCount permissions from plugin.yml")
             true
         } catch (e: Exception) {
             logger.warn("Failed to register permissions from plugin.yml: ${e.message}", e)

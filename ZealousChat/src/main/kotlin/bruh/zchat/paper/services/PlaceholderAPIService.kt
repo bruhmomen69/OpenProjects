@@ -11,6 +11,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import org.bukkit.plugin.java.JavaPlugin
 import org.slf4j.LoggerFactory
 import java.util.regex.Pattern
 
@@ -18,7 +19,7 @@ import java.util.regex.Pattern
  * Service for optional PlaceholderAPI integration.
  * Bridges PlaceholderAPI placeholders to MiniMessage's TagResolver system.
  */
-class PlaceholderAPIService(private val configManager: ConfigManager) {
+class PlaceholderAPIService(private val configManager: ConfigManager, private val plugin: JavaPlugin) {
     private val logger = LoggerFactory.getLogger(PlaceholderAPIService::class.java)
     private var placeholderAPIAvailable = false
     private val modernPlaceholderPattern = Pattern.compile("<([^<>]+)>")
@@ -41,9 +42,9 @@ class PlaceholderAPIService(private val configManager: ConfigManager) {
         }
 
         if (placeholderAPIAvailable) {
-            logger.info("PlaceholderAPI detected and enabled - external placeholders will be processed")
+            plugin.slF4JLogger.info("PlaceholderAPI detected and enabled - external placeholders will be processed")
         } else {
-            logger.info("PlaceholderAPI not found - only built-in placeholders will be available")
+            plugin.slF4JLogger.info("PlaceholderAPI not found - only built-in placeholders will be available")
         }
     }
 
