@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.kotlinPluginSerialization)
 }
 
-group = "lol.mcplugs.minimessagechatplugin"
+group = "bruh.zchat.minimessagechatplugin"
 version = "1.2.6"
 
 repositories {

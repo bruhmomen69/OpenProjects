@@ -4,11 +4,7 @@ import bruh.zchat.paper.config.ConfigManager
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.deleteIfExists
-import kotlin.io.path.exists
-import kotlin.io.path.getLastModifiedTime
-import kotlin.io.path.inputStream
-import kotlin.io.path.outputStream
+import kotlin.io.path.*
 
 /**
  * Filesystem-backed snapshot store that matches the existing behavior:
@@ -38,7 +34,9 @@ class FileInventorySnapshotStore(
         data: ByteArray
     ): Boolean {
         return try {
-            val target = dataDir.resolve("$snapshotId.dat")
+            val target = dataDir.resolve("$snapshotId.dat").normalize()
+            if (!target.startsWith(dataDir.normalize()))
+                throw IllegalStateException("Attempted to save snapshot $snapshotId to invalid path: $target")
             target.outputStream().use { it.write(data) }
             true
         } catch (e: Exception) {
@@ -48,7 +46,8 @@ class FileInventorySnapshotStore(
     }
 
     override suspend fun load(snapshotId: String, serverInstanceId: String): InventorySnapshotStore.StoredSnapshot? {
-        val file = dataDir.resolve("$snapshotId.dat")
+        val file = dataDir.resolve("$snapshotId.dat").normalize()
+        if (!file.startsWith(dataDir.normalize())) return null
         if (!file.exists()) return null
         return try {
             val bytes = file.inputStream().use { it.readBytes() }
@@ -68,7 +67,10 @@ class FileInventorySnapshotStore(
 
     override suspend fun delete(snapshotId: String, serverInstanceId: String): Boolean {
         return runCatching {
-            dataDir.resolve("$snapshotId.dat").deleteIfExists()
+            val path = dataDir.resolve("$snapshotId.dat").normalize()
+            if (!path.startsWith(dataDir.normalize()))
+                throw IllegalStateException("Attempted to delete snapshot $snapshotId from invalid path: $path")
+            path.deleteIfExists()
         }.getOrElse {
             logger.debug("Failed to delete inventory snapshot $snapshotId", it)
             false

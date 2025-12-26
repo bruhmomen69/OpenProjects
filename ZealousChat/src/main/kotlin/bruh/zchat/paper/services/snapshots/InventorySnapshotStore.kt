@@ -11,7 +11,25 @@ interface InventorySnapshotStore {
         val createdAtEpochMs: Long,
         val expiresAtEpochMs: Long,
         val data: ByteArray
-    )
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is StoredSnapshot) return false
+
+            if (createdAtEpochMs != other.createdAtEpochMs) return false
+            if (expiresAtEpochMs != other.expiresAtEpochMs) return false
+            if (!data.contentEquals(other.data)) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = createdAtEpochMs.hashCode()
+            result = 31 * result + expiresAtEpochMs.hashCode()
+            result = 31 * result + data.contentHashCode()
+            return result
+        }
+    }
 
     /**
      * Persist a snapshot.

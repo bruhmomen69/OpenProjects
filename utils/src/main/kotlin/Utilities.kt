@@ -1,4 +1,4 @@
-package lol.mcplugs.utils
+package bruh.zchat.utils
 
 import kotlinx.datetime.*
 import kotlinx.serialization.Serializable
