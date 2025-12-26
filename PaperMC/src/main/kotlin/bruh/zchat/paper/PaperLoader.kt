@@ -9,6 +9,8 @@ import org.eclipse.aether.repository.RemoteRepository
 
 class PaperMCLoader : PluginLoader {
     override fun classloader(classpathBuilder: PluginClasspathBuilder) {
+        // Mark that this plugin was loaded by PaperLoader
+        loadedByPaperLoader = true
         val resolver = MavenLibraryResolver()
 
         resolver.addRepository(
@@ -84,6 +86,9 @@ class PaperMCLoader : PluginLoader {
     }
 
     companion object {
+        var loadedByPaperLoader = false
+            private set
+
         val dependencies: Array<String> = arrayOf(
             "it.unimi.dsi:fastutil:8.5.16",
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0",

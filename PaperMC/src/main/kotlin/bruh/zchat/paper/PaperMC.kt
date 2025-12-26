@@ -65,6 +65,15 @@ class PaperMC : SuspendingJavaPlugin() {
         // Update the configuration
         configManager.saveConfig()
 
+        // Register permissions manually if loaded via PaperLoader
+        if (PaperMCLoader.loadedByPaperLoader) {
+            logger.info("Plugin loaded via PaperLoader, manually registering permissions...")
+            val permissionRegistrar = PermissionRegistrar(this)
+            if (!permissionRegistrar.registerPermissions()) {
+                logger.warning("Failed to register permissions from plugin.yml. Permissions may not work correctly.")
+            }
+        }
+
         ModrinthUpdateChecker(
             projectId = "zealouschat",
             loader = "paper",
