@@ -1,0 +1,313 @@
+package bruh.essentiallystateless.commands
+
+import bruh.essentiallystateless.EssentiallyStatelessPlugin
+import bruh.essentiallystateless.translations.CommandMessages
+import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
+import com.github.shynixn.mccoroutine.folia.launch
+import com.github.shynixn.mccoroutine.folia.regionDispatcher
+import kotlinx.coroutines.withContext
+import org.bukkit.Bukkit
+import org.bukkit.World
+import org.bukkit.entity.Player
+import revxrsal.commands.annotation.Command
+import revxrsal.commands.annotation.Default
+import revxrsal.commands.annotation.Optional
+import revxrsal.commands.bukkit.actor.BukkitCommandActor
+import revxrsal.commands.bukkit.annotation.CommandPermission
+
+/**
+ * Commands for time and weather management.
+ */
+class TimeWeatherCommands(
+    private val plugin: EssentiallyStatelessPlugin,
+    private val translations: TranslationAPI
+) {
+
+    @Command("time")
+    @CommandPermission("essentiallystateless.time")
+    fun time(
+        actor: BukkitCommandActor,
+        @Optional timeValue: String?,
+        @Optional @SuggestWorld worldName: String?
+    ) {
+        val world = resolveWorld(actor, worldName) ?: return
+
+        if (timeValue == null) {
+            // Query time
+            val ticks = world.time
+            val timeOfDay = ticksToTimeString(ticks)
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.TIME_QUERY) {
+                unparsed("world", world.name)
+                unparsed("time", timeOfDay)
+                unparsed("ticks", ticks.toString())
+            })
+            return
+        }
+
+        val ticks = parseTime(timeValue)
+        if (ticks < 0) {
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.INVALID_NUMBER) {
+                unparsed("value", timeValue)
+            })
+            return
+        }
+
+        plugin.launch {
+            withContext(plugin.regionDispatcher(world.spawnLocation)) {
+                world.time = ticks
+            }
+        }
+
+        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.TIME_SET) {
+            unparsed("world", world.name)
+            unparsed("time", ticksToTimeString(ticks))
+        })
+    }
+
+    @Command("day")
+    @CommandPermission("essentiallystateless.time")
+    fun day(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        time(actor, "day", worldName)
+    }
+
+    @Command("night")
+    @CommandPermission("essentiallystateless.time")
+    fun night(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        time(actor, "night", worldName)
+    }
+
+    @Command("noon")
+    @CommandPermission("essentiallystateless.time")
+    fun noon(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        time(actor, "noon", worldName)
+    }
+
+    @Command("midnight")
+    @CommandPermission("essentiallystateless.time")
+    fun midnight(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        time(actor, "midnight", worldName)
+    }
+
+    @Command("weather")
+    @CommandPermission("essentiallystateless.weather")
+    fun weather(
+        actor: BukkitCommandActor,
+        weatherType: String,
+        @Optional @SuggestWorld worldName: String?
+    ) {
+        val world = resolveWorld(actor, worldName) ?: return
+
+        plugin.launch {
+            withContext(plugin.regionDispatcher(world.spawnLocation)) {
+                when (weatherType.lowercase()) {
+                    "clear", "sun", "sunny" -> {
+                        world.setStorm(false)
+                        world.isThundering = false
+                    }
+                    "rain", "rainy" -> {
+                        world.setStorm(true)
+                        world.isThundering = false
+                    }
+                    "storm", "thunder", "thunderstorm" -> {
+                        world.setStorm(true)
+                        world.isThundering = true
+                    }
+                    else -> {
+                        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.INVALID_NUMBER) {
+                            unparsed("value", weatherType)
+                        })
+                        return@withContext
+                    }
+                }
+            }
+        }
+
+        val weatherName = when (weatherType.lowercase()) {
+            "clear", "sun", "sunny" -> translations.getString(CommandMessages.WEATHER_CLEAR)
+            "rain", "rainy" -> translations.getString(CommandMessages.WEATHER_RAIN)
+            "storm", "thunder", "thunderstorm" -> translations.getString(CommandMessages.WEATHER_STORM)
+            else -> weatherType
+        }
+
+        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WEATHER_SET) {
+            unparsed("world", world.name)
+            unparsed("weather", weatherName)
+        })
+    }
+
+    @Command("sun", "sky")
+    @CommandPermission("essentiallystateless.weather")
+    fun sun(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        weather(actor, "clear", worldName)
+    }
+
+    @Command("rain")
+    @CommandPermission("essentiallystateless.weather")
+    fun rain(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        weather(actor, "rain", worldName)
+    }
+
+    @Command("storm")
+    @CommandPermission("essentiallystateless.weather")
+    fun storm(actor: BukkitCommandActor, @Optional @SuggestWorld worldName: String?) {
+        weather(actor, "storm", worldName)
+    }
+
+    @Command("thunder")
+    @CommandPermission("essentiallystateless.weather")
+    fun thunder(
+        actor: BukkitCommandActor,
+        @Optional enable: Boolean?,
+        @Optional @SuggestWorld worldName: String?
+    ) {
+        val world = resolveWorld(actor, worldName) ?: return
+        val shouldEnable = enable ?: !world.isThundering
+
+        plugin.launch {
+            withContext(plugin.regionDispatcher(world.spawnLocation)) {
+                world.isThundering = shouldEnable
+                if (shouldEnable) {
+                    world.setStorm(true)
+                }
+            }
+        }
+
+        if (shouldEnable) {
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.THUNDER_ENABLED) {
+                unparsed("world", world.name)
+            })
+        } else {
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.THUNDER_DISABLED) {
+                unparsed("world", world.name)
+            })
+        }
+    }
+
+    @Command("ptime")
+    @CommandPermission("essentiallystateless.ptime")
+    fun ptime(
+        actor: BukkitCommandActor,
+        @Optional timeValue: String?,
+        @Optional @SuggestOnlinePlayer targetName: String?
+    ) {
+        val target = resolvePlayer(actor, targetName) ?: return
+
+        if (timeValue == null || timeValue.equals("reset", ignoreCase = true)) {
+            target.resetPlayerTime()
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PTIME_RESET) {
+                unparsed("player", target.name)
+            })
+            return
+        }
+
+        val ticks = parseTime(timeValue)
+        if (ticks < 0) {
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.INVALID_NUMBER) {
+                unparsed("value", timeValue)
+            })
+            return
+        }
+
+        target.setPlayerTime(ticks, false)
+        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PTIME_SET) {
+            unparsed("player", target.name)
+            unparsed("time", ticksToTimeString(ticks))
+        })
+    }
+
+    @Command("pweather")
+    @CommandPermission("essentiallystateless.pweather")
+    fun pweather(
+        actor: BukkitCommandActor,
+        @Optional weatherType: String?,
+        @Optional @SuggestOnlinePlayer targetName: String?
+    ) {
+        val target = resolvePlayer(actor, targetName) ?: return
+
+        if (weatherType == null || weatherType.equals("reset", ignoreCase = true)) {
+            target.resetPlayerWeather()
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PWEATHER_RESET) {
+                unparsed("player", target.name)
+            })
+            return
+        }
+
+        val weather = when (weatherType.lowercase()) {
+            "clear", "sun", "sunny" -> org.bukkit.WeatherType.CLEAR
+            "rain", "rainy", "storm", "downfall" -> org.bukkit.WeatherType.DOWNFALL
+            else -> {
+                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.INVALID_NUMBER) {
+                    unparsed("value", weatherType)
+                })
+                return
+            }
+        }
+
+        target.setPlayerWeather(weather)
+        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PWEATHER_SET) {
+            unparsed("player", target.name)
+            unparsed("weather", weatherType)
+        })
+    }
+
+    private fun resolveWorld(actor: BukkitCommandActor, worldName: String?): World? {
+        return if (worldName != null) {
+            val world = Bukkit.getWorld(worldName)
+            if (world == null) {
+                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WORLD_NOT_FOUND) {
+                    unparsed("world", worldName)
+                })
+            }
+            world
+        } else if (actor.sender() is Player) {
+            (actor.sender() as Player).world
+        } else {
+            Bukkit.getWorlds().firstOrNull()
+        }
+    }
+
+    private fun resolvePlayer(actor: BukkitCommandActor, targetName: String?): Player? {
+        return if (targetName != null) {
+            val player = Bukkit.getPlayer(targetName)
+            if (player == null) {
+                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+                    unparsed("player", targetName)
+                })
+            }
+            player
+        } else if (actor.sender() is Player) {
+            actor.sender() as Player
+        } else {
+            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            null
+        }
+    }
+
+    private fun parseTime(time: String): Long {
+        return when (time.lowercase()) {
+            "day", "morning" -> 1000L
+            "noon" -> 6000L
+            "afternoon" -> 9000L
+            "sunset", "dusk" -> 12000L
+            "night" -> 13000L
+            "midnight" -> 18000L
+            "sunrise", "dawn" -> 23000L
+            else -> time.toLongOrNull() ?: -1
+        }
+    }
+
+    private fun ticksToTimeString(ticks: Long): String {
+        val normalizedTicks = ticks % 24000
+        return when {
+            normalizedTicks in 0..999 -> translations.getString(CommandMessages.TIME_SUNRISE)
+            normalizedTicks in 1000..5999 -> translations.getString(CommandMessages.TIME_DAY)
+            normalizedTicks in 6000..6999 -> translations.getString(CommandMessages.TIME_NOON)
+            normalizedTicks in 7000..11999 -> translations.getString(CommandMessages.TIME_DAY)
+            normalizedTicks in 12000..12999 -> translations.getString(CommandMessages.TIME_SUNSET)
+            normalizedTicks in 13000..17500 -> translations.getString(CommandMessages.TIME_NIGHT)
+            normalizedTicks in 17500..18999 -> translations.getString(CommandMessages.TIME_MIDNIGHT)
+            else -> translations.getString(CommandMessages.TIME_NIGHT)
+        }
+    }
+}

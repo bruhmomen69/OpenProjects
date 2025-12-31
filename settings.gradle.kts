@@ -20,6 +20,8 @@ plugins {
 include(":app")
 include(":utils")
 include(":ZealousChat")
+// EssentiallyStateless
+include(":EssentiallyStateless")
 // RegionRestore
 include(":RegionRestore:PaperMC")
 include(":RegionRestore:api")

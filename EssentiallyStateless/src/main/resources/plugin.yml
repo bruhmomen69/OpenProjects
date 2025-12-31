@@ -1,0 +1,96 @@
+name: EssentiallyStateless
+version: '1.0.0'
+main: bruh.essentiallystateless.EssentiallyStatelessPlugin
+api-version: '1.21'
+description: A stateless essential commands plugin
+author: OpenProjects
+folia-supported: true
+
+permissions:
+  essentiallystateless.admin:
+    description: Access to all EssentiallyStateless commands
+    default: op
+    children:
+      essentiallystateless.gamemode: true
+      essentiallystateless.gamemode.others: true
+      essentiallystateless.time: true
+      essentiallystateless.weather: true
+      essentiallystateless.heal: true
+      essentiallystateless.heal.others: true
+      essentiallystateless.feed: true
+      essentiallystateless.feed.others: true
+      essentiallystateless.fly: true
+      essentiallystateless.fly.others: true
+      essentiallystateless.speed: true
+      essentiallystateless.speed.others: true
+      essentiallystateless.god: true
+      essentiallystateless.god.others: true
+      essentiallystateless.tp: true
+      essentiallystateless.tphere: true
+      essentiallystateless.tpall: true
+      essentiallystateless.tppos: true
+      essentiallystateless.top: true
+      essentiallystateless.bottom: true
+      essentiallystateless.jump: true
+      essentiallystateless.world: true
+      essentiallystateless.anvil: true
+      essentiallystateless.workbench: true
+      essentiallystateless.grindstone: true
+      essentiallystateless.cartography: true
+      essentiallystateless.loom: true
+      essentiallystateless.smithing: true
+      essentiallystateless.stonecutter: true
+      essentiallystateless.enderchest: true
+      essentiallystateless.enderchest.others: true
+      essentiallystateless.disposal: true
+      essentiallystateless.invsee: true
+      essentiallystateless.clearinventory: true
+      essentiallystateless.clearinventory.others: true
+      essentiallystateless.give: true
+      essentiallystateless.item: true
+      essentiallystateless.more: true
+      essentiallystateless.repair: true
+      essentiallystateless.enchant: true
+      essentiallystateless.hat: true
+      essentiallystateless.skull: true
+      essentiallystateless.itemname: true
+      essentiallystateless.itemlore: true
+      essentiallystateless.condense: true
+      essentiallystateless.lightning: true
+      essentiallystateless.remove: true
+      essentiallystateless.spawnmob: true
+      essentiallystateless.tree: true
+      essentiallystateless.break: true
+      essentiallystateless.spawner: true
+      essentiallystateless.kick: true
+      essentiallystateless.kickall: true
+      essentiallystateless.ban: true
+      essentiallystateless.unban: true
+      essentiallystateless.banip: true
+      essentiallystateless.unbanip: true
+      essentiallystateless.sudo: true
+      essentiallystateless.broadcast: true
+      essentiallystateless.gc: true
+      essentiallystateless.list: true
+      essentiallystateless.whois: true
+      essentiallystateless.near: true
+      essentiallystateless.seen: true
+      essentiallystateless.ping: true
+      essentiallystateless.getpos: true
+      essentiallystateless.compass: true
+      essentiallystateless.depth: true
+      essentiallystateless.playtime: true
+      essentiallystateless.exp: true
+      essentiallystateless.kill: true
+      essentiallystateless.burn: true
+      essentiallystateless.ext: true
+      essentiallystateless.rest: true
+      essentiallystateless.ptime: true
+      essentiallystateless.pweather: true
+      essentiallystateless.me: true
+      essentiallystateless.fireball: true
+      essentiallystateless.book: true
+      essentiallystateless.editsign: true
+      essentiallystateless.potion: true
+      essentiallystateless.firework: true
+      essentiallystateless.reload: true
