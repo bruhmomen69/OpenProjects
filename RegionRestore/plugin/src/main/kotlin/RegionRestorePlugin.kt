@@ -20,7 +20,11 @@ import bruh.regionrestore.notification.NotificationService
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.template.TemplateCache
 import bruh.regionrestore.timer.SchedulerService
+import bruh.regionrestore.translations.CommandMessages
+import bruh.regionrestore.translations.GuiMessages
 import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.translations.TranslationAPI
+import bruh.zchat.utils.translations.translationApi
 
 class RegionRestorePlugin : SuspendingJavaPlugin() {
     lateinit var nmsAdapter: PaperNmsAdapter
@@ -41,6 +45,8 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         private set
     lateinit var menuAPI: MenuAPI
         private set
+    lateinit var translations: TranslationAPI
+        private set
 
     override suspend fun onLoadAsync() {
         nmsAdapter = PaperNmsAdapterLoader.load()
@@ -53,6 +59,15 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
 
     override suspend fun onEnableAsync() {
         slF4JLogger.info("Loading RegionRestore...")
+
+        // Initialize translation system
+        translations = translationApi()
+        translations.register("commands", CommandMessages::class)
+        translations.register("gui", GuiMessages::class)
+        // Switch to configured language before loading to ensure correct files are read
+        translations.switchLanguage(config.language)
+        translations.load()
+        slF4JLogger.info("Translation system initialized")
 
         menuAPI = MenuAPI(this)
 
@@ -157,6 +172,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                 }
             }
             .build()
-        lamp.register(RegionRestoreCommands(nmsAdapter, templateRepository, schedulerService, config, massClonerService, menuAPI, this))
+        lamp.register(RegionRestoreCommands(nmsAdapter, templateRepository, schedulerService, config, massClonerService, menuAPI, this, translations))
     }
 }

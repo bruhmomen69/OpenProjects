@@ -78,6 +78,9 @@ MCCoroutine falls back automatically to Bukkit schedulers if Folia schedulers ar
         repository.save(data)
     }
     ```
+- **Dispatchers.Unconfined**
+  - Thread: Kotlin default dispatcher
+  - Use for: Light weight tasks where you want to stay on the current thread for as long as possible. This is a particularly good thread for when you want to stay on the current thread for as long as possible, before having to sometimes context switch depending on the situation.
 
 Notes:
 - Always hop to one of the Folia dispatchers before touching Minecraft state.

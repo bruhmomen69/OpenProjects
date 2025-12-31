@@ -7,6 +7,8 @@ import bruh.regionrestore.notification.AudienceScope
 
 @ConfigSerializable
 data class RegionRestoreConfig(
+    @Comment("Language for translations. Configure translations in the `translations` folder.")
+    val language: String = "en",
     val templates: TemplatesConfig = TemplatesConfig(),
     val notifications: NotificationsConfig = NotificationsConfig(),
     val restore: RestoreConfig = RestoreConfig(),

@@ -7,11 +7,14 @@ import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.timer.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
-import bruh.regionrestore.utils.sendMiniMessage
+import bruh.regionrestore.translations.CommandMessages
+import bruh.regionrestore.translations.GuiMessages
 import bruh.zchat.utils.menuapi.*
+import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -44,8 +47,13 @@ class RegionRestoreCommands(
     private val config: RegionRestoreConfig,
     private val massClonerService: MassClonerService,
     private val menuAPI: MenuAPI,
-    private val plugin: JavaPlugin
+    private val plugin: JavaPlugin,
+    private val translations: TranslationAPI
 ) {
+    
+    /** Gets a GUI string (for menu titles, lore, etc. that need strings) */
+    private fun tGui(key: GuiMessages) = translations.getString(key)
+    
     @Subcommand("gui")
     @CommandPermission("regionrestore.gui")
     suspend fun openGui(actor: BukkitCommandActor) {
@@ -64,10 +72,10 @@ class RegionRestoreCommands(
         }
 
         val ui = menuAPI.menuTree {
-            title("RegionRestore")
+            title(tGui(GuiMessages.MAIN_TITLE))
 
             // ========================= TEMPLATES =========================
-            submenu("templates", "Templates", XMaterial.BOOK) {
+            submenu("templates", tGui(GuiMessages.TEMPLATES_TITLE), XMaterial.BOOK) {
                 paginated(28)
 
                 dynamicItems { _ ->
@@ -77,35 +85,35 @@ class RegionRestoreCommands(
                         val activeVersion = versions.firstOrNull { it.versionId == activeVersionId }
                             ?: versions.maxByOrNull { it.versionId }
                         val description = activeVersion?.description?.takeIf { it.isNotBlank() }
-                            ?: "No description"
+                            ?: tGui(GuiMessages.TEMPLATE_NO_DESCRIPTION)
                         val infoLore = listOf(
-                            "Template: $templateName",
-                            "Description: $description"
+                            tGui(GuiMessages.TEMPLATE_INFO_LINE).replace("<name>", templateName),
+                            tGui(GuiMessages.TEMPLATE_DESC_LINE).replace("<description>", description)
                         )
 
-                        submenuNode("template_$templateName", "Template: $templateName", XMaterial.PAPER) {
+                        submenuNode("template_$templateName", tGui(GuiMessages.TEMPLATE_ITEM_TITLE).replace("<name>", templateName), XMaterial.PAPER) {
                             display(
                                 "info",
-                                "Info",
+                                tGui(GuiMessages.TEMPLATE_INFO_TITLE),
                                 XMaterial.BOOK,
                                 infoLore
                             )
 
-                            submenu("versions", "Versions", XMaterial.BOOKSHELF) {
+                            submenu("versions", tGui(GuiMessages.VERSIONS_TITLE), XMaterial.BOOKSHELF) {
                                 paginated(28)
 
                                 dynamicItems { _ ->
                                     versions.map { version ->
                                         val isActive = version.versionId == activeVersionId
                                         val title = if (isActive) {
-                                            "v${version.versionId} (active)"
+                                            tGui(GuiMessages.VERSION_ACTIVE).replace("<version>", version.versionId.toString())
                                         } else {
-                                            "v${version.versionId}"
+                                            tGui(GuiMessages.VERSION_NORMAL).replace("<version>", version.versionId.toString())
                                         }
                                         val lore = listOf(
-                                            "Created: ${java.time.Instant.ofEpochMilli(version.createdAt)}",
-                                            "Minecraft: ${version.minecraftVersion}",
-                                            "Description: ${version.description}"
+                                            tGui(GuiMessages.VERSION_CREATED).replace("<timestamp>", java.time.Instant.ofEpochMilli(version.createdAt).toString()),
+                                            tGui(GuiMessages.VERSION_MINECRAFT).replace("<version>", version.minecraftVersion),
+                                            tGui(GuiMessages.VERSION_DESCRIPTION).replace("<description>", version.description)
                                         )
 
                                         displayNode(
@@ -120,18 +128,18 @@ class RegionRestoreCommands(
 
                             action(
                                 "restore_original",
-                                "Restore (original position)",
+                                tGui(GuiMessages.RESTORE_ORIGINAL_TITLE),
                                 XMaterial.EMERALD_BLOCK,
-                                listOf("Restore at the template's saved position")
+                                listOf(tGui(GuiMessages.RESTORE_ORIGINAL_DESC))
                             ) { p ->
                                 restoreTemplate(p, templateName)
                             }
 
                             action(
                                 "restore_here",
-                                "Restore here",
+                                tGui(GuiMessages.RESTORE_HERE_TITLE),
                                 XMaterial.EMERALD,
-                                listOf("Restore at your current location")
+                                listOf(tGui(GuiMessages.RESTORE_HERE_DESC))
                             ) { p ->
                                 val worldName = p.world.name
                                 val chunk = p.location.chunk
@@ -141,21 +149,24 @@ class RegionRestoreCommands(
 
                             action(
                                 "create_instance_original",
-                                "Create instance at template location",
+                                tGui(GuiMessages.CREATE_INSTANCE_TITLE),
                                 XMaterial.ANVIL,
-                                listOf("Create a manual instance at the template's saved location and restore it"),
+                                listOf(tGui(GuiMessages.CREATE_INSTANCE_DESC)),
                                 returnLevels = 1
                             ) { p ->
                                 val templateVersion = templateRepository.loadActiveTemplateVersion(templateName)
                                 if (templateVersion == null) {
-                                    p.sendMiniMessage("<red>Template '$templateName' not found")
+                                    p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_NOT_FOUND) {
+                                        unparsed("name", templateName)
+                                    })
                                     return@action null
                                 }
 
                                 if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-                                    p.sendMiniMessage(
-                                        "<yellow>Template version ${templateVersion.minecraftVersion} differs from server ${nmsAdapter.minecraftVersion}. Proceeding anyway."
-                                    )
+                                    p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_VERSION_MISMATCH_WARNING) {
+                                        unparsed("template_version", templateVersion.minecraftVersion)
+                                        unparsed("server_version", nmsAdapter.minecraftVersion)
+                                    })
                                 }
 
                                 val originChunkX = templateVersion.data.minChunkX
@@ -185,62 +196,71 @@ class RegionRestoreCommands(
                                 massClonerService.addManualInstance(instance)
                                 massClonerService.triggerInstanceRestore(instance)
 
-                                p.sendMiniMessage(
-                                    "<green>Created manual instance '${instance.instanceId}' for template '$templateName' " +
-                                            "at original chunk (${originChunkX}, ${originChunkZ}) and triggered restore."
-                                )
+                                p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_CREATED_ORIGINAL) {
+                                    unparsed("id", instance.instanceId.toString())
+                                    unparsed("name", templateName)
+                                    unparsed("chunk_x", originChunkX.toString())
+                                    unparsed("chunk_z", originChunkZ.toString())
+                                })
                                 null
                             }
 
                             action(
                                 "set_active",
-                                "Set active version",
+                                tGui(GuiMessages.SET_ACTIVE_TITLE),
                                 XMaterial.LIME_DYE,
-                                listOf("Set the active version for this template"),
+                                listOf(tGui(GuiMessages.SET_ACTIVE_DESC)),
                                 returnLevels = 1
                             ) { p ->
                                 val versionResult = menuAPI.promptInt(
                                     p,
-                                    "Active version for $templateName",
+                                    tGui(GuiMessages.SET_ACTIVE_PROMPT).replace("<name>", templateName),
                                     min = 1
                                 )
                                 if (versionResult.isSuccess) {
                                     val versionId = versionResult.getOrNull() ?: return@action null
                                     val success = templateRepository.setActiveVersion(templateName, versionId)
                                     if (success) {
-                                        p.sendMiniMessage("<green>Active version for '$templateName' set to v$versionId")
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_ACTIVE_SET) {
+                                            unparsed("name", templateName)
+                                            unparsed("version", versionId.toString())
+                                        })
                                     } else {
-                                        p.sendMiniMessage("<red>Failed to set active version v$versionId for '$templateName'")
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_ACTIVE_SET_FAILED))
                                     }
                                 } else {
-                                    p.sendMiniMessage("<gray>Active version change cancelled")
+                                    p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_ACTIVE_CHANGE_CANCELLED))
                                 }
                             }
 
                             action(
                                 "delete",
-                                "Delete template",
+                                tGui(GuiMessages.DELETE_TEMPLATE_TITLE),
                                 XMaterial.BARRIER,
-                                listOf("Delete this template and all its versions")
+                                listOf(tGui(GuiMessages.DELETE_TEMPLATE_DESC))
                             ) { p ->
                                 val textResult = menuAPI.promptText(
                                     p,
-                                    "Type '$templateName' to confirm delete",
+                                    tGui(GuiMessages.DELETE_TEMPLATE_PROMPT).replace("<name>", templateName),
                                     initialText = "",
                                     validator = { text ->
                                         if (text.isNotBlank()) InputValidation.Valid
-                                        else InputValidation.Invalid("Input cannot be empty")
+                                        else InputValidation.Invalid(tGui(GuiMessages.INPUT_EMPTY))
                                     }
                                 )
                                 if (textResult.isSuccess && textResult.getOrNull() == templateName) {
                                     val deleted = templateRepository.deleteTemplate(templateName)
                                     if (deleted) {
-                                        p.sendMiniMessage("<green>Deleted template '$templateName'")
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETED) {
+                                            unparsed("name", templateName)
+                                        })
                                     } else {
-                                        p.sendMiniMessage("<red>Template '$templateName' not found")
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_NOT_FOUND) {
+                                            unparsed("name", templateName)
+                                        })
                                     }
                                 } else {
-                                    p.sendMiniMessage("<gray>Template deletion cancelled")
+                                    p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETE_CANCELLED))
                                 }
                             }
                         }
@@ -249,28 +269,30 @@ class RegionRestoreCommands(
             }
 
             // ========================= CLONER / POOLS =========================
-            submenu("cloner", "Cloner / Pools", XMaterial.COMPARATOR) {
+            submenu("cloner", tGui(GuiMessages.CLONER_TITLE), XMaterial.COMPARATOR) {
                 // Root-level pool creation for the player's current world
                 action(
                     "create_pool_here",
-                    "Create pool in this world (runtime)",
+                    tGui(GuiMessages.CREATE_POOL_HERE_TITLE),
                     XMaterial.ANVIL,
-                    listOf("Create a basic pool in your current world using a template")
+                    listOf(tGui(GuiMessages.CREATE_POOL_HERE_DESC))
                 ) { p ->
                     val worldCfg = config.massCloner.worlds.firstOrNull { it.name == p.world.name }
                     if (worldCfg == null) {
-                        p.sendMiniMessage("<red>This world is not configured for Mass Cloner")
+                        p.sendMessage(translations.getComponentSync(CommandMessages.CLONER_WORLD_NOT_MANAGED_ERROR) {
+                            unparsed("world", p.world.name)
+                        })
                         return@action null
                     }
 
                     val templates = templateNames
                     if (templates.isEmpty()) {
-                        p.sendMiniMessage("<gray>No templates available for pool creation")
+                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_NO_TEMPLATES))
                         return@action null
                     }
 
                     menuAPI.menuTree {
-                        title("Select template for pool in ${worldCfg.name}")
+                        title(tGui(GuiMessages.SELECT_TEMPLATE_TITLE).replace("<world>", worldCfg.name))
 
                         submenu("templates_pool_here_${worldCfg.name}", "Templates", XMaterial.BOOK) {
                             paginated(28)
@@ -284,29 +306,29 @@ class RegionRestoreCommands(
                                     ) {
                                         action(
                                             "configure",
-                                            "Configure & create pool",
+                                            tGui(GuiMessages.CONFIGURE_CREATE_TITLE),
                                             XMaterial.ANVIL,
-                                            listOf("Set count and separation for this pool")
+                                            listOf(tGui(GuiMessages.CONFIGURE_CREATE_DESC))
                                         ) { pp ->
                                             val countResult = menuAPI.promptInt(
                                                 pp,
-                                                "Instance count",
+                                                tGui(GuiMessages.INSTANCE_COUNT_PROMPT),
                                                 min = 1
                                             )
                                             val count = countResult.getOrNull()
                                             if (!countResult.isSuccess || count == null) {
-                                                pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
                                                 return@action null
                                             }
 
                                             val sepResult = menuAPI.promptInt(
                                                 pp,
-                                                "Separation (chunks)",
+                                                tGui(GuiMessages.SEPARATION_PROMPT),
                                                 min = 1
                                             )
                                             val separation = sepResult.getOrNull()
                                             if (!sepResult.isSuccess || separation == null) {
-                                                pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
                                                 return@action null
                                             }
 
@@ -324,9 +346,12 @@ class RegionRestoreCommands(
                                                 updateLight = null
                                             )
 
-                                            pp.sendMiniMessage(
-                                                "<green>Created/updated pool '$tmplName' in '${worldCfg.name}' with $allocated new instance(s) (target=$count)."
-                                            )
+                                            pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATED) {
+                                                unparsed("name", tmplName)
+                                                unparsed("world", worldCfg.name)
+                                                unparsed("count", allocated.toString())
+                                                unparsed("target", count.toString())
+                                            })
                                             null
                                         }
                                     }
@@ -339,25 +364,25 @@ class RegionRestoreCommands(
                 }
 
                 for (worldCfg in config.massCloner.worlds) {
-                    submenu("world_${worldCfg.name}", "World: ${worldCfg.name}", XMaterial.GRASS_BLOCK) {
+                    submenu("world_${worldCfg.name}", tGui(GuiMessages.WORLD_TITLE).replace("<world>", worldCfg.name), XMaterial.GRASS_BLOCK) {
                         // Basic pool creation (runtime only, non-persistent)
                         action(
                             "create_pool",
-                            "Create pool (runtime)",
+                            tGui(GuiMessages.CREATE_POOL_TITLE),
                             XMaterial.ANVIL,
-                            listOf("Create a basic pool in this world using a template")
+                            listOf(tGui(GuiMessages.CREATE_POOL_DESC))
                         ) { p ->
                             val templates = templateNames
                             if (templates.isEmpty()) {
-                                p.sendMiniMessage("<gray>No templates available for pool creation")
+                                p.sendMessage(translations.getComponentSync(CommandMessages.POOL_NO_TEMPLATES))
                                 return@action null
                             }
 
                             // Open a template selection menu tree for pool creation
                             menuAPI.menuTree {
-                                title("Select template for pool in ${worldCfg.name}")
+                                title(tGui(GuiMessages.SELECT_TEMPLATE_TITLE).replace("<world>", worldCfg.name))
 
-                                submenu("templates_pool_${worldCfg.name}", "Templates", XMaterial.BOOK) {
+                                submenu("templates_pool_${worldCfg.name}", tGui(GuiMessages.TEMPLATES_TITLE), XMaterial.BOOK) {
                                     paginated(28)
 
                                     dynamicItems { _ ->
@@ -369,29 +394,29 @@ class RegionRestoreCommands(
                                             ) {
                                                 action(
                                                     "configure",
-                                                    "Configure & create pool",
+                                                    tGui(GuiMessages.CONFIGURE_CREATE_TITLE),
                                                     XMaterial.ANVIL,
-                                                    listOf("Set count and separation for this pool")
+                                                    listOf(tGui(GuiMessages.CONFIGURE_CREATE_DESC))
                                                 ) { pp ->
                                                     val countResult = menuAPI.promptInt(
                                                         pp,
-                                                        "Instance count",
+                                                        tGui(GuiMessages.INSTANCE_COUNT_PROMPT),
                                                         min = 1
                                                     )
                                                     val count = countResult.getOrNull()
                                                     if (!countResult.isSuccess || count == null) {
-                                                        pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                        pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
                                                         return@action null
                                                     }
 
                                                     val sepResult = menuAPI.promptInt(
                                                         pp,
-                                                        "Separation (chunks)",
+                                                        tGui(GuiMessages.SEPARATION_PROMPT),
                                                         min = 1
                                                     )
                                                     val separation = sepResult.getOrNull()
                                                     if (!sepResult.isSuccess || separation == null) {
-                                                        pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                        pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
                                                         return@action null
                                                     }
 
@@ -409,9 +434,12 @@ class RegionRestoreCommands(
                                                         updateLight = null
                                                     )
 
-                                                    pp.sendMiniMessage(
-                                                        "<green>Created/updated pool '$tmplName' in '${worldCfg.name}' with $allocated new instance(s) (target=$count)."
-                                                    )
+                                                    pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATED) {
+                                                        unparsed("name", tmplName)
+                                                        unparsed("world", worldCfg.name)
+                                                        unparsed("count", allocated.toString())
+                                                        unparsed("target", count.toString())
+                                                    })
                                                     null
                                                 }
                                             }
@@ -427,37 +455,46 @@ class RegionRestoreCommands(
                             worldCfg.pools.map { poolCfg ->
                                 submenuNode(
                                     "pool_${worldCfg.name}_${poolCfg.templateName}",
-                                    "Pool: ${poolCfg.templateName}",
+                                    tGui(GuiMessages.POOL_TITLE).replace("<name>", poolCfg.templateName),
                                     XMaterial.CHEST
                                 ) {
-                                    action("status", "Status", XMaterial.PAPER) { p ->
+                                    action("status", tGui(GuiMessages.STATUS_TITLE), XMaterial.PAPER) { p ->
                                         val instances =
                                             massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
                                         val activeCount = instances.size
                                         val targetCount = poolCfg.count
                                         val status = if (activeCount == targetCount) "<green>OK" else "<yellow>Mismatch"
 
-                                        p.sendMiniMessage("<green>Pool status for '${poolCfg.templateName}' in '${worldCfg.name}':")
-                                        p.sendMiniMessage("  <gray>Instances: $activeCount/$targetCount ($status)")
-                                        p.sendMiniMessage(
-                                            "  <gray>Version: ${poolCfg.versionMode}" +
-                                                    (if (poolCfg.versionMode == VersionMode.PINNED) " #${poolCfg.pinnedVersionId}" else " (active)")
-                                        )
-                                        p.sendMiniMessage(
-                                            "  <gray>Separation: ${poolCfg.separationChunks} chunks | " +
-                                                    "Boot restore: ${poolCfg.restoreOnBoot} | " +
-                                                    "Vacate restore: ${poolCfg.restoreOnVacate}"
-                                        )
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_STATUS_HEADER) {
+                                            unparsed("name", poolCfg.templateName)
+                                            unparsed("world", worldCfg.name)
+                                        })
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_INSTANCES_LINE) {
+                                            unparsed("active", activeCount.toString())
+                                            unparsed("target", targetCount.toString())
+                                            placeholder("status", status)
+                                        })
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_VERSION_LINE) {
+                                            unparsed("version", poolCfg.versionMode.toString() +
+                                                    (if (poolCfg.versionMode == VersionMode.PINNED) " #${poolCfg.pinnedVersionId}" else " (active)"))
+                                        })
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_SETTINGS_LINE) {
+                                            unparsed("separation", poolCfg.separationChunks.toString())
+                                            unparsed("boot", poolCfg.restoreOnBoot.toString())
+                                            unparsed("vacate", poolCfg.restoreOnVacate.toString())
+                                        })
                                         if (poolCfg.restoreIntervalSeconds != null) {
-                                            p.sendMiniMessage("  <gray>Repeat: Every ${poolCfg.restoreIntervalSeconds}s")
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REPEAT_LINE) {
+                                                unparsed("interval", poolCfg.restoreIntervalSeconds.toString())
+                                            })
                                         }
                                     }
 
                                     action(
                                         "restore_pool",
-                                        "Restore all instances",
+                                        tGui(GuiMessages.RESTORE_ALL_TITLE),
                                         XMaterial.EMERALD_BLOCK,
-                                        listOf("Trigger restore for all instances in this pool"),
+                                        listOf(tGui(GuiMessages.RESTORE_ALL_DESC)),
                                         returnLevels = 1
                                     ) { p ->
                                         val instances =
@@ -467,40 +504,55 @@ class RegionRestoreCommands(
                                             massClonerService.triggerInstanceRestore(instance)
                                             restored++
                                         }
-                                        p.sendMiniMessage("<green>Triggered restore for $restored instance(s) in pool '${poolCfg.templateName}'")
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_RESTORE_TRIGGERED) {
+                                            unparsed("count", restored.toString())
+                                            unparsed("name", poolCfg.templateName)
+                                        })
                                     }
 
                                     action(
                                         "regen_pool_world",
-                                        "Regenerate pooled instances",
+                                        tGui(GuiMessages.REGEN_POOL_TITLE),
                                         XMaterial.ANVIL,
-                                        listOf("Reallocate pooled instances for this world"),
+                                        listOf(tGui(GuiMessages.REGEN_POOL_DESC)),
                                         returnLevels = 1
                                     ) { p ->
                                         val (removed, allocated) = massClonerService.regeneratePools(listOf(worldCfg.name))
-                                        p.sendMiniMessage("<green>Regenerated pooled instances for '${worldCfg.name}':")
-                                        p.sendMiniMessage("  Removed: $removed, Allocated: $allocated")
-                                        p.sendMiniMessage("<yellow>Manual instances were preserved.")
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REGEN_HEADER) {
+                                            unparsed("world", worldCfg.name)
+                                        })
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REGEN_STATS) {
+                                            unparsed("removed", removed.toString())
+                                            unparsed("allocated", allocated.toString())
+                                        })
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.CLONER_REGEN_MANUAL_PRESERVED))
                                     }
 
                                     action(
                                         "show_pool_instances",
-                                        "Show instances",
+                                        tGui(GuiMessages.SHOW_INSTANCES_TITLE),
                                         XMaterial.CHEST,
-                                        listOf("Open instance list for this pool")
+                                        listOf(tGui(GuiMessages.SHOW_INSTANCES_DESC))
                                     ) { p ->
                                         val instances =
                                             massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
                                         if (instances.isEmpty()) {
-                                            p.sendMiniMessage("<gray>No instances for this pool")
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_NO_INSTANCES))
                                         } else {
-                                            p.sendMiniMessage("<green>Instances for pool '${poolCfg.templateName}' in '${worldCfg.name}':")
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_INSTANCES_HEADER) {
+                                                unparsed("name", poolCfg.templateName)
+                                                unparsed("world", worldCfg.name)
+                                            })
                                             for (instance in instances) {
                                                 val typeMark =
                                                     if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
-                                                p.sendMiniMessage(
-                                                    "  $typeMark ${instance.instanceId} - ${instance.templateName} at (${instance.originChunkX}, ${instance.originChunkZ})"
-                                                )
+                                                p.sendMessage(translations.getComponentSync(CommandMessages.POOL_INSTANCE_LINE) {
+                                                    unparsed("type_mark", typeMark)
+                                                    unparsed("id", instance.instanceId.toString())
+                                                    unparsed("template", instance.templateName)
+                                                    unparsed("chunk_x", instance.originChunkX.toString())
+                                                    unparsed("chunk_z", instance.originChunkZ.toString())
+                                                })
                                             }
                                         }
                                     }
@@ -512,14 +564,14 @@ class RegionRestoreCommands(
             }
 
             // ========================= INSTANCES & TIMERS =========================
-            submenu("instances", "Instances & Timers", XMaterial.CHEST) {
-                submenu("create_manual", "Create manual instance here", XMaterial.ANVIL) {
+            submenu("instances", tGui(GuiMessages.INSTANCES_TITLE), XMaterial.CHEST) {
+                submenu("create_manual", tGui(GuiMessages.CREATE_MANUAL_TITLE), XMaterial.ANVIL) {
                     paginated(28)
 
                     dynamicItems { p ->
                         val templates = templateNames
                         if (templates.isEmpty()) {
-                            p.sendMiniMessage("<gray>No templates available")
+                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_NO_TEMPLATES))
                             return@dynamicItems emptyList()
                         }
 
@@ -528,7 +580,7 @@ class RegionRestoreCommands(
                                 id = "create_manual_${templateName}",
                                 title = templateName,
                                 material = XMaterial.PAPER,
-                                description = listOf("Create instance of '$templateName' at your current chunk"),
+                                description = listOf(tGui(GuiMessages.CREATE_MANUAL_DESC).replace("<name>", templateName)),
                                 returnLevels = 1
                             ) { pp ->
                                 val chunk = pp.location.chunk
@@ -548,7 +600,7 @@ class RegionRestoreCommands(
                     }
                 }
 
-                submenu("instances_all", "All instances", XMaterial.MAP) {
+                submenu("instances_all", tGui(GuiMessages.ALL_INSTANCES_TITLE), XMaterial.MAP) {
                     paginated(28)
 
                     dynamicItems { _ ->
@@ -559,7 +611,7 @@ class RegionRestoreCommands(
                     }
                 }
 
-                submenu("instances_world", "Instances in this world", XMaterial.GRASS_BLOCK) {
+                submenu("instances_world", tGui(GuiMessages.WORLD_INSTANCES_TITLE), XMaterial.GRASS_BLOCK) {
                     paginated(28)
 
                     dynamicItems { p ->
@@ -580,15 +632,17 @@ class RegionRestoreCommands(
 
         when (result) {
             is MenuTreeResult.ActionCompleted -> {
-                player.sendMiniMessage("<gray>GUI closed after action: ${result.actionId}")
+                player.sendMessage(translations.getComponent(CommandMessages.GUI_CLOSED_ACTION) {
+                    unparsed("action", result.actionId)
+                })
             }
 
             is MenuTreeResult.Cancelled -> {
-                player.sendMiniMessage("<gray>GUI cancelled")
+                player.sendMessage(translations.getComponent(CommandMessages.GUI_CANCELLED))
             }
 
             is MenuTreeResult.ClosedAtRoot -> {
-                player.sendMiniMessage("<gray>GUI closed")
+                player.sendMessage(translations.getComponent(CommandMessages.GUI_CLOSED))
             }
         }
     }
@@ -605,7 +659,7 @@ class RegionRestoreCommands(
         world: String? = null
     ) {
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("This command can only be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
@@ -614,7 +668,9 @@ class RegionRestoreCommands(
         } else {
             player.world
         } ?: run {
-            actor.sendMiniMessage("World not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
+                unparsed("world", world ?: "unknown")
+            })
             return
         }
 
@@ -629,7 +685,9 @@ class RegionRestoreCommands(
         val description = descriptionFormat.replace("<player>", player.name)
         templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)
 
-        actor.sendMiniMessage("<green>Template '$name' created successfully!")
+        actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_CREATED) {
+            unparsed("name", name)
+        })
     }
 
     @Subcommand("template list")
@@ -637,13 +695,15 @@ class RegionRestoreCommands(
     suspend fun listTemplates(actor: CommandSender) {
         val templates = templateRepository.listTemplates()
         if (templates.isEmpty()) {
-            actor.sendMiniMessage("<gray>No templates found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_LIST_EMPTY))
             return
         }
 
-        actor.sendMiniMessage("<green>Templates:")
+        actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_LIST_HEADER))
         templates.forEach { templateName ->
-            actor.sendMiniMessage("<white>- $templateName")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_LIST_ITEM) {
+                unparsed("name", templateName)
+            })
         }
     }
 
@@ -652,23 +712,28 @@ class RegionRestoreCommands(
     suspend fun templateInfo(actor: CommandSender, @SuggestTemplateName name: String) {
         val versions = templateRepository.getTemplateVersions(name)
         if (versions == null || versions.isEmpty()) {
-            actor.sendMiniMessage("<red>Template '$name' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_NOT_FOUND) {
+                unparsed("name", name)
+            })
             return
         }
 
         val activeVersionId = templateRepository.loadActiveTemplateVersion(name)?.versionId ?: 0
 
-        actor.sendMiniMessage("<green>Template: <white>$name")
-        actor.sendMiniMessage("<gray>Versions: ${versions.size}")
+        actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_INFO_HEADER) {
+            unparsed("name", name)
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_INFO_VERSIONS) {
+            unparsed("count", versions.size.toString())
+        })
         versions.forEach { version ->
-            val activeMark = if (version.versionId == activeVersionId) " <green>(active)" else ""
-            actor.sendMiniMessage(
-                "<white>  v${version.versionId}:$activeMark <gray>${
-                    java.time.Instant.ofEpochMilli(
-                        version.createdAt
-                    )
-                } - ${version.description}"
-            )
+            val activeMark = if (version.versionId == activeVersionId) translations.getString(CommandMessages.TEMPLATE_INFO_VERSION_ACTIVE_MARK) else ""
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_INFO_VERSION_LINE) {
+                unparsed("version", version.versionId.toString())
+                unparsed("active_mark", activeMark)
+                unparsed("created", java.time.Instant.ofEpochMilli(version.createdAt).toString())
+                unparsed("description", version.description)
+            })
         }
     }
 
@@ -681,9 +746,12 @@ class RegionRestoreCommands(
     ) {
         val success = templateRepository.setActiveVersion(name, versionId)
         if (success) {
-            actor.sendMiniMessage("<green>Template '$name' active version set to v$versionId")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_ACTIVE_SET) {
+                unparsed("name", name)
+                unparsed("version", versionId.toString())
+            })
         } else {
-            actor.sendMiniMessage("<red>Failed to set active version. Template or version not found.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_ACTIVE_SET_FAILED))
         }
     }
 
@@ -692,9 +760,13 @@ class RegionRestoreCommands(
     suspend fun deleteTemplate(actor: CommandSender, @SuggestTemplateName name: String) {
         val deleted = templateRepository.deleteTemplate(name)
         if (deleted) {
-            actor.sendMiniMessage("<green>Template '$name' deleted successfully!")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_DELETED) {
+                unparsed("name", name)
+            })
         } else {
-            actor.sendMiniMessage("<red>Template '$name' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_NOT_FOUND) {
+                unparsed("name", name)
+            })
         }
     }
 
@@ -707,7 +779,7 @@ class RegionRestoreCommands(
         @Optional scope: AudienceScope? = config.notifications.defaultAudienceScope
     ) {
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("This command can only be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
@@ -721,18 +793,26 @@ class RegionRestoreCommands(
             try {
                 templateRepository.loadTemplateVersion(name, versionOrActive.toInt())
             } catch (e: NumberFormatException) {
-                actor.sendMiniMessage("<red>Invalid version ID: '$versionOrActive'")
+                actor.sendMessage(translations.getComponent(CommandMessages.INVALID_VERSION_ID) {
+                    unparsed("version", versionOrActive)
+                })
                 return
             }
         }
 
         if (templateVersion == null) {
-            actor.sendMiniMessage("<red>Template '$name' version '$versionOrActive' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_NOT_FOUND) {
+                unparsed("name", name)
+                unparsed("version", versionOrActive)
+            })
             return
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-            actor.sendMiniMessage("<red>Template was created on Minecraft version ${templateVersion.minecraftVersion}, attemping restore on version ${nmsAdapter.minecraftVersion}. Please update the template to avoid restore errors.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_MISMATCH) {
+                unparsed("template_version", templateVersion.minecraftVersion)
+                unparsed("server_version", nmsAdapter.minecraftVersion)
+            })
         }
 
         val job = RestoreJob(
@@ -756,7 +836,10 @@ class RegionRestoreCommands(
 
         schedulerService.scheduleRestore(job, null, emptyList(), scope)
 
-        actor.sendMiniMessage("<green>Restoring template '$name' (v${templateVersion.versionId})...")
+        actor.sendMessage(translations.getComponent(CommandMessages.RESTORE_STARTING) {
+            unparsed("name", name)
+            unparsed("version", templateVersion.versionId.toString())
+        })
     }
 
     @Subcommand("restore in")
@@ -769,7 +852,7 @@ class RegionRestoreCommands(
         scope: AudienceScope = config.notifications.defaultAudienceScope
     ) {
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("This command can only be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
@@ -781,18 +864,26 @@ class RegionRestoreCommands(
             try {
                 templateRepository.loadTemplateVersion(name, versionOrActive.toInt())
             } catch (e: NumberFormatException) {
-                actor.sendMiniMessage("<red>Invalid version ID: '$versionOrActive'")
+                actor.sendMessage(translations.getComponent(CommandMessages.INVALID_VERSION_ID) {
+                    unparsed("version", versionOrActive)
+                })
                 return
             }
         }
 
         if (templateVersion == null) {
-            actor.sendMiniMessage("<red>Template '$name' version '$versionOrActive' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_NOT_FOUND) {
+                unparsed("name", name)
+                unparsed("version", versionOrActive)
+            })
             return
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-            actor.sendMiniMessage("<red>Template was created on Minecraft version ${templateVersion.minecraftVersion}, restoring on version ${nmsAdapter.minecraftVersion}. Please update the template to avoid errors.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_MISMATCH) {
+                unparsed("template_version", templateVersion.minecraftVersion)
+                unparsed("server_version", nmsAdapter.minecraftVersion)
+            })
         }
 
         val job = RestoreJob(
@@ -821,7 +912,10 @@ class RegionRestoreCommands(
             audienceScope = scope
         )
 
-        actor.sendMiniMessage("<green>Scheduled restore of '$name' in $seconds seconds")
+        actor.sendMessage(translations.getComponent(CommandMessages.RESTORE_SCHEDULED) {
+            unparsed("name", name)
+            unparsed("seconds", seconds.toString())
+        })
     }
 
     @Subcommand("restore template")
@@ -831,7 +925,7 @@ class RegionRestoreCommands(
         @SuggestTemplateName name: String
     ) {
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("This command can only be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
@@ -840,12 +934,17 @@ class RegionRestoreCommands(
         val templateVersion = templateRepository.loadActiveTemplateVersion(name)
 
         if (templateVersion == null) {
-            actor.sendMiniMessage("<red>Template '$name' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_NOT_FOUND) {
+                unparsed("name", name)
+            })
             return
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-            actor.sendMiniMessage("<red>Template was created on Minecraft version ${templateVersion.minecraftVersion}, attemping restore on version ${nmsAdapter.minecraftVersion}. Please update the template to avoid errors.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_MISMATCH) {
+                unparsed("template_version", templateVersion.minecraftVersion)
+                unparsed("server_version", nmsAdapter.minecraftVersion)
+            })
         }
 
         val job = RestoreJob(
@@ -869,7 +968,10 @@ class RegionRestoreCommands(
 
         schedulerService.scheduleRestore(job, null, emptyList(), config.notifications.defaultAudienceScope)
 
-        actor.sendMiniMessage("<green>Restoring template '$name' (v${templateVersion.versionId})...")
+        actor.sendMessage(translations.getComponent(CommandMessages.RESTORE_STARTING) {
+            unparsed("name", name)
+            unparsed("version", templateVersion.versionId.toString())
+        })
     }
 
     @Subcommand("restore at")
@@ -883,7 +985,9 @@ class RegionRestoreCommands(
         @SuggestVersionId @Optional versionOrActive: String? = null
     ) {
         val targetWorld = Bukkit.getWorld(world) ?: run {
-            actor.sendMiniMessage("<red>World '$world' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
+                unparsed("world", world)
+            })
             return
         }
 
@@ -895,18 +999,26 @@ class RegionRestoreCommands(
             try {
                 templateRepository.loadTemplateVersion(name, versionToUse.toInt())
             } catch (e: NumberFormatException) {
-                actor.sendMiniMessage("<red>Invalid version ID: '$versionToUse'")
+                actor.sendMessage(translations.getComponent(CommandMessages.INVALID_VERSION_ID) {
+                    unparsed("version", versionToUse)
+                })
                 return
             }
         }
 
         if (templateVersion == null) {
-            actor.sendMiniMessage("<red>Template '$name' version '$versionToUse' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_NOT_FOUND) {
+                unparsed("name", name)
+                unparsed("version", versionToUse)
+            })
             return
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-            actor.sendMiniMessage("<red>Template was created on Minecraft version ${templateVersion.minecraftVersion}, restoring on ${nmsAdapter.minecraftVersion}. Please update the template to avoid errors.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_MISMATCH) {
+                unparsed("template_version", templateVersion.minecraftVersion)
+                unparsed("server_version", nmsAdapter.minecraftVersion)
+            })
         }
 
         val targetChunkX = floor(x / 16.0).toInt()
@@ -933,19 +1045,26 @@ class RegionRestoreCommands(
 
         schedulerService.scheduleRestore(job, null, emptyList(), config.notifications.defaultAudienceScope)
 
-        actor.sendMiniMessage("<green>Restoring template '$name' (v${templateVersion.versionId}) at chunk ($targetChunkX, $targetChunkZ)...")
+        actor.sendMessage(translations.getComponent(CommandMessages.RESTORE_STARTING_AT) {
+            unparsed("name", name)
+            unparsed("version", templateVersion.versionId.toString())
+            unparsed("chunk_x", targetChunkX.toString())
+            unparsed("chunk_z", targetChunkZ.toString())
+        })
     }
 
     @Subcommand("cloner status")
     @CommandPermission("regionrestore.cloner.status")
     suspend fun clonerStatus(actor: CommandSender, world: String? = null) {
-        actor.sendMiniMessage("<green>Mass Cloner Status:")
-        actor.sendMiniMessage("<gray>─────────────────────────────────")
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_STATUS_HEADER))
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_STATUS_SEPARATOR))
 
         val worldsToShow = if (world != null) {
             val targetWorld = Bukkit.getWorld(world)
             if (targetWorld == null) {
-                actor.sendMiniMessage("<red>World '$world' not found")
+                actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
+                    unparsed("world", world)
+                })
                 return
             }
             listOf(targetWorld)
@@ -958,11 +1077,15 @@ class RegionRestoreCommands(
         for (targetWorld in worldsToShow) {
             val worldConfig = config.massCloner.worlds.firstOrNull { it.name == targetWorld.name }
             if (worldConfig == null) {
-                actor.sendMiniMessage("<gray>${targetWorld.name}: <yellow>Not managed")
+                actor.sendMessage(translations.getComponent(CommandMessages.CLONER_WORLD_NOT_MANAGED) {
+                    unparsed("world", targetWorld.name)
+                })
                 continue
             }
 
-            actor.sendMiniMessage("<white>${targetWorld.name}:")
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_WORLD_HEADER) {
+                unparsed("world", targetWorld.name)
+            })
 
             for (pool in worldConfig.pools) {
                 val instances = massClonerService.getInstancesForPool(targetWorld.name, pool.templateName)
@@ -970,19 +1093,26 @@ class RegionRestoreCommands(
                 val targetCount = pool.count
                 val status = if (activeCount == targetCount) "<green>✓" else "<yellow>⚠"
 
-                actor.sendMiniMessage("  $status <white>${pool.templateName}: $activeCount/$targetCount instances")
-                actor.sendMiniMessage(
-                    "     <gray>Version: ${pool.versionMode}" +
-                            (if (pool.versionMode == VersionMode.PINNED) " #${pool.pinnedVersionId}" else " (active)")
-                )
-                actor.sendMiniMessage(
-                    "     <gray>Separation: ${pool.separationChunks} chunks | " +
-                            "Boot restore: ${pool.restoreOnBoot} | " +
-                            "Vacate restore: ${pool.restoreOnVacate}"
-                )
+                actor.sendMessage(translations.getComponent(CommandMessages.CLONER_POOL_STATUS) {
+                    placeholder("status", status)  // Contains MiniMessage formatting
+                    unparsed("name", pool.templateName)
+                    unparsed("active", activeCount.toString())
+                    unparsed("target", targetCount.toString())
+                })
+                actor.sendMessage(translations.getComponent(CommandMessages.CLONER_POOL_VERSION) {
+                    unparsed("version", pool.versionMode.toString() +
+                            (if (pool.versionMode == VersionMode.PINNED) " #${pool.pinnedVersionId}" else " (active)"))
+                })
+                actor.sendMessage(translations.getComponent(CommandMessages.CLONER_POOL_SETTINGS) {
+                    unparsed("separation", pool.separationChunks.toString())
+                    unparsed("boot", pool.restoreOnBoot.toString())
+                    unparsed("vacate", pool.restoreOnVacate.toString())
+                })
 
                 if (pool.restoreIntervalSeconds != null) {
-                    actor.sendMiniMessage("     <gray>Repeat: Every ${pool.restoreIntervalSeconds}s")
+                    actor.sendMessage(translations.getComponent(CommandMessages.CLONER_POOL_REPEAT) {
+                        unparsed("interval", pool.restoreIntervalSeconds.toString())
+                    })
                 }
             }
         }
@@ -993,11 +1123,11 @@ class RegionRestoreCommands(
     suspend fun clonerRestore(actor: CommandSender, world: String?, template: String?) {
         val worldName = world ?: (actor as? Player)?.world?.name
         if (worldName == null) {
-            actor.sendMiniMessage("<red>Please specify a world or run as a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_SPECIFIED))
             return
         }
 
-        actor.sendMiniMessage("<green>Triggering manual restore for cloner instances...")
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_RESTORE_STARTING))
 
         val worldsToRestore = if (template != null) {
             // Restore specific template in specific world
@@ -1006,7 +1136,9 @@ class RegionRestoreCommands(
             // Restore all templates in world
             val worldConfig = config.massCloner.worlds.firstOrNull { it.name == worldName }
             if (worldConfig == null) {
-                actor.sendMiniMessage("<red>World '$worldName' is not managed by Mass Cloner")
+                actor.sendMessage(translations.getComponent(CommandMessages.CLONER_WORLD_NOT_MANAGED_ERROR) {
+                    unparsed("world", worldName)
+                })
                 return
             }
             listOf(worldName to worldConfig.pools.map { it.templateName })
@@ -1024,7 +1156,9 @@ class RegionRestoreCommands(
             }
         }
 
-        actor.sendMiniMessage("<green>Triggered restore for $restoredCount instances")
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_RESTORE_TRIGGERED) {
+            unparsed("count", restoredCount.toString())
+        })
     }
 
     @Subcommand("cloner regen")
@@ -1036,10 +1170,7 @@ class RegionRestoreCommands(
     ) {
         // Require --force flag to prevent accidental data loss
         if (!force) {
-            actor.sendMiniMessage(
-                "<red>This command will destroy and reallocate all pooled instances. " +
-                        "Use --force to confirm: /regionrestore cloner regen [world] --force"
-            )
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_CONFIRM))
             return
         }
 
@@ -1047,7 +1178,9 @@ class RegionRestoreCommands(
         if (world != null) {
             val worldConfig = config.massCloner.worlds.firstOrNull { it.name == world }
             if (worldConfig == null) {
-                actor.sendMiniMessage("<red>World '$world' is not configured in Mass Cloner")
+                actor.sendMessage(translations.getComponent(CommandMessages.CLONER_WORLD_NOT_CONFIGURED) {
+                    unparsed("world", world)
+                })
                 return
             }
         }
@@ -1056,10 +1189,14 @@ class RegionRestoreCommands(
         val worldsToRegen = if (world != null) listOf(world) else emptyList()
         val (removed, allocated) = massClonerService.regeneratePools(worldsToRegen)
 
-        actor.sendMiniMessage("<green>Regeneration complete:")
-        actor.sendMiniMessage("  Removed: $removed pooled instances")
-        actor.sendMiniMessage("  Allocated: $allocated pooled instances")
-        actor.sendMiniMessage("<yellow>Manual instances were preserved.")
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_COMPLETE))
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_REMOVED) {
+            unparsed("count", removed.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_ALLOCATED) {
+            unparsed("count", allocated.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_MANUAL_PRESERVED))
     }
 
     @Subcommand("instance create")
@@ -1076,7 +1213,7 @@ class RegionRestoreCommands(
         restoreIntervalSeconds: Int? = null
     ) {
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("<red>This command must be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
@@ -1085,7 +1222,9 @@ class RegionRestoreCommands(
         } else {
             player.world
         } ?: run {
-            actor.sendMiniMessage("<red>World not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
+                unparsed("world", world ?: "unknown")
+            })
             return
         }
 
@@ -1095,12 +1234,14 @@ class RegionRestoreCommands(
         } else {
             templateRepository.loadActiveTemplateVersion(templateName)
         } ?: run {
-            actor.sendMiniMessage("<red>Template '$templateName' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_NOT_FOUND) {
+                unparsed("name", templateName)
+            })
             return
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-            actor.sendMiniMessage("<red>Template version mismatch. Please update the template to avoid errors.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_MISMATCH_SIMPLE))
         }
 
         // Create instance config
@@ -1134,10 +1275,12 @@ class RegionRestoreCommands(
             massClonerService.startInstanceTriggers(instance)
         }
 
-        actor.sendMiniMessage(
-            "<green>Created manual instance '${instance.instanceId}' for template '$templateName' " +
-                    "at chunk ($chunkX, $chunkZ)"
-        )
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_CREATED) {
+            unparsed("id", instance.instanceId.toString())
+            unparsed("name", templateName)
+            unparsed("chunk_x", chunkX.toString())
+            unparsed("chunk_z", chunkZ.toString())
+        })
     }
 
     @Subcommand("instance list all")
@@ -1146,17 +1289,23 @@ class RegionRestoreCommands(
         val instances = massClonerService.listInstances(null, null)
 
         if (instances.isEmpty()) {
-            actor.sendMiniMessage("<gray>No instances found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_LIST_EMPTY))
             return
         }
 
-        actor.sendMiniMessage("<green>Instances (${instances.size}):")
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_LIST_HEADER) {
+            unparsed("count", instances.size.toString())
+        })
         for (instance in instances) {
             val typeMark = if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
-            actor.sendMiniMessage(
-                "  $typeMark ${instance.instanceId} - ${instance.templateName} " +
-                        "at (${instance.originChunkX}, ${instance.originChunkZ}) in ${instance.worldName}"
-            )
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_LIST_ITEM) {
+                unparsed("type_mark", typeMark)
+                unparsed("id", instance.instanceId.toString())
+                unparsed("name", instance.templateName)
+                unparsed("chunk_x", instance.originChunkX.toString())
+                unparsed("chunk_z", instance.originChunkZ.toString())
+                unparsed("world", instance.worldName)
+            })
         }
     }
 
@@ -1176,17 +1325,23 @@ class RegionRestoreCommands(
         val instances = massClonerService.listInstances(world, instanceType)
 
         if (instances.isEmpty()) {
-            actor.sendMiniMessage("<gray>No instances found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_LIST_EMPTY))
             return
         }
 
-        actor.sendMiniMessage("<green>Instances (${instances.size}):")
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_LIST_HEADER) {
+            unparsed("count", instances.size.toString())
+        })
         for (instance in instances) {
             val typeMark = if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
-            actor.sendMiniMessage(
-                "  $typeMark ${instance.instanceId} - ${instance.templateName} " +
-                        "at (${instance.originChunkX}, ${instance.originChunkZ}) in ${instance.worldName}"
-            )
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_LIST_ITEM) {
+                unparsed("type_mark", typeMark)
+                unparsed("id", instance.instanceId.toString())
+                unparsed("name", instance.templateName)
+                unparsed("chunk_x", instance.originChunkX.toString())
+                unparsed("chunk_z", instance.originChunkZ.toString())
+                unparsed("world", instance.worldName)
+            })
         }
     }
 
@@ -1197,20 +1352,41 @@ class RegionRestoreCommands(
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
-            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_NOT_FOUND) {
+                unparsed("id", instanceId)
+            })
             return
         }
 
-        val config = instance.config
-        actor.sendMiniMessage("<green>Instance: ${instance.instanceId}")
-        actor.sendMiniMessage("  Template: ${instance.templateName}")
-        actor.sendMiniMessage("  Location: ${instance.worldName} chunk (${instance.originChunkX}, ${instance.originChunkZ})")
-        actor.sendMiniMessage("  Size: ${instance.sizeXChunks}x${instance.sizeZChunks} chunks")
-        actor.sendMiniMessage("  Type: ${instance.instanceType}")
-        actor.sendMiniMessage("  Config:")
-        actor.sendMiniMessage("    Boot restore: ${config?.restoreOnBoot ?: false}")
-        actor.sendMiniMessage("    Vacate restore: ${config?.restoreOnVacate ?: false}")
-        actor.sendMiniMessage("    Repeat: ${config?.restoreIntervalSeconds ?: "none"}")
+        val cfg = instance.config
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_HEADER) {
+            unparsed("id", instance.instanceId.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_TEMPLATE) {
+            unparsed("name", instance.templateName)
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_LOCATION) {
+            unparsed("world", instance.worldName)
+            unparsed("chunk_x", instance.originChunkX.toString())
+            unparsed("chunk_z", instance.originChunkZ.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_SIZE) {
+            unparsed("size_x", instance.sizeXChunks.toString())
+            unparsed("size_z", instance.sizeZChunks.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_TYPE) {
+            unparsed("type", instance.instanceType.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_CONFIG))
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_BOOT_RESTORE) {
+            unparsed("value", (cfg?.restoreOnBoot ?: false).toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_VACATE_RESTORE) {
+            unparsed("value", (cfg?.restoreOnVacate ?: false).toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_INFO_REPEAT) {
+            unparsed("value", (cfg?.restoreIntervalSeconds?.toString() ?: "none"))
+        })
     }
 
     @Subcommand("instance delete")
@@ -1220,27 +1396,33 @@ class RegionRestoreCommands(
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
-            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_NOT_FOUND) {
+                unparsed("id", instanceId)
+            })
             return
         }
 
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("<red>This command must be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
         val confirmed = confirmInstanceDeletion(player, instance)
         if (!confirmed) {
-            actor.sendMiniMessage("<gray>Instance deletion cancelled")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_DELETE_CANCELLED))
             return
         }
 
         val deleted = massClonerService.removeInstance(id)
 
         if (deleted) {
-            actor.sendMiniMessage("<green>Deleted instance '$instanceId'")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_DELETED) {
+                unparsed("id", instanceId)
+            })
         } else {
-            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_NOT_FOUND) {
+                unparsed("id", instanceId)
+            })
         }
     }
 
@@ -1251,12 +1433,16 @@ class RegionRestoreCommands(
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
-            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_NOT_FOUND) {
+                unparsed("id", instanceId)
+            })
             return
         }
 
         massClonerService.triggerInstanceRestore(instance)
-        actor.sendMiniMessage("<green>Triggered restore for instance '$instanceId'")
+        actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_RESTORE_TRIGGERED) {
+            unparsed("id", instanceId)
+        })
     }
 
     @Subcommand("timer set instance")
@@ -1271,7 +1457,9 @@ class RegionRestoreCommands(
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
-            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_NOT_FOUND) {
+                unparsed("id", instanceId)
+            })
             return
         }
 
@@ -1299,8 +1487,13 @@ class RegionRestoreCommands(
         // Start new timers
         massClonerService.startInstanceTriggers(updatedInstance)
 
-        actor.sendMiniMessage("<green>Set repeating timer for instance '$instanceId' every $intervalSeconds seconds")
-        actor.sendMiniMessage("<gray>Use '/regionrestore timer cancel id $instanceId' to stop")
+        actor.sendMessage(translations.getComponent(CommandMessages.TIMER_SET) {
+            unparsed("id", instanceId)
+            unparsed("interval", intervalSeconds.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.TIMER_SET_HELP) {
+            unparsed("id", instanceId)
+        })
     }
 
     @Subcommand("timer set template")
@@ -1313,19 +1506,23 @@ class RegionRestoreCommands(
     ) {
         val player = actor as? Player
         val targetWorld = player?.world ?: run {
-            actor.sendMiniMessage("<red>World not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
+                unparsed("world", "unknown")
+            })
             return
         }
 
         // Load template
         val templateVersion = templateRepository.loadActiveTemplateVersion(templateName)
         if (templateVersion == null) {
-            actor.sendMiniMessage("<red>Template '$templateName' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_NOT_FOUND) {
+                unparsed("name", templateName)
+            })
             return
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-            actor.sendMiniMessage("<red>Template version mismatch. Please update the template to avoid errors.")
+            actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_VERSION_MISMATCH_SIMPLE))
         }
 
         // Use template's original coordinates
@@ -1357,11 +1554,13 @@ class RegionRestoreCommands(
         massClonerService.addManualInstance(instance)
         massClonerService.startInstanceTriggers(instance)
 
-        actor.sendMiniMessage(
-            "<green>Set repeating timer for template '$templateName' at original location " +
-                    "every $intervalSeconds seconds"
-        )
-        actor.sendMiniMessage("<gray>Instance ID: ${instance.instanceId} (use '/regionrestore timer cancel id ${instance.instanceId}' to stop)")
+        actor.sendMessage(translations.getComponent(CommandMessages.TIMER_SET_TEMPLATE) {
+            unparsed("name", templateName)
+            unparsed("interval", intervalSeconds.toString())
+        })
+        actor.sendMessage(translations.getComponent(CommandMessages.TIMER_INSTANCE_ID_HELP) {
+            unparsed("id", instance.instanceId.toString())
+        })
     }
 
     @Subcommand("timer cancel id")
@@ -1374,12 +1573,16 @@ class RegionRestoreCommands(
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
-            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_NOT_FOUND) {
+                unparsed("id", instanceId)
+            })
             return
         }
 
         massClonerService.removeInstance(id)
-        actor.sendMiniMessage("<green>Cancelled timer for instance '$instanceId'")
+        actor.sendMessage(translations.getComponent(CommandMessages.TIMER_CANCELLED) {
+            unparsed("id", instanceId)
+        })
     }
 
     @Subcommand("timer cancel template-all")
@@ -1390,7 +1593,7 @@ class RegionRestoreCommands(
     ) {
         // Cancel all timers for instances of this template in the current world
         val player = actor as? Player ?: run {
-            actor.sendMiniMessage("This command can only be run by a player")
+            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
 
@@ -1399,7 +1602,9 @@ class RegionRestoreCommands(
         val templateInstances = instances.filter { it.templateName == templateName }
 
         if (templateInstances.isEmpty()) {
-            actor.sendMiniMessage("<yellow>No instances found for template '$templateName' in this world")
+            actor.sendMessage(translations.getComponent(CommandMessages.TIMER_NO_INSTANCES) {
+                unparsed("name", templateName)
+            })
             return
         }
 
@@ -1411,7 +1616,10 @@ class RegionRestoreCommands(
             }
         }
 
-        actor.sendMiniMessage("<green>Cancelled timers for $cancelledCount instance(s) of template '$templateName'")
+        actor.sendMessage(translations.getComponent(CommandMessages.TIMER_CANCELLED_TEMPLATE) {
+            unparsed("count", cancelledCount.toString())
+            unparsed("name", templateName)
+        })
     }
 
     private fun instanceNode(instance: RegionInstance): SubmenuNode {
@@ -1419,56 +1627,60 @@ class RegionRestoreCommands(
         val title =
             "$typeMark ${instance.templateName} @ ${instance.worldName} (${instance.originChunkX}, ${instance.originChunkZ})"
         return submenuNode("instance_${instance.instanceId}", title, XMaterial.CHEST) {
-            action("info", "Info", XMaterial.BOOK) { p ->
+            action("info", tGui(GuiMessages.INSTANCE_INFO_TITLE), XMaterial.BOOK) { p ->
                 instanceInfo(p, instance.instanceId.toString())
             }
 
-            action("restore", "Restore", XMaterial.EMERALD) { p ->
+            action("restore", tGui(GuiMessages.INSTANCE_RESTORE_TITLE), XMaterial.EMERALD) { p ->
                 restoreInstance(p, instance.instanceId.toString())
             }
 
-            action("delete", "Delete", XMaterial.BARRIER) { p ->
+            action("delete", tGui(GuiMessages.INSTANCE_DELETE_TITLE), XMaterial.BARRIER) { p ->
                 val confirmed = confirmInstanceDeletion(p, instance)
                 if (!confirmed) {
-                    p.sendMiniMessage("<gray>Instance deletion cancelled")
+                    p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_DELETE_CANCELLED))
                     return@action null
                 }
 
                 val deleted = massClonerService.removeInstance(instance.instanceId)
                 if (deleted) {
-                    p.sendMiniMessage("<green>Deleted instance '${instance.instanceId}'")
+                    p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_DELETED) {
+                        unparsed("id", instance.instanceId.toString())
+                    })
                 } else {
-                    p.sendMiniMessage("<red>Instance '${instance.instanceId}' not found")
+                    p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_NOT_FOUND) {
+                        unparsed("id", instance.instanceId.toString())
+                    })
                 }
             }
 
             // Timers submenu for this instance
-            submenu("timers", "Timers", XMaterial.CLOCK) {
+            submenu("timers", tGui(GuiMessages.TIMERS_TITLE), XMaterial.CLOCK) {
                 val timerLoreBase = mutableListOf<String>()
                 val cfg = instance.config
                 if (cfg == null || cfg.restoreIntervalSeconds == null) {
-                    timerLoreBase += "No timer configured"
+                    timerLoreBase += tGui(GuiMessages.TIMER_NO_CONFIG)
                 } else {
-                    timerLoreBase += "Interval: ${cfg.restoreIntervalSeconds} seconds"
-                    timerLoreBase += "Audience: ${cfg.restoreAudienceScope}"
+                    timerLoreBase += tGui(GuiMessages.TIMER_INTERVAL).replace("<interval>", cfg.restoreIntervalSeconds.toString())
+                    timerLoreBase += tGui(GuiMessages.TIMER_AUDIENCE).replace("<scope>", cfg.restoreAudienceScope.toString())
                 }
 
                 display(
                     "timer_info",
-                    "View timer",
+                    tGui(GuiMessages.VIEW_TIMER_TITLE),
                     XMaterial.CLOCK,
                     timerLoreBase
                 )
 
-                action("timer_set", "Set / update timer", XMaterial.LIME_DYE, emptyList(), returnLevels = 1) { p ->
+                action("timer_set", tGui(GuiMessages.SET_TIMER_TITLE), XMaterial.LIME_DYE, emptyList(), returnLevels = 1) { p ->
                     val intervalResult = menuAPI.promptInt(
                         p,
-                        "Interval seconds (>= 1)",
+                        tGui(GuiMessages.TIMER_INTERVAL_PROMPT),
                         min = 1
                     )
                     val interval = intervalResult.getOrNull()
                     if (!intervalResult.isSuccess || interval == null) {
-                        p.sendMiniMessage("<gray>Timer configuration cancelled")
+                        p.sendMessage(translations.getComponentSync(CommandMessages.TIMER_CONFIG_CANCELLED))
                         return@action null
                     }
 
@@ -1480,7 +1692,7 @@ class RegionRestoreCommands(
                     )
                 }
 
-                action("timer_clear", "Delete timer", XMaterial.RED_DYE, emptyList(), returnLevels = 1) { p ->
+                action("timer_clear", tGui(GuiMessages.DELETE_TIMER_TITLE), XMaterial.RED_DYE, emptyList(), returnLevels = 1) { p ->
                     cancelTimerById(p, instance.instanceId.toString())
                 }
             }
@@ -1491,15 +1703,15 @@ class RegionRestoreCommands(
         return suspendCoroutine { continuation ->
             var completed = false
             val menu = ConfirmationMenu {
-                title = Component.text("Delete instance?")
+                title = Component.text(tGui(GuiMessages.CONFIRM_DELETE_TITLE))
                 infoItem = VItem(XMaterial.PAPER) {
-                    name = Component.text("Confirm deletion")
+                    name = Component.text(tGui(GuiMessages.CONFIRM_DELETE_INFO))
                     loreStrings(
                         listOf(
-                            "Instance: ${instance.instanceId}",
-                            "Template: ${instance.templateName}",
-                            "World: ${instance.worldName}",
-                            "This cannot be undone."
+                            tGui(GuiMessages.CONFIRM_INSTANCE_LINE).replace("<id>", instance.instanceId.toString()),
+                            tGui(GuiMessages.CONFIRM_TEMPLATE_LINE).replace("<name>", instance.templateName),
+                            tGui(GuiMessages.CONFIRM_WORLD_LINE).replace("<world>", instance.worldName),
+                            tGui(GuiMessages.CONFIRM_WARNING)
                         )
                     )
                 }
