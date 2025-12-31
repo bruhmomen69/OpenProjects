@@ -6,10 +6,16 @@ plugins {
     alias(libs.plugins.kotlinPluginSerialization)
 }
 
+repositories {
+    maven("https://mvn.wesjd.net/")
+}
+
 dependencies {
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     api("com.github.cryptomorin:XSeries:13.6.0")
+    api("net.wesjd:anvilgui:1.10.11-SNAPSHOT")
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     compileOnly(libs.bundles.kotlinxEcosystem)
     testImplementation(libs.bundles.kotlinxEcosystem)
     testImplementation(kotlin("test"))

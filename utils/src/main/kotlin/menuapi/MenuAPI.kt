@@ -39,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap
  * menuApi.open(menu, player)
  * ```
  */
-class MenuAPI(private val plugin: JavaPlugin) : Closeable, AutoCloseable {
+class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
     private val listener = MenuListener()
     private val openMenus: MutableMap<UUID, MenuHolder<*>> = ConcurrentHashMap()
     private val scheduledTasks: MutableList<BukkitTask> = mutableListOf()
