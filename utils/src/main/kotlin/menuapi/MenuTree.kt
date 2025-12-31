@@ -673,19 +673,31 @@ class MenuTreeNavigator(
                             val result = kotlinx.coroutines.runBlocking {
                                 child.handler(player)
                             }
-                            
+
                             // Handle post-action navigation
                             if (child.returnLevels > 0 && !future.isDone) {
-                                // Navigate back up the tree
+                                // fullBreadcrumb contains the path from root to the current submenu node
+                                // (i.e., the parent of this action): [root, ..., parentNode]
                                 val fullBreadcrumb = breadcrumb + parentNode
-                                val targetLevel = (fullBreadcrumb.size - child.returnLevels).coerceAtLeast(0)
-                                val targetBreadcrumb = fullBreadcrumb.take(targetLevel)
-                                val targetNode = if (targetLevel == 0) {
+
+                                // Determine the index of the target node in fullBreadcrumb.
+                                // We go up `returnLevels` from the parent node (which is at index size - 1).
+                                val targetIndex = (fullBreadcrumb.size - 1 - child.returnLevels).coerceAtLeast(0)
+
+                                // Breadcrumb for the target node should contain ONLY its ancestors,
+                                // not the node itself.
+                                val targetBreadcrumb = if (targetIndex == 0) {
+                                    emptyList()
+                                } else {
+                                    fullBreadcrumb.take(targetIndex)
+                                }
+
+                                val targetNode = if (targetIndex == 0) {
                                     rootNode
                                 } else {
-                                    fullBreadcrumb.getOrNull(targetLevel - 1) ?: rootNode
+                                    fullBreadcrumb.getOrNull(targetIndex) ?: rootNode
                                 }
-                                
+
                                 // Schedule showing the target node on the main thread
                                 menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
                                     showNode(player, targetNode, targetBreadcrumb, future)

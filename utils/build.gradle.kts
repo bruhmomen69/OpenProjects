@@ -18,6 +18,15 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     compileOnly(libs.bundles.kotlinxEcosystem)
+    
+    // Translation system dependencies
+    api("net.kyori:adventure-api:4.23.0")
+    api("net.kyori:adventure-text-minimessage:4.23.0")
+    implementation("com.mayakapps.kache:kache:2.1.1")
+    
     testImplementation(libs.bundles.kotlinxEcosystem)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("net.kyori:adventure-text-serializer-plain:4.23.0")
 }
