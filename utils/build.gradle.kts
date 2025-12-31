@@ -8,6 +8,8 @@ plugins {
 
 dependencies {
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
+    api("com.github.cryptomorin:XSeries:13.6.0")
+    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     compileOnly(libs.bundles.kotlinxEcosystem)
     testImplementation(libs.bundles.kotlinxEcosystem)
     testImplementation(kotlin("test"))

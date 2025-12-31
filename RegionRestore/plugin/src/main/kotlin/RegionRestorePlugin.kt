@@ -20,6 +20,7 @@ import bruh.regionrestore.notification.NotificationService
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.template.TemplateCache
 import bruh.regionrestore.timer.SchedulerService
+import bruh.zchat.utils.menuapi.MenuAPI
 
 class RegionRestorePlugin : SuspendingJavaPlugin() {
     lateinit var nmsAdapter: PaperNmsAdapter
@@ -38,6 +39,8 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         private set
     lateinit var configLoader: RegionRestoreConfigLoader
         private set
+    lateinit var menuAPI: MenuAPI
+        private set
 
     override suspend fun onLoadAsync() {
         nmsAdapter = PaperNmsAdapterLoader.load()
@@ -50,6 +53,8 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
 
     override suspend fun onEnableAsync() {
         slF4JLogger.info("Loading RegionRestore...")
+
+        menuAPI = MenuAPI(this)
 
         templateRepository = TemplateRepository(dataFolder.toPath(), slF4JLogger, nmsAdapter)
 
@@ -105,7 +110,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         slF4JLogger.info("RegionRestore disabled!")
     }
 
-    private suspend fun setupCommands() {
+    private fun setupCommands() {
         val lamp = BukkitLamp.builder(this)
             .suggestionProviders { providers ->
                 // Template name suggestions
@@ -152,6 +157,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                 }
             }
             .build()
-        lamp.register(RegionRestoreCommands(nmsAdapter, templateRepository, schedulerService, config, massClonerService, this))
+        lamp.register(RegionRestoreCommands(nmsAdapter, templateRepository, schedulerService, config, massClonerService, menuAPI, this))
     }
 }

@@ -17,6 +17,10 @@ import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.timer.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.utils.sendMiniMessage
+import bruh.zchat.utils.menuapi.MenuAPI
+import com.cryptomorin.xseries.XMaterial
+import net.kyori.adventure.text.Component
+import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import kotlin.math.floor
 
 /**
@@ -34,8 +38,64 @@ class RegionRestoreCommands(
     private val schedulerService: SchedulerService,
     private val config: RegionRestoreConfig,
     private val massClonerService: MassClonerService,
+    private val menuAPI: MenuAPI,
     private val plugin: JavaPlugin
 ) {
+    @Subcommand("uitest")
+    fun uiTest(actor: BukkitCommandActor) {
+        val menu = menuAPI.dynamic {
+            item(XMaterial.ALLIUM) {
+                name = Component.text("Test Allium")
+                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
+                onClickDeny { a, b ->
+                    actor.requirePlayer().sendMiniMessage("You clicked Allium")
+                }
+            }
+
+            item(XMaterial.ROSE_BUSH) {
+                name = Component.text("Test Rose")
+                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
+                onClickDeny { a, b ->
+                    actor.requirePlayer().sendMiniMessage("You clicked Rose")
+                }
+            }
+
+            item(XMaterial.AZALEA) {
+                name = Component.text("Test Azalea")
+                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
+                onClickDeny { a, b ->
+                    actor.requirePlayer().sendMiniMessage("You clicked Azalea")
+                }
+            }
+
+            item(XMaterial.SUNFLOWER) {
+                name = Component.text("Test Sunflower")
+                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
+                onClickDeny { a, b ->
+                    actor.requirePlayer().sendMiniMessage("You clicked Sunflower")
+                }
+            }
+
+
+            item(XMaterial.CACTUS) {
+                name = Component.text("Test Cactus")
+                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
+                onClickDeny { a, b ->
+                    actor.requirePlayer().sendMiniMessage("You clicked Cactus")
+                }
+            }
+
+            item(XMaterial.ORANGE_TULIP) {
+                name = Component.text("Test Tulip")
+                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
+                onClickDeny { a, b ->
+                    actor.requirePlayer().sendMiniMessage("You clicked Tulip")
+                }
+            }
+        }
+
+        menuAPI.open(menu, actor.requirePlayer())
+    }
 
     @Subcommand("template create")
     @CommandPermission("regionrestore.template.create")

@@ -25,7 +25,7 @@ data class RegionTemplate(
         for (byteBuf in chunkData.values) {
             if (byteBuf.refCnt() == 0)
                 continue
-            
+
             byteBuf.release()
         }
     }

@@ -6,6 +6,7 @@ plugins {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     compileOnly("io.netty:netty-buffer:4.1.115.Final")
+    api(project(":utils"))
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.8.0")
     api("com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.21.0")
