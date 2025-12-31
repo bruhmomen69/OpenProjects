@@ -7,13 +7,14 @@ plugins {
 }
 
 repositories {
-    maven("https://mvn.wesjd.net/")
+    maven("https://repo.spaceio.xyz/repository/maven-public/")
 }
 
 dependencies {
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     api("com.github.cryptomorin:XSeries:13.6.0")
-    api("net.wesjd:anvilgui:1.10.11-SNAPSHOT")
+    implementation("net.wesjd:anvilgui:2.0.4-20251228.114051-1")
+    api(kotlin("reflect"))
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     compileOnly(libs.bundles.kotlinxEcosystem)

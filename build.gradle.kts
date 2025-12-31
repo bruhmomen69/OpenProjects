@@ -26,6 +26,9 @@ allprojects {
         maven("https://repo.codemc.io/repository/nms/") {
             name = "nms"
         }
+        maven("https://repo.spaceio.xyz/repository/maven-public/") {
+            name = "spaceio-repo"
+        }
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {

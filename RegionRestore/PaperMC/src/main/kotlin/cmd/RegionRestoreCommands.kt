@@ -17,11 +17,15 @@ import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.timer.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.utils.sendMiniMessage
-import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.menuapi.*
 import com.cryptomorin.xseries.XMaterial
+import com.github.shynixn.mccoroutine.folia.entityDispatcher
+import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import kotlin.math.floor
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 /**
  * Target for timer operations - either an instance ID or a template name.
@@ -41,60 +45,545 @@ class RegionRestoreCommands(
     private val menuAPI: MenuAPI,
     private val plugin: JavaPlugin
 ) {
-    @Subcommand("uitest")
-    fun uiTest(actor: BukkitCommandActor) {
-        val menu = menuAPI.dynamic {
-            item(XMaterial.ALLIUM) {
-                name = Component.text("Test Allium")
-                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
-                onClickDeny { a, b ->
-                    actor.requirePlayer().sendMiniMessage("You clicked Allium")
-                }
-            }
+    @Subcommand("gui")
+    @CommandPermission("regionrestore.gui")
+    suspend fun openGui(actor: BukkitCommandActor) {
+        val player = actor.requirePlayer()
 
-            item(XMaterial.ROSE_BUSH) {
-                name = Component.text("Test Rose")
-                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
-                onClickDeny { a, b ->
-                    actor.requirePlayer().sendMiniMessage("You clicked Rose")
-                }
-            }
+        // Snapshot template names once when opening the GUI to avoid doing
+        // blocking IO on the main thread inside menu builders.
+        val templateNames = templateRepository.listTemplates()
 
-            item(XMaterial.AZALEA) {
-                name = Component.text("Test Azalea")
-                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
-                onClickDeny { a, b ->
-                    actor.requirePlayer().sendMiniMessage("You clicked Azalea")
-                }
-            }
-
-            item(XMaterial.SUNFLOWER) {
-                name = Component.text("Test Sunflower")
-                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
-                onClickDeny { a, b ->
-                    actor.requirePlayer().sendMiniMessage("You clicked Sunflower")
-                }
-            }
-
-
-            item(XMaterial.CACTUS) {
-                name = Component.text("Test Cactus")
-                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
-                onClickDeny { a, b ->
-                    actor.requirePlayer().sendMiniMessage("You clicked Cactus")
-                }
-            }
-
-            item(XMaterial.ORANGE_TULIP) {
-                name = Component.text("Test Tulip")
-                lore = mutableListOf(Component.text("Lore line 1"), Component.text("Lore line 2"))
-                onClickDeny { a, b ->
-                    actor.requirePlayer().sendMiniMessage("You clicked Tulip")
-                }
-            }
+        // Snapshot template metadata for GUI display
+        val templateVersionsByName = templateNames.associateWith {
+            templateRepository.getTemplateVersions(it) ?: emptyList()
+        }
+        val activeVersionIdsByName = templateNames.associateWith {
+            templateRepository.loadActiveTemplateVersion(it)?.versionId ?: 0
         }
 
-        menuAPI.open(menu, actor.requirePlayer())
+        val ui = menuAPI.menuTree {
+            title("RegionRestore")
+
+            // ========================= TEMPLATES =========================
+            submenu("templates", "Templates", XMaterial.BOOK) {
+                paginated(28)
+
+                dynamicItems { _ ->
+                    templateNames.map { templateName ->
+                        val versions = templateVersionsByName[templateName] ?: emptyList()
+                        val activeVersionId = activeVersionIdsByName[templateName] ?: 0
+                        val activeVersion = versions.firstOrNull { it.versionId == activeVersionId }
+                            ?: versions.maxByOrNull { it.versionId }
+                        val description = activeVersion?.description?.takeIf { it.isNotBlank() }
+                            ?: "No description"
+                        val infoLore = listOf(
+                            "Template: $templateName",
+                            "Description: $description"
+                        )
+
+                        submenuNode("template_$templateName", "Template: $templateName", XMaterial.PAPER) {
+                            action(
+                                "info",
+                                "Info",
+                                XMaterial.BOOK,
+                                infoLore
+                            ) { _ ->
+                                // Displayed in lore only; keep UI open
+                                null
+                            }
+
+                            submenu("versions", "Versions", XMaterial.BOOKSHELF) {
+                                paginated(28)
+
+                                dynamicItems { _ ->
+                                    versions.map { version ->
+                                        val isActive = version.versionId == activeVersionId
+                                        val title = if (isActive) {
+                                            "v${version.versionId} (active)"
+                                        } else {
+                                            "v${version.versionId}"
+                                        }
+                                        val lore = listOf(
+                                            "Created: ${java.time.Instant.ofEpochMilli(version.createdAt)}",
+                                            "Minecraft: ${version.minecraftVersion}",
+                                            "Description: ${version.description}"
+                                        )
+
+                                        actionNode(
+                                            id = "version_${templateName}_${version.versionId}",
+                                            title = title,
+                                            material = if (isActive) XMaterial.LIME_DYE else XMaterial.PAPER,
+                                            description = lore
+                                        ) { _ ->
+                                            // Read-only view; keep UI open
+                                        }
+                                    }
+                                }
+                            }
+
+                            action(
+                                "restore_original",
+                                "Restore (original position)",
+                                XMaterial.EMERALD_BLOCK,
+                                listOf("Restore at the template's saved position")
+                            ) { p ->
+                                restoreTemplate(p, templateName)
+                            }
+
+                            action(
+                                "restore_here",
+                                "Restore here",
+                                XMaterial.EMERALD,
+                                listOf("Restore at your current location")
+                            ) { p ->
+                                val worldName = p.world.name
+                                val chunk = p.location.chunk
+                                restoreAt(p, templateName, worldName, chunk.x * 16, chunk.z * 16, "active")
+                                null
+                            }
+
+                            action(
+                                "create_instance_original",
+                                "Create instance at template location",
+                                XMaterial.ANVIL,
+                                listOf("Create a manual instance at the template's saved location and restore it")
+                            ) { p ->
+                                val templateVersion = templateRepository.loadActiveTemplateVersion(templateName)
+                                if (templateVersion == null) {
+                                    p.sendMiniMessage("<red>Template '$templateName' not found")
+                                    return@action null
+                                }
+
+                                if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
+                                    p.sendMiniMessage(
+                                        "<yellow>Template version ${templateVersion.minecraftVersion} differs from server ${nmsAdapter.minecraftVersion}. Proceeding anyway."
+                                    )
+                                }
+
+                                val originChunkX = templateVersion.data.minChunkX
+                                val originChunkZ = templateVersion.data.minChunkZ
+
+                                val instanceConfig = InstanceConfig(
+                                    restoreOnBoot = false,
+                                    restoreOnVacate = false,
+                                    restoreIntervalSeconds = null,
+                                    restoreAudienceScope = config.notifications.defaultAudienceScope,
+                                    updateLight = null
+                                )
+
+                                val instance = RegionInstance.create(
+                                    instanceId = java.util.UUID.randomUUID(),
+                                    worldName = p.world.name,
+                                    templateName = templateName,
+                                    versionId = templateVersion.versionId,
+                                    originChunkX = originChunkX,
+                                    originChunkZ = originChunkZ,
+                                    sizeXChunks = templateVersion.data.sizeXChunks,
+                                    sizeZChunks = templateVersion.data.sizeZChunks,
+                                    instanceType = InstanceType.MANUAL,
+                                    config = instanceConfig
+                                )
+
+                                massClonerService.addManualInstance(instance)
+                                massClonerService.triggerInstanceRestore(instance)
+
+                                p.sendMiniMessage(
+                                    "<green>Created manual instance '${instance.instanceId}' for template '$templateName' " +
+                                            "at original chunk (${originChunkX}, ${originChunkZ}) and triggered restore."
+                                )
+                                null
+                            }
+
+                            action(
+                                "set_active",
+                                "Set active version",
+                                XMaterial.LIME_DYE,
+                                listOf("Set the active version for this template")
+                            ) { p ->
+                                val versionResult = menuAPI.promptInt(
+                                    p,
+                                    "Active version for $templateName",
+                                    min = 1
+                                )
+                                if (versionResult.isSuccess) {
+                                    val versionId = versionResult.getOrNull() ?: return@action null
+                                    val success = templateRepository.setActiveVersion(templateName, versionId)
+                                    if (success) {
+                                        p.sendMiniMessage("<green>Active version for '$templateName' set to v$versionId")
+                                    } else {
+                                        p.sendMiniMessage("<red>Failed to set active version v$versionId for '$templateName'")
+                                    }
+                                } else {
+                                    p.sendMiniMessage("<gray>Active version change cancelled")
+                                }
+                            }
+
+                            action(
+                                "delete",
+                                "Delete template",
+                                XMaterial.BARRIER,
+                                listOf("Delete this template and all its versions")
+                            ) { p ->
+                                val textResult = menuAPI.promptText(
+                                    p,
+                                    "Type '$templateName' to confirm delete",
+                                    initialText = "",
+                                    validator = { text ->
+                                        if (text.isNotBlank()) InputValidation.Valid
+                                        else InputValidation.Invalid("Input cannot be empty")
+                                    }
+                                )
+                                if (textResult.isSuccess && textResult.getOrNull() == templateName) {
+                                    val deleted = templateRepository.deleteTemplate(templateName)
+                                    if (deleted) {
+                                        p.sendMiniMessage("<green>Deleted template '$templateName'")
+                                    } else {
+                                        p.sendMiniMessage("<red>Template '$templateName' not found")
+                                    }
+                                } else {
+                                    p.sendMiniMessage("<gray>Template deletion cancelled")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ========================= CLONER / POOLS =========================
+            submenu("cloner", "Cloner / Pools", XMaterial.COMPARATOR) {
+                // Root-level pool creation for the player's current world
+                action(
+                    "create_pool_here",
+                    "Create pool in this world (runtime)",
+                    XMaterial.ANVIL,
+                    listOf("Create a basic pool in your current world using a template")
+                ) { p ->
+                    val worldCfg = config.massCloner.worlds.firstOrNull { it.name == p.world.name }
+                    if (worldCfg == null) {
+                        p.sendMiniMessage("<red>This world is not configured for Mass Cloner")
+                        return@action null
+                    }
+
+                    val templates = templateNames
+                    if (templates.isEmpty()) {
+                        p.sendMiniMessage("<gray>No templates available for pool creation")
+                        return@action null
+                    }
+
+                    menuAPI.menuTree {
+                        title("Select template for pool in ${worldCfg.name}")
+
+                        submenu("templates_pool_here_${worldCfg.name}", "Templates", XMaterial.BOOK) {
+                            paginated(28)
+
+                            dynamicItems { _ ->
+                                templates.map { tmplName ->
+                                    submenuNode(
+                                        "pool_create_here_${worldCfg.name}_$tmplName",
+                                        tmplName,
+                                        XMaterial.PAPER
+                                    ) {
+                                        action(
+                                            "configure",
+                                            "Configure & create pool",
+                                            XMaterial.ANVIL,
+                                            listOf("Set count and separation for this pool")
+                                        ) { pp ->
+                                            val countResult = menuAPI.promptInt(
+                                                pp,
+                                                "Instance count",
+                                                min = 1
+                                            )
+                                            val count = countResult.getOrNull()
+                                            if (!countResult.isSuccess || count == null) {
+                                                pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                return@action null
+                                            }
+
+                                            val sepResult = menuAPI.promptInt(
+                                                pp,
+                                                "Separation (chunks)",
+                                                min = 1
+                                            )
+                                            val separation = sepResult.getOrNull()
+                                            if (!sepResult.isSuccess || separation == null) {
+                                                pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                return@action null
+                                            }
+
+                                            val allocated = massClonerService.createPool(
+                                                worldName = worldCfg.name,
+                                                templateName = tmplName,
+                                                versionMode = VersionMode.ACTIVE,
+                                                pinnedVersionId = null,
+                                                count = count,
+                                                separationChunks = separation,
+                                                restoreOnBoot = false,
+                                                restoreOnVacate = false,
+                                                restoreIntervalSeconds = null,
+                                                restoreAudienceScope = config.notifications.defaultAudienceScope,
+                                                updateLight = null
+                                            )
+
+                                            pp.sendMiniMessage(
+                                                "<green>Created/updated pool '$tmplName' in '${worldCfg.name}' with $allocated new instance(s) (target=$count)."
+                                            )
+                                            null
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }.open(p)
+
+                    null
+                }
+
+                for (worldCfg in config.massCloner.worlds) {
+                    submenu("world_${worldCfg.name}", "World: ${worldCfg.name}", XMaterial.GRASS_BLOCK) {
+                        // Basic pool creation (runtime only, non-persistent)
+                        action(
+                            "create_pool",
+                            "Create pool (runtime)",
+                            XMaterial.ANVIL,
+                            listOf("Create a basic pool in this world using a template")
+                        ) { p ->
+                            val templates = templateNames
+                            if (templates.isEmpty()) {
+                                p.sendMiniMessage("<gray>No templates available for pool creation")
+                                return@action null
+                            }
+
+                            // Open a template selection menu tree for pool creation
+                            menuAPI.menuTree {
+                                title("Select template for pool in ${worldCfg.name}")
+
+                                submenu("templates_pool_${worldCfg.name}", "Templates", XMaterial.BOOK) {
+                                    paginated(28)
+
+                                    dynamicItems { _ ->
+                                        templates.map { tmplName ->
+                                            submenuNode(
+                                                "pool_create_${worldCfg.name}_$tmplName",
+                                                tmplName,
+                                                XMaterial.PAPER
+                                            ) {
+                                                action(
+                                                    "configure",
+                                                    "Configure & create pool",
+                                                    XMaterial.ANVIL,
+                                                    listOf("Set count and separation for this pool")
+                                                ) { pp ->
+                                                    val countResult = menuAPI.promptInt(
+                                                        pp,
+                                                        "Instance count",
+                                                        min = 1
+                                                    )
+                                                    val count = countResult.getOrNull()
+                                                    if (!countResult.isSuccess || count == null) {
+                                                        pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                        return@action null
+                                                    }
+
+                                                    val sepResult = menuAPI.promptInt(
+                                                        pp,
+                                                        "Separation (chunks)",
+                                                        min = 1
+                                                    )
+                                                    val separation = sepResult.getOrNull()
+                                                    if (!sepResult.isSuccess || separation == null) {
+                                                        pp.sendMiniMessage("<gray>Pool creation cancelled")
+                                                        return@action null
+                                                    }
+
+                                                    val allocated = massClonerService.createPool(
+                                                        worldName = worldCfg.name,
+                                                        templateName = tmplName,
+                                                        versionMode = VersionMode.ACTIVE,
+                                                        pinnedVersionId = null,
+                                                        count = count,
+                                                        separationChunks = separation,
+                                                        restoreOnBoot = false,
+                                                        restoreOnVacate = false,
+                                                        restoreIntervalSeconds = null,
+                                                        restoreAudienceScope = config.notifications.defaultAudienceScope,
+                                                        updateLight = null
+                                                    )
+
+                                                    pp.sendMiniMessage(
+                                                        "<green>Created/updated pool '$tmplName' in '${worldCfg.name}' with $allocated new instance(s) (target=$count)."
+                                                    )
+                                                    null
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }.open(p)
+
+                            null
+                        }
+
+                        dynamicItems { _ ->
+                            worldCfg.pools.map { poolCfg ->
+                                submenuNode(
+                                    "pool_${worldCfg.name}_${poolCfg.templateName}",
+                                    "Pool: ${poolCfg.templateName}",
+                                    XMaterial.CHEST
+                                ) {
+                                    action("status", "Status", XMaterial.PAPER) { p ->
+                                        val instances = massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
+                                        val activeCount = instances.size
+                                        val targetCount = poolCfg.count
+                                        val status = if (activeCount == targetCount) "<green>OK" else "<yellow>Mismatch"
+
+                                        p.sendMiniMessage("<green>Pool status for '${poolCfg.templateName}' in '${worldCfg.name}':")
+                                        p.sendMiniMessage("  <gray>Instances: $activeCount/$targetCount ($status)")
+                                        p.sendMiniMessage(
+                                            "  <gray>Version: ${poolCfg.versionMode}" +
+                                                    (if (poolCfg.versionMode == VersionMode.PINNED) " #${poolCfg.pinnedVersionId}" else " (active)")
+                                        )
+                                        p.sendMiniMessage(
+                                            "  <gray>Separation: ${poolCfg.separationChunks} chunks | " +
+                                                    "Boot restore: ${poolCfg.restoreOnBoot} | " +
+                                                    "Vacate restore: ${poolCfg.restoreOnVacate}"
+                                        )
+                                        if (poolCfg.restoreIntervalSeconds != null) {
+                                            p.sendMiniMessage("  <gray>Repeat: Every ${poolCfg.restoreIntervalSeconds}s")
+                                        }
+                                    }
+
+                                    action(
+                                        "restore_pool",
+                                        "Restore all instances",
+                                        XMaterial.EMERALD_BLOCK,
+                                        listOf("Trigger restore for all instances in this pool")
+                                    ) { p ->
+                                        val instances = massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
+                                        var restored = 0
+                                        for (instance in instances) {
+                                            massClonerService.triggerInstanceRestore(instance)
+                                            restored++
+                                        }
+                                        p.sendMiniMessage("<green>Triggered restore for $restored instance(s) in pool '${poolCfg.templateName}'")
+                                    }
+
+                                    action(
+                                        "regen_pool_world",
+                                        "Regenerate pooled instances",
+                                        XMaterial.ANVIL,
+                                        listOf("Reallocate pooled instances for this world")
+                                    ) { p ->
+                                        val (removed, allocated) = massClonerService.regeneratePools(listOf(worldCfg.name))
+                                        p.sendMiniMessage("<green>Regenerated pooled instances for '${worldCfg.name}':")
+                                        p.sendMiniMessage("  Removed: $removed, Allocated: $allocated")
+                                        p.sendMiniMessage("<yellow>Manual instances were preserved.")
+                                    }
+
+                                    action(
+                                        "show_pool_instances",
+                                        "Show instances",
+                                        XMaterial.CHEST,
+                                        listOf("Open instance list for this pool")
+                                    ) { p ->
+                                        val instances = massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
+                                        if (instances.isEmpty()) {
+                                            p.sendMiniMessage("<gray>No instances for this pool")
+                                        } else {
+                                            p.sendMiniMessage("<green>Instances for pool '${poolCfg.templateName}' in '${worldCfg.name}':")
+                                            for (instance in instances) {
+                                                val typeMark = if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
+                                                p.sendMiniMessage(
+                                                    "  $typeMark ${instance.instanceId} - ${instance.templateName} at (${instance.originChunkX}, ${instance.originChunkZ})"
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ========================= INSTANCES & TIMERS =========================
+            submenu("instances", "Instances & Timers", XMaterial.CHEST) {
+                submenu("create_manual", "Create manual instance here", XMaterial.ANVIL) {
+                    paginated(28)
+
+                    dynamicItems { p ->
+                        val templates = templateNames
+                        if (templates.isEmpty()) {
+                            p.sendMiniMessage("<gray>No templates available")
+                            return@dynamicItems emptyList()
+                        }
+
+                        templates.map { templateName ->
+                            actionNode(
+                                id = "create_manual_${templateName}",
+                                title = templateName,
+                                material = XMaterial.PAPER,
+                                description = listOf("Create instance of '$templateName' at your current chunk")
+                            ) { pp ->
+                                val chunk = pp.location.chunk
+                                createInstance(
+                                    pp,
+                                    templateName,
+                                    chunk.x,
+                                    chunk.z,
+                                    pp.world.name,
+                                    null,
+                                    false,
+                                    false,
+                                    null
+                                )
+                            }
+                        }
+                    }
+                }
+
+                submenu("instances_all", "All instances", XMaterial.MAP) {
+                    paginated(28)
+
+                    dynamicItems { _ ->
+                        val instances = massClonerService.listInstances(null, null)
+                        instances.map { instance ->
+                            instanceNode(instance)
+                        }
+                    }
+                }
+
+                submenu("instances_world", "Instances in this world", XMaterial.GRASS_BLOCK) {
+                    paginated(28)
+
+                    dynamicItems { p ->
+                        val worldName = p.world.name
+                        val instances = massClonerService.listInstances(worldName, null)
+                        instances.map { instance ->
+                            instanceNode(instance)
+                        }
+                    }
+                }
+            }
+
+        }
+
+        val result = withContext(plugin.entityDispatcher(player)) {
+            ui.open(player)
+        }
+
+        when (result) {
+            is MenuTreeResult.ActionCompleted -> {
+                player.sendMiniMessage("<gray>GUI closed after action: ${result.actionId}")
+            }
+            is MenuTreeResult.Cancelled -> {
+                player.sendMiniMessage("<gray>GUI cancelled")
+            }
+            is MenuTreeResult.ClosedAtRoot -> {
+                player.sendMiniMessage("<gray>GUI closed")
+            }
+        }
     }
 
     @Subcommand("template create")
@@ -717,6 +1206,24 @@ class RegionRestoreCommands(
     @CommandPermission("regionrestore.instance.delete")
     suspend fun deleteInstance(actor: CommandSender, @SuggestInstanceId instanceId: String) {
         val id = java.util.UUID.fromString(instanceId)
+        val instance = massClonerService.getInstance(id)
+
+        if (instance == null) {
+            actor.sendMiniMessage("<red>Instance '$instanceId' not found")
+            return
+        }
+
+        val player = actor as? Player ?: run {
+            actor.sendMiniMessage("<red>This command must be run by a player")
+            return
+        }
+
+        val confirmed = confirmInstanceDeletion(player, instance)
+        if (!confirmed) {
+            actor.sendMiniMessage("<gray>Instance deletion cancelled")
+            return
+        }
+
         val deleted = massClonerService.removeInstance(id)
 
         if (deleted) {
@@ -894,5 +1401,109 @@ class RegionRestoreCommands(
         }
 
         actor.sendMiniMessage("<green>Cancelled timers for $cancelledCount instance(s) of template '$templateName'")
+    }
+
+    private fun instanceNode(instance: RegionInstance): SubmenuNode {
+        val typeMark = if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
+        val title = "$typeMark ${instance.templateName} @ ${instance.worldName} (${instance.originChunkX}, ${instance.originChunkZ})"
+        return submenuNode("instance_${instance.instanceId}", title, XMaterial.CHEST) {
+            action("info", "Info", XMaterial.BOOK) { p ->
+                instanceInfo(p, instance.instanceId.toString())
+            }
+
+            action("restore", "Restore", XMaterial.EMERALD) { p ->
+                restoreInstance(p, instance.instanceId.toString())
+            }
+
+            action("delete", "Delete", XMaterial.BARRIER) { p ->
+                val confirmed = confirmInstanceDeletion(p, instance)
+                if (!confirmed) {
+                    p.sendMiniMessage("<gray>Instance deletion cancelled")
+                    return@action null
+                }
+
+                val deleted = massClonerService.removeInstance(instance.instanceId)
+                if (deleted) {
+                    p.sendMiniMessage("<green>Deleted instance '${instance.instanceId}'")
+                } else {
+                    p.sendMiniMessage("<red>Instance '${instance.instanceId}' not found")
+                }
+            }
+
+            // Timers submenu for this instance
+            submenu("timers", "Timers", XMaterial.CLOCK) {
+                val timerLoreBase = mutableListOf<String>()
+                val cfg = instance.config
+                if (cfg == null || cfg.restoreIntervalSeconds == null) {
+                    timerLoreBase += "No timer configured"
+                } else {
+                    timerLoreBase += "Interval: ${cfg.restoreIntervalSeconds} seconds"
+                    timerLoreBase += "Audience: ${cfg.restoreAudienceScope}"
+                }
+
+                action(
+                    "timer_info",
+                    "View timer",
+                    XMaterial.CLOCK,
+                    timerLoreBase
+                ) { _ ->
+                    // Info is shown in lore; keep UI open
+                    null
+                }
+
+                action("timer_set", "Set / update timer", XMaterial.LIME_DYE) { p ->
+                    val intervalResult = menuAPI.promptInt(
+                        p,
+                        "Interval seconds (>= 1)",
+                        min = 1
+                    )
+                    val interval = intervalResult.getOrNull()
+                    if (!intervalResult.isSuccess || interval == null) {
+                        p.sendMiniMessage("<gray>Timer configuration cancelled")
+                        return@action null
+                    }
+
+                    setTimerByInstanceId(p, instance.instanceId.toString(), interval, config.notifications.defaultAudienceScope)
+                }
+
+                action("timer_clear", "Delete timer", XMaterial.RED_DYE) { p ->
+                    cancelTimerById(p, instance.instanceId.toString())
+                }
+            }
+        }
+    }
+
+    private suspend fun confirmInstanceDeletion(player: Player, instance: RegionInstance): Boolean {
+        return suspendCoroutine { continuation ->
+            var completed = false
+            val menu = ConfirmationMenu {
+                title = Component.text("Delete instance?")
+                infoItem = VItem(XMaterial.PAPER) {
+                    name = Component.text("Confirm deletion")
+                    loreStrings(
+                        listOf(
+                            "Instance: ${instance.instanceId}",
+                            "Template: ${instance.templateName}",
+                            "World: ${instance.worldName}",
+                            "This cannot be undone."
+                        )
+                    )
+                }
+                onConfirm = {
+                    if (!completed) {
+                        completed = true
+                        continuation.resume(true)
+                    }
+                }
+                onCancel = {
+                    if (!completed) {
+                        completed = true
+                        continuation.resume(false)
+                    }
+                }
+            }
+
+            menuAPI.open(menu, player)
+        }
     }
 }

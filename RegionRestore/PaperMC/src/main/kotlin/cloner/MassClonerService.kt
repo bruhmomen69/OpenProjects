@@ -450,6 +450,118 @@ class MassClonerService(
     }
 
     /**
+     * Create or update a pool at runtime and allocate the required instances.
+     *
+     * This does NOT persist to the configuration file; it only affects the
+     * current runtime state. It is intended for use by admin GUIs and
+     * temporary setups.
+     *
+     * @return number of newly allocated instances for this pool
+     */
+    suspend fun createPool(
+        worldName: String,
+        templateName: String,
+        versionMode: VersionMode = VersionMode.ACTIVE,
+        pinnedVersionId: Int? = null,
+        count: Int,
+        separationChunks: Int,
+        restoreOnBoot: Boolean = false,
+        restoreOnVacate: Boolean = false,
+        restoreIntervalSeconds: Int? = null,
+        restoreAudienceScope: AudienceScope = AudienceScope.WORLD,
+        updateLight: Boolean? = null
+    ): Int = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val pool = RegionPool(
+            worldName = worldName,
+            templateName = templateName,
+            versionMode = versionMode,
+            pinnedVersionId = pinnedVersionId,
+            count = count,
+            separationChunks = separationChunks,
+            restoreOnBoot = restoreOnBoot,
+            restoreOnVacate = restoreOnVacate,
+            restoreIntervalSeconds = restoreIntervalSeconds,
+            restoreAudienceScope = restoreAudienceScope,
+            updateLight = updateLight
+        )
+
+        pools[PoolKey(worldName, templateName)] = pool
+
+        // Snapshot existing instances for this pool
+        val existingInstances = synchronized(stateLock) {
+            registry.instances[worldName]
+                ?.filter { it.templateName == templateName }
+                ?: emptyList()
+        }
+
+        val currentCount = existingInstances.size
+        val targetCount = pool.count
+
+        if (currentCount >= targetCount) {
+            return@withContext 0
+        }
+
+        // Load template to get dimensions and resolve version
+        val templateVersion = when (pool.versionMode) {
+            VersionMode.ACTIVE ->
+                templateRepository.loadActiveTemplateVersion(pool.templateName)
+
+            VersionMode.PINNED ->
+                pool.pinnedVersionId?.let {
+                    templateRepository.loadTemplateVersion(pool.templateName, it)
+                }
+        }
+
+        if (templateVersion == null) {
+            slf4jLogger.error("Failed to load template '${pool.templateName}' for pool allocation")
+            return@withContext 0
+        }
+
+        if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
+            slf4jLogger.warn(
+                "Template '${pool.templateName}' version mismatch: " +
+                        "created on ${templateVersion.minecraftVersion}, running on ${nmsAdapter.minecraftVersion}. Please update the template or use a compatible version to avoid errors during restore."
+            )
+        }
+
+        val neededCount = targetCount - currentCount
+
+        // Allocate new instances (including ALL existing instances for overlap detection)
+        val allWorldInstances = synchronized(stateLock) {
+            registry.instances[pool.worldName] ?: emptyList()
+        }
+        val newInstances = allocator.allocateInstances(
+            pool = pool,
+            existingInstances = allWorldInstances,
+            template = templateVersion.data,
+            neededCount = neededCount
+        )
+
+        if (newInstances.isEmpty()) {
+            slf4jLogger.error("Failed to allocate any instances for pool '${pool.templateName}' in world '$worldName'")
+            return@withContext 0
+        }
+
+        // Commit new instances to the registries under the shared lock
+        synchronized(stateLock) {
+            addInstancesLocked(newInstances)
+        }
+
+        // Register new instances for occupancy tracking outside the lock
+        for (instance in newInstances) {
+            registerInstance(instance)
+        }
+
+        saveState()
+
+        slf4jLogger.info(
+            "Created/updated pool '${pool.templateName}' in world '${pool.worldName}' with ${newInstances.size} new instances (target=$targetCount)."
+        )
+
+        return@withContext newInstances.size
+    }
+
+    /**
      * Collect all template references that need to be preloaded.
      *
      * Includes:

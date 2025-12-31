@@ -3,7 +3,6 @@ package bruh.zchat.utils.menuapi
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer
 import net.wesjd.anvilgui.AnvilGUI
-import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
@@ -221,6 +220,7 @@ class AnvilInputBuilder(private val plugin: Plugin) {
                         future.complete(AnvilInputResult.Success(text))
                         listOf(AnvilGUI.ResponseAction.close())
                     }
+
                     is InputValidation.Invalid -> {
                         listOf(AnvilGUI.ResponseAction.replaceInputText(invalidText ?: result.message))
                     }
@@ -231,7 +231,17 @@ class AnvilInputBuilder(private val plugin: Plugin) {
             }
         }
 
-        builder.open(player)
+        // AnvilGUI must be opened synchronously on the server thread.
+        if (plugin.server.isGlobalTickThread) {
+            builder.open(player)
+        } else {
+            player.scheduler.run(plugin, { _ ->
+                builder.open(player)
+            }, {
+                future.complete(AnvilInputResult.Cancelled)
+            })
+        }
+
         return future
     }
 
@@ -357,20 +367,25 @@ class AnvilNumberInputBuilder(private val plugin: Plugin) {
                 number == null -> {
                     listOf(AnvilGUI.ResponseAction.replaceInputText(invalidFormatMessage))
                 }
+
                 !allowDecimals && number != number.toLong().toDouble() -> {
                     listOf(AnvilGUI.ResponseAction.replaceInputText("Whole numbers only"))
                 }
+
                 !allowNegative && number < 0 -> {
                     listOf(AnvilGUI.ResponseAction.replaceInputText("Positive numbers only"))
                 }
+
                 min != null && number < min!!.toDouble() -> {
                     val msg = outOfRangeMessage ?: "Minimum: ${min}"
                     listOf(AnvilGUI.ResponseAction.replaceInputText(msg))
                 }
+
                 max != null && number > max!!.toDouble() -> {
                     val msg = outOfRangeMessage ?: "Maximum: ${max}"
                     listOf(AnvilGUI.ResponseAction.replaceInputText(msg))
                 }
+
                 else -> {
                     future.complete(AnvilInputResult.Success(number))
                     listOf(AnvilGUI.ResponseAction.close())
@@ -378,7 +393,17 @@ class AnvilNumberInputBuilder(private val plugin: Plugin) {
             }
         }
 
-        builder.open(player)
+        // AnvilGUI must be opened synchronously on the server thread.
+        if (plugin.server.isGlobalTickThread) {
+            builder.open(player)
+        } else {
+            player.scheduler.run(plugin, { _ ->
+                builder.open(player)
+            }, {
+                future.complete(AnvilInputResult.Cancelled)
+            })
+        }
+
         return future
     }
 
@@ -488,7 +513,7 @@ class AnvilBuilder(private val plugin: Plugin) {
     /**
      * Open the anvil for a player.
      */
-    fun open(player: Player): AnvilGUI {
+    fun open(player: Player): CompletableFuture<AnvilGUI> {
         val builder = AnvilGUI.Builder()
             .plugin(plugin)
             .text(text)
@@ -523,7 +548,21 @@ class AnvilBuilder(private val plugin: Plugin) {
             }
         }
 
-        return builder.open(player)
+        // Ensure the inventory is opened on the main server thread.
+        val gui: CompletableFuture<AnvilGUI> = CompletableFuture()
+        if (plugin.server.isGlobalTickThread) {
+            gui.complete(builder.open(player))
+        } else {
+            player.scheduler.run(plugin, { _ ->
+                gui.complete(builder.open(player))
+            }, {
+                gui.completeExceptionally(IllegalStateException("Player disconnected"))
+            })
+        }
+        // Note: gui will be null until the scheduled task runs; callers
+        // generally don't need the AnvilGUI instance, but we return it when
+        // available.
+        return gui
     }
 }
 
