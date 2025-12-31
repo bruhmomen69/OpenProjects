@@ -21,6 +21,12 @@ sealed class MenuTreeResult {
     data object ClosedAtRoot : MenuTreeResult()
 }
 
+enum class ReturnAction {
+    CLOSE,
+    RETURN_UP_LEVELS,
+    DO_NOTHING
+}
+
 /**
  * A node in the menu tree - can be a menu, submenu, or action.
  */
@@ -82,6 +88,7 @@ class SubmenuNode(
         material: XMaterial = XMaterial.PAPER,
         description: List<String> = emptyList(),
         returnLevels: Int = 0,
+        postAction: ReturnAction? = null,
         handler: suspend (Player) -> Any?
     ) {
         val icon = VItem(material) {
@@ -90,7 +97,7 @@ class SubmenuNode(
                 loreStrings(description)
             }
         }
-        children.add(ActionNode(id, Component.text(title), icon, handler, returnLevels))
+        children.add(ActionNode(id, Component.text(title), icon, handler, returnLevels, postAction))
     }
 
     /**
@@ -102,9 +109,10 @@ class SubmenuNode(
         title: Component,
         icon: VItem,
         returnLevels: Int = 0,
+        postAction: ReturnAction? = null,
         handler: suspend (Player) -> Any?
     ) {
-        children.add(ActionNode(id, title, icon, handler, returnLevels))
+        children.add(ActionNode(id, title, icon, handler, returnLevels, postAction))
     }
 
     /**
@@ -116,6 +124,8 @@ class SubmenuNode(
         material: XMaterial = XMaterial.PAPER,
         description: List<String> = emptyList(),
         formData: T,
+        returnLevels: Int = 0,
+        postAction: ReturnAction? = null,
         crossinline handler: suspend (Player, T) -> Any?
     ) {
         val icon = VItem(material) {
@@ -124,7 +134,7 @@ class SubmenuNode(
                 loreStrings(description)
             }
         }
-        children.add(FormActionNode(id, Component.text(title), icon, formData) { player, data ->
+        children.add(FormActionNode(id, Component.text(title), icon, formData, returnLevels, postAction) { player, data ->
             @Suppress("UNCHECKED_CAST")
             handler(player, data as T)
         })
@@ -146,7 +156,7 @@ class SubmenuNode(
                 loreStrings(description)
             }
         }
-        children.add(NonClosingActionNode(id, Component.text(title), icon, handler))
+        children.add(ActionNode(id, Component.text(title), icon, handler, 0, ReturnAction.DO_NOTHING))
     }
 
     /**
@@ -211,19 +221,11 @@ class ActionNode(
     override val title: Component,
     override val icon: VItem,
     val handler: suspend (Player) -> Any?,
-    val returnLevels: Int = 0
+    val returnLevels: Int = 0,
+    val postAction: ReturnAction? = null
 ) : MenuNode()
 
-/**
- * An action node that executes code but does NOT close the menu.
- * Useful for actions that should keep the UI open (e.g., toggle settings).
- */
-class NonClosingActionNode(
-    override val id: String,
-    override val title: Component,
-    override val icon: VItem,
-    val handler: suspend (Player) -> Any?
-) : MenuNode()
+ 
 
 /**
  * A display-only node that shows information but has no click behavior.
@@ -243,6 +245,8 @@ class FormActionNode<T : Any>(
     override val title: Component,
     override val icon: VItem,
     val formData: T,
+    val returnLevels: Int = 0,
+    val postAction: ReturnAction? = null,
     val handler: suspend (Player, Any) -> Any?
 ) : MenuNode()
 
@@ -311,6 +315,7 @@ class MenuTreeBuilder(
         material: XMaterial = XMaterial.PAPER,
         description: List<String> = emptyList(),
         returnLevels: Int = 0,
+        postAction: ReturnAction? = null,
         handler: suspend (Player) -> Any?
     ) {
         val icon = VItem(material) {
@@ -319,7 +324,7 @@ class MenuTreeBuilder(
                 loreStrings(description)
             }
         }
-        rootChildren.add(ActionNode(id, Component.text(title), icon, handler, returnLevels))
+        rootChildren.add(ActionNode(id, Component.text(title), icon, handler, returnLevels, postAction))
     }
 
     /**
@@ -331,9 +336,10 @@ class MenuTreeBuilder(
         title: Component,
         icon: VItem,
         returnLevels: Int = 0,
+        postAction: ReturnAction? = null,
         handler: suspend (Player) -> Any?
     ) {
-        rootChildren.add(ActionNode(id, title, icon, handler, returnLevels))
+        rootChildren.add(ActionNode(id, title, icon, handler, returnLevels, postAction))
     }
 
     /**
@@ -345,6 +351,8 @@ class MenuTreeBuilder(
         material: XMaterial = XMaterial.PAPER,
         description: List<String> = emptyList(),
         formData: T,
+        returnLevels: Int = 0,
+        postAction: ReturnAction? = null,
         crossinline handler: suspend (Player, T) -> Any?
     ) {
         val icon = VItem(material) {
@@ -353,7 +361,7 @@ class MenuTreeBuilder(
                 loreStrings(description)
             }
         }
-        rootChildren.add(FormActionNode(id, Component.text(title), icon, formData) { player, data ->
+        rootChildren.add(FormActionNode(id, Component.text(title), icon, formData, returnLevels, postAction) { player, data ->
             @Suppress("UNCHECKED_CAST")
             handler(player, data as T)
         })
@@ -375,7 +383,7 @@ class MenuTreeBuilder(
                 loreStrings(description)
             }
         }
-        rootChildren.add(NonClosingActionNode(id, Component.text(title), icon, handler))
+        rootChildren.add(ActionNode(id, Component.text(title), icon, handler, 0, ReturnAction.DO_NOTHING))
     }
 
     /**
@@ -664,50 +672,43 @@ class MenuTreeNavigator(
             }
             is ActionNode -> {
                 icon.onClickDeny { _, _ ->
-                    onInteraction()
-                    player.closeInventory()
+                    val effective = child.postAction ?: if (child.returnLevels > 0) ReturnAction.RETURN_UP_LEVELS else ReturnAction.CLOSE
+                    if (effective != ReturnAction.DO_NOTHING) {
+                        onInteraction()
+                        player.closeInventory()
+                    }
                     // Execute action asynchronously
                     menuApi.plugin.server.scheduler.runTaskAsynchronously(menuApi.plugin, Runnable {
                         try {
-                            // We need to run the suspend function - use a simple approach
                             val result = kotlinx.coroutines.runBlocking {
                                 child.handler(player)
                             }
 
-                            // Handle post-action navigation
-                            if (child.returnLevels > 0 && !future.isDone) {
-                                // fullBreadcrumb contains the path from root to the current submenu node
-                                // (i.e., the parent of this action): [root, ..., parentNode]
-                                val fullBreadcrumb = breadcrumb + parentNode
-
-                                // Determine the index of the target node in fullBreadcrumb.
-                                // We go up `returnLevels` from the parent node (which is at index size - 1).
-                                val targetIndex = (fullBreadcrumb.size - 1 - child.returnLevels).coerceAtLeast(0)
-
-                                // Breadcrumb for the target node should contain ONLY its ancestors,
-                                // not the node itself.
-                                val targetBreadcrumb = if (targetIndex == 0) {
-                                    emptyList()
-                                } else {
-                                    fullBreadcrumb.take(targetIndex)
+                            when (effective) {
+                                ReturnAction.RETURN_UP_LEVELS -> {
+                                    if (!future.isDone) {
+                                        val fullBreadcrumb = breadcrumb + parentNode
+                                        val levels = child.returnLevels.coerceAtLeast(1)
+                                        val targetIndex = (fullBreadcrumb.size - 1 - levels).coerceAtLeast(0)
+                                        val targetBreadcrumb = if (targetIndex == 0) emptyList() else fullBreadcrumb.take(targetIndex)
+                                        val targetNode = if (targetIndex == 0) rootNode else fullBreadcrumb.getOrNull(targetIndex) ?: rootNode
+                                        menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
+                                            showNode(player, targetNode, targetBreadcrumb, future)
+                                        })
+                                    }
                                 }
-
-                                val targetNode = if (targetIndex == 0) {
-                                    rootNode
-                                } else {
-                                    fullBreadcrumb.getOrNull(targetIndex) ?: rootNode
+                                ReturnAction.CLOSE -> {
+                                    if (!future.isDone) {
+                                        future.complete(MenuTreeResult.ActionCompleted(child.id, result))
+                                    }
                                 }
-
-                                // Schedule showing the target node on the main thread
-                                menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
-                                    showNode(player, targetNode, targetBreadcrumb, future)
-                                })
-                            } else if (!future.isDone) {
-                                future.complete(MenuTreeResult.ActionCompleted(child.id, result))
+                                ReturnAction.DO_NOTHING -> {
+                                    // Do not close or complete; keep the menu open
+                                }
                             }
                         } catch (e: Exception) {
                             menuApi.plugin.slF4JLogger.error("Error executing menu action ${child.id}", e)
-                            if (!future.isDone) {
+                            if (!future.isDone && (effective == ReturnAction.CLOSE || effective == ReturnAction.RETURN_UP_LEVELS)) {
                                 future.complete(MenuTreeResult.ActionCompleted(child.id, null))
                             }
                         }
@@ -716,8 +717,8 @@ class MenuTreeNavigator(
             }
             is FormActionNode<*> -> {
                 icon.onClickDeny { _, _ ->
+                    val effective = child.postAction ?: if (child.returnLevels > 0) ReturnAction.RETURN_UP_LEVELS else ReturnAction.CLOSE
                     onInteraction()
-                    // Collect form data first, then execute action
                     val formCollector = FormDataCollector(menuApi, child.formData, child.title.toString())
                     formCollector.collectAsync(player).thenAccept { formResult ->
                         when (formResult) {
@@ -727,8 +728,31 @@ class MenuTreeNavigator(
                                         val result = kotlinx.coroutines.runBlocking {
                                             child.handler(player, formResult.data)
                                         }
-                                        if (!future.isDone) {
-                                            future.complete(MenuTreeResult.ActionCompleted(child.id, result))
+                                        when (effective) {
+                                            ReturnAction.RETURN_UP_LEVELS -> {
+                                                val fullBreadcrumb = breadcrumb + parentNode
+                                                val levels = child.returnLevels.coerceAtLeast(1)
+                                                val targetIndex = (fullBreadcrumb.size - 1 - levels).coerceAtLeast(0)
+                                                val targetBreadcrumb = if (targetIndex == 0) emptyList() else fullBreadcrumb.take(targetIndex)
+                                                val targetNode = if (targetIndex == 0) rootNode else fullBreadcrumb.getOrNull(targetIndex) ?: rootNode
+                                                menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
+                                                    player.closeInventory()
+                                                    showNode(player, targetNode, targetBreadcrumb, future)
+                                                })
+                                            }
+                                            ReturnAction.CLOSE -> {
+                                                menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
+                                                    player.closeInventory()
+                                                })
+                                                if (!future.isDone) {
+                                                    future.complete(MenuTreeResult.ActionCompleted(child.id, result))
+                                                }
+                                            }
+                                            ReturnAction.DO_NOTHING -> {
+                                                if (!future.isDone) {
+                                                    future.complete(MenuTreeResult.ActionCompleted(child.id, result))
+                                                }
+                                            }
                                         }
                                     } catch (e: Exception) {
                                         menuApi.plugin.slF4JLogger.error("Error executing menu action ${child.id}", e)
@@ -739,28 +763,13 @@ class MenuTreeNavigator(
                                 })
                             }
                             is FormResult.Cancelled -> {
-                                // Return to the menu
                                 showNode(player, parentNode, breadcrumb, future)
                             }
                         }
                     }
                 }
             }
-            is NonClosingActionNode -> {
-                icon.onClickDeny { _, _ ->
-                    // Do NOT call onInteraction() - we want to stay in the menu
-                    // Execute action asynchronously but don't close or complete the future
-                    menuApi.plugin.server.scheduler.runTaskAsynchronously(menuApi.plugin, Runnable {
-                        try {
-                            kotlinx.coroutines.runBlocking {
-                                child.handler(player)
-                            }
-                        } catch (e: Exception) {
-                            menuApi.plugin.slF4JLogger.error("Error executing non-closing action ${child.id}", e)
-                        }
-                    })
-                }
-            }
+ 
             is DisplayNode -> {
                 // Display-only item: no click handler, just shows info
                 // Nothing to do - the icon is already set up with lore
@@ -859,6 +868,7 @@ fun actionNode(
     material: XMaterial = XMaterial.PAPER,
     description: List<String> = emptyList(),
     returnLevels: Int = 0,
+    postAction: ReturnAction? = null,
     handler: suspend (Player) -> Any?
 ): ActionNode {
     val icon = VItem(material) {
@@ -867,7 +877,7 @@ fun actionNode(
             loreStrings(description)
         }
     }
-    return ActionNode(id, Component.text(title), icon, handler, returnLevels)
+    return ActionNode(id, Component.text(title), icon, handler, returnLevels, postAction)
 }
 
 /**
@@ -892,14 +902,14 @@ fun nonClosingActionNode(
     material: XMaterial = XMaterial.PAPER,
     description: List<String> = emptyList(),
     handler: suspend (Player) -> Any?
-): NonClosingActionNode {
+): ActionNode {
     val icon = VItem(material) {
         name = Component.text(title)
         if (description.isNotEmpty()) {
             loreStrings(description)
         }
     }
-    return NonClosingActionNode(id, Component.text(title), icon, handler)
+    return ActionNode(id, Component.text(title), icon, handler, 0, ReturnAction.DO_NOTHING)
 }
 
 /**
