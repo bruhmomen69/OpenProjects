@@ -1,9 +1,9 @@
 
 # Code Structure
-- Common code is in the `utils` project
-- Common application code is in the `app` project
-- Platform specific code is in the `PaperMC` and `Sponge` projects.
-- New features must be in `PaperMC`, but can be added to `Sponge` if easily possible.
+- You are in a monorepo with core utils, and the `ZealousChat` and `RegionRestore` plugins.
+- The `ZealousChat` plugin is a chat plugin that uses MiniMessage for chat formatting.
+- The `RegionRestore` plugin is a region restore plugin that uses MiniMessage for chat formatting.
+- RegionRestore uses a multi module structure, with `api`, `PaperMC` and `plugin` (packaging) modules, along with NMS modules.
 
 # Working
 Always document project state in the project state section at the top of the README.

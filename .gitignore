@@ -46,4 +46,8 @@ bin/
 
 */run
 
+# Common working directory
+run/
+runs/
+
 .claude/

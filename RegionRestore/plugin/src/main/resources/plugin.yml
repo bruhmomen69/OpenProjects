@@ -1,0 +1,13 @@
+name: RegionRestore
+version: '${version}'
+main: bruh.regionrestore.RegionRestorePlugin
+api-version: '1.21'
+website: https://github.com/bruhmomen69/RegionRestore
+authors: [bruhmomen69]
+description: High-performance region/arena snapshot + restore with mass cloning
+folia-supported: true
+commands:
+  regionrestore:
+    description: Main RegionRestore command
+    aliases: [arena, arenas]
+    usage: /regionrestore <subcommand>

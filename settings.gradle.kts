@@ -16,12 +16,21 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
 }
 
-// Include the `app` and `utils` subprojects in the build.
-// If there are changes in only one of the projects, Gradle will rebuild only the one that has changed.
-// Learn more about structuring projects with Gradle - https://docs.gradle.org/8.7/userguide/multi_project_builds.html
+// Chat
 include(":app")
 include(":utils")
 include(":ZealousChat")
-// include(":Sponge")
+// RegionRestore
+include(":RegionRestore:PaperMC")
+include(":RegionRestore:api")
+include(":RegionRestore:nms:PaperMC-1_21_4")
+include(":RegionRestore:nms:PaperMC-1_21_5")
+include(":RegionRestore:nms:PaperMC-1_21_6")
+include(":RegionRestore:nms:PaperMC-1_21_7")
+include(":RegionRestore:nms:PaperMC-1_21_8")
+include(":RegionRestore:nms:PaperMC-1_21_9")
+include(":RegionRestore:nms:PaperMC-1_21_10")
+include(":RegionRestore:nms:PaperMC-1_21_11")
+include(":RegionRestore:plugin")
 
 rootProject.name = "OpenProjects"
