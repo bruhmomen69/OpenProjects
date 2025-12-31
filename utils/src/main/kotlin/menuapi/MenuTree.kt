@@ -73,12 +73,15 @@ class SubmenuNode(
 
     /**
      * Add an action item.
+     * @param returnLevels If > 0, navigates back this many levels after action completes instead of closing.
+     *                     0 = close menu (default), 1 = return to parent, 2 = return to grandparent, etc.
      */
     fun action(
         id: String,
         title: String,
         material: XMaterial = XMaterial.PAPER,
         description: List<String> = emptyList(),
+        returnLevels: Int = 0,
         handler: suspend (Player) -> Any?
     ) {
         val icon = VItem(material) {
@@ -87,19 +90,21 @@ class SubmenuNode(
                 loreStrings(description)
             }
         }
-        children.add(ActionNode(id, Component.text(title), icon, handler))
+        children.add(ActionNode(id, Component.text(title), icon, handler, returnLevels))
     }
 
     /**
      * Add an action item with custom icon.
+     * @param returnLevels If > 0, navigates back this many levels after action completes instead of closing.
      */
     fun action(
         id: String,
         title: Component,
         icon: VItem,
+        returnLevels: Int = 0,
         handler: suspend (Player) -> Any?
     ) {
-        children.add(ActionNode(id, title, icon, handler))
+        children.add(ActionNode(id, title, icon, handler, returnLevels))
     }
 
     /**
@@ -123,6 +128,54 @@ class SubmenuNode(
             @Suppress("UNCHECKED_CAST")
             handler(player, data as T)
         })
+    }
+
+    /**
+     * Add a non-closing action item (stays open after click).
+     */
+    fun nonClosingAction(
+        id: String,
+        title: String,
+        material: XMaterial = XMaterial.PAPER,
+        description: List<String> = emptyList(),
+        handler: suspend (Player) -> Any?
+    ) {
+        val icon = VItem(material) {
+            name = Component.text(title)
+            if (description.isNotEmpty()) {
+                loreStrings(description)
+            }
+        }
+        children.add(NonClosingActionNode(id, Component.text(title), icon, handler))
+    }
+
+    /**
+     * Add a display-only item (no action, just shows info in lore).
+     */
+    fun display(
+        id: String,
+        title: String,
+        material: XMaterial = XMaterial.PAPER,
+        description: List<String> = emptyList()
+    ) {
+        val icon = VItem(material) {
+            name = Component.text(title)
+            if (description.isNotEmpty()) {
+                loreStrings(description)
+            }
+        }
+        children.add(DisplayNode(id, Component.text(title), icon))
+    }
+
+    /**
+     * Add a display-only item with custom icon.
+     */
+    fun display(
+        id: String,
+        title: Component,
+        icon: VItem
+    ) {
+        children.add(DisplayNode(id, title, icon))
     }
 
     /**
@@ -150,12 +203,36 @@ class SubmenuNode(
 
 /**
  * An action node that executes code when clicked.
+ * @param returnLevels If > 0, navigates back this many levels after action completes instead of closing.
+ *                     0 = close menu (default), 1 = return to parent, 2 = return to grandparent, etc.
  */
 class ActionNode(
     override val id: String,
     override val title: Component,
     override val icon: VItem,
+    val handler: suspend (Player) -> Any?,
+    val returnLevels: Int = 0
+) : MenuNode()
+
+/**
+ * An action node that executes code but does NOT close the menu.
+ * Useful for actions that should keep the UI open (e.g., toggle settings).
+ */
+class NonClosingActionNode(
+    override val id: String,
+    override val title: Component,
+    override val icon: VItem,
     val handler: suspend (Player) -> Any?
+) : MenuNode()
+
+/**
+ * A display-only node that shows information but has no click behavior.
+ * Useful for showing status/info via item lore without any action.
+ */
+class DisplayNode(
+    override val id: String,
+    override val title: Component,
+    override val icon: VItem
 ) : MenuNode()
 
 /**
@@ -226,12 +303,14 @@ class MenuTreeBuilder(
 
     /**
      * Add an action to the root.
+     * @param returnLevels If > 0, navigates back this many levels after action completes instead of closing.
      */
     fun action(
         id: String,
         title: String,
         material: XMaterial = XMaterial.PAPER,
         description: List<String> = emptyList(),
+        returnLevels: Int = 0,
         handler: suspend (Player) -> Any?
     ) {
         val icon = VItem(material) {
@@ -240,19 +319,21 @@ class MenuTreeBuilder(
                 loreStrings(description)
             }
         }
-        rootChildren.add(ActionNode(id, Component.text(title), icon, handler))
+        rootChildren.add(ActionNode(id, Component.text(title), icon, handler, returnLevels))
     }
 
     /**
      * Add an action to the root with custom icon.
+     * @param returnLevels If > 0, navigates back this many levels after action completes instead of closing.
      */
     fun action(
         id: String,
         title: Component,
         icon: VItem,
+        returnLevels: Int = 0,
         handler: suspend (Player) -> Any?
     ) {
-        rootChildren.add(ActionNode(id, title, icon, handler))
+        rootChildren.add(ActionNode(id, title, icon, handler, returnLevels))
     }
 
     /**
@@ -276,6 +357,54 @@ class MenuTreeBuilder(
             @Suppress("UNCHECKED_CAST")
             handler(player, data as T)
         })
+    }
+
+    /**
+     * Add a non-closing action to the root (stays open after click).
+     */
+    fun nonClosingAction(
+        id: String,
+        title: String,
+        material: XMaterial = XMaterial.PAPER,
+        description: List<String> = emptyList(),
+        handler: suspend (Player) -> Any?
+    ) {
+        val icon = VItem(material) {
+            name = Component.text(title)
+            if (description.isNotEmpty()) {
+                loreStrings(description)
+            }
+        }
+        rootChildren.add(NonClosingActionNode(id, Component.text(title), icon, handler))
+    }
+
+    /**
+     * Add a display-only item to the root (no action, just shows info in lore).
+     */
+    fun display(
+        id: String,
+        title: String,
+        material: XMaterial = XMaterial.PAPER,
+        description: List<String> = emptyList()
+    ) {
+        val icon = VItem(material) {
+            name = Component.text(title)
+            if (description.isNotEmpty()) {
+                loreStrings(description)
+            }
+        }
+        rootChildren.add(DisplayNode(id, Component.text(title), icon))
+    }
+
+    /**
+     * Add a display-only item to the root with custom icon.
+     */
+    fun display(
+        id: String,
+        title: Component,
+        icon: VItem
+    ) {
+        rootChildren.add(DisplayNode(id, title, icon))
     }
 
     /**
@@ -544,7 +673,24 @@ class MenuTreeNavigator(
                             val result = kotlinx.coroutines.runBlocking {
                                 child.handler(player)
                             }
-                            if (!future.isDone) {
+                            
+                            // Handle post-action navigation
+                            if (child.returnLevels > 0 && !future.isDone) {
+                                // Navigate back up the tree
+                                val fullBreadcrumb = breadcrumb + parentNode
+                                val targetLevel = (fullBreadcrumb.size - child.returnLevels).coerceAtLeast(0)
+                                val targetBreadcrumb = fullBreadcrumb.take(targetLevel)
+                                val targetNode = if (targetLevel == 0) {
+                                    rootNode
+                                } else {
+                                    fullBreadcrumb.getOrNull(targetLevel - 1) ?: rootNode
+                                }
+                                
+                                // Schedule showing the target node on the main thread
+                                menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
+                                    showNode(player, targetNode, targetBreadcrumb, future)
+                                })
+                            } else if (!future.isDone) {
                                 future.complete(MenuTreeResult.ActionCompleted(child.id, result))
                             }
                         } catch (e: Exception) {
@@ -587,6 +733,25 @@ class MenuTreeNavigator(
                         }
                     }
                 }
+            }
+            is NonClosingActionNode -> {
+                icon.onClickDeny { _, _ ->
+                    // Do NOT call onInteraction() - we want to stay in the menu
+                    // Execute action asynchronously but don't close or complete the future
+                    menuApi.plugin.server.scheduler.runTaskAsynchronously(menuApi.plugin, Runnable {
+                        try {
+                            kotlinx.coroutines.runBlocking {
+                                child.handler(player)
+                            }
+                        } catch (e: Exception) {
+                            menuApi.plugin.slF4JLogger.error("Error executing non-closing action ${child.id}", e)
+                        }
+                    })
+                }
+            }
+            is DisplayNode -> {
+                // Display-only item: no click handler, just shows info
+                // Nothing to do - the icon is already set up with lore
             }
         }
 
@@ -674,12 +839,14 @@ inline fun <T> dynamicNodes(
 
 /**
  * Helper to create an action node from data.
+ * @param returnLevels If > 0, navigates back this many levels after action completes instead of closing.
  */
 fun actionNode(
     id: String,
     title: String,
     material: XMaterial = XMaterial.PAPER,
     description: List<String> = emptyList(),
+    returnLevels: Int = 0,
     handler: suspend (Player) -> Any?
 ): ActionNode {
     val icon = VItem(material) {
@@ -688,7 +855,7 @@ fun actionNode(
             loreStrings(description)
         }
     }
-    return ActionNode(id, Component.text(title), icon, handler)
+    return ActionNode(id, Component.text(title), icon, handler, returnLevels)
 }
 
 /**
@@ -702,4 +869,41 @@ fun submenuNode(
 ): SubmenuNode {
     val icon = VItem(material) { name = Component.text(title) }
     return SubmenuNode(id, Component.text(title), icon).apply(builder)
+}
+
+/**
+ * Helper to create a non-closing action node (stays open after click).
+ */
+fun nonClosingActionNode(
+    id: String,
+    title: String,
+    material: XMaterial = XMaterial.PAPER,
+    description: List<String> = emptyList(),
+    handler: suspend (Player) -> Any?
+): NonClosingActionNode {
+    val icon = VItem(material) {
+        name = Component.text(title)
+        if (description.isNotEmpty()) {
+            loreStrings(description)
+        }
+    }
+    return NonClosingActionNode(id, Component.text(title), icon, handler)
+}
+
+/**
+ * Helper to create a display-only node (no action, info shown in lore).
+ */
+fun displayNode(
+    id: String,
+    title: String,
+    material: XMaterial = XMaterial.PAPER,
+    description: List<String> = emptyList()
+): DisplayNode {
+    val icon = VItem(material) {
+        name = Component.text(title)
+        if (description.isNotEmpty()) {
+            loreStrings(description)
+        }
+    }
+    return DisplayNode(id, Component.text(title), icon)
 }

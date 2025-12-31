@@ -1,14 +1,5 @@
 package bruh.regionrestore.cmd
 
-import org.bukkit.Bukkit
-import org.bukkit.command.CommandSender
-import org.bukkit.entity.Player
-import org.bukkit.plugin.java.JavaPlugin
-import revxrsal.commands.annotation.Command
-import revxrsal.commands.annotation.Default
-import revxrsal.commands.annotation.Optional
-import revxrsal.commands.annotation.Subcommand
-import revxrsal.commands.bukkit.annotation.CommandPermission
 import bruh.regionrestore.cloner.*
 import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.nms.PaperNmsAdapter
@@ -20,12 +11,22 @@ import bruh.regionrestore.utils.sendMiniMessage
 import bruh.zchat.utils.menuapi.*
 import com.cryptomorin.xseries.XMaterial
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
+import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
+import org.bukkit.Bukkit
+import org.bukkit.command.CommandSender
+import org.bukkit.entity.Player
+import org.bukkit.plugin.java.JavaPlugin
+import revxrsal.commands.annotation.Command
+import revxrsal.commands.annotation.Default
+import revxrsal.commands.annotation.Optional
+import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
-import kotlin.math.floor
+import revxrsal.commands.bukkit.annotation.CommandPermission
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.math.floor
 
 /**
  * Target for timer operations - either an instance ID or a template name.
@@ -83,15 +84,12 @@ class RegionRestoreCommands(
                         )
 
                         submenuNode("template_$templateName", "Template: $templateName", XMaterial.PAPER) {
-                            action(
+                            display(
                                 "info",
                                 "Info",
                                 XMaterial.BOOK,
                                 infoLore
-                            ) { _ ->
-                                // Displayed in lore only; keep UI open
-                                null
-                            }
+                            )
 
                             submenu("versions", "Versions", XMaterial.BOOKSHELF) {
                                 paginated(28)
@@ -110,14 +108,12 @@ class RegionRestoreCommands(
                                             "Description: ${version.description}"
                                         )
 
-                                        actionNode(
+                                        displayNode(
                                             id = "version_${templateName}_${version.versionId}",
                                             title = title,
                                             material = if (isActive) XMaterial.LIME_DYE else XMaterial.PAPER,
                                             description = lore
-                                        ) { _ ->
-                                            // Read-only view; keep UI open
-                                        }
+                                        )
                                     }
                                 }
                             }
@@ -147,7 +143,8 @@ class RegionRestoreCommands(
                                 "create_instance_original",
                                 "Create instance at template location",
                                 XMaterial.ANVIL,
-                                listOf("Create a manual instance at the template's saved location and restore it")
+                                listOf("Create a manual instance at the template's saved location and restore it"),
+                                returnLevels = 1
                             ) { p ->
                                 val templateVersion = templateRepository.loadActiveTemplateVersion(templateName)
                                 if (templateVersion == null) {
@@ -199,7 +196,8 @@ class RegionRestoreCommands(
                                 "set_active",
                                 "Set active version",
                                 XMaterial.LIME_DYE,
-                                listOf("Set the active version for this template")
+                                listOf("Set the active version for this template"),
+                                returnLevels = 1
                             ) { p ->
                                 val versionResult = menuAPI.promptInt(
                                     p,
@@ -433,7 +431,8 @@ class RegionRestoreCommands(
                                     XMaterial.CHEST
                                 ) {
                                     action("status", "Status", XMaterial.PAPER) { p ->
-                                        val instances = massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
+                                        val instances =
+                                            massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
                                         val activeCount = instances.size
                                         val targetCount = poolCfg.count
                                         val status = if (activeCount == targetCount) "<green>OK" else "<yellow>Mismatch"
@@ -458,9 +457,11 @@ class RegionRestoreCommands(
                                         "restore_pool",
                                         "Restore all instances",
                                         XMaterial.EMERALD_BLOCK,
-                                        listOf("Trigger restore for all instances in this pool")
+                                        listOf("Trigger restore for all instances in this pool"),
+                                        returnLevels = 1
                                     ) { p ->
-                                        val instances = massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
+                                        val instances =
+                                            massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
                                         var restored = 0
                                         for (instance in instances) {
                                             massClonerService.triggerInstanceRestore(instance)
@@ -473,7 +474,8 @@ class RegionRestoreCommands(
                                         "regen_pool_world",
                                         "Regenerate pooled instances",
                                         XMaterial.ANVIL,
-                                        listOf("Reallocate pooled instances for this world")
+                                        listOf("Reallocate pooled instances for this world"),
+                                        returnLevels = 1
                                     ) { p ->
                                         val (removed, allocated) = massClonerService.regeneratePools(listOf(worldCfg.name))
                                         p.sendMiniMessage("<green>Regenerated pooled instances for '${worldCfg.name}':")
@@ -487,13 +489,15 @@ class RegionRestoreCommands(
                                         XMaterial.CHEST,
                                         listOf("Open instance list for this pool")
                                     ) { p ->
-                                        val instances = massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
+                                        val instances =
+                                            massClonerService.getInstancesForPool(worldCfg.name, poolCfg.templateName)
                                         if (instances.isEmpty()) {
                                             p.sendMiniMessage("<gray>No instances for this pool")
                                         } else {
                                             p.sendMiniMessage("<green>Instances for pool '${poolCfg.templateName}' in '${worldCfg.name}':")
                                             for (instance in instances) {
-                                                val typeMark = if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
+                                                val typeMark =
+                                                    if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
                                                 p.sendMiniMessage(
                                                     "  $typeMark ${instance.instanceId} - ${instance.templateName} at (${instance.originChunkX}, ${instance.originChunkZ})"
                                                 )
@@ -524,7 +528,8 @@ class RegionRestoreCommands(
                                 id = "create_manual_${templateName}",
                                 title = templateName,
                                 material = XMaterial.PAPER,
-                                description = listOf("Create instance of '$templateName' at your current chunk")
+                                description = listOf("Create instance of '$templateName' at your current chunk"),
+                                returnLevels = 1
                             ) { pp ->
                                 val chunk = pp.location.chunk
                                 createInstance(
@@ -577,9 +582,11 @@ class RegionRestoreCommands(
             is MenuTreeResult.ActionCompleted -> {
                 player.sendMiniMessage("<gray>GUI closed after action: ${result.actionId}")
             }
+
             is MenuTreeResult.Cancelled -> {
                 player.sendMiniMessage("<gray>GUI cancelled")
             }
+
             is MenuTreeResult.ClosedAtRoot -> {
                 player.sendMiniMessage("<gray>GUI closed")
             }
@@ -667,7 +674,11 @@ class RegionRestoreCommands(
 
     @Subcommand("template setactive")
     @CommandPermission("regionrestore.template.setactive")
-    suspend fun setActiveVersion(actor: CommandSender, @SuggestTemplateName name: String, @SuggestVersionNumber versionId: Int) {
+    suspend fun setActiveVersion(
+        actor: CommandSender,
+        @SuggestTemplateName name: String,
+        @SuggestVersionNumber versionId: Int
+    ) {
         val success = templateRepository.setActiveVersion(name, versionId)
         if (success) {
             actor.sendMiniMessage("<green>Template '$name' active version set to v$versionId")
@@ -1405,7 +1416,8 @@ class RegionRestoreCommands(
 
     private fun instanceNode(instance: RegionInstance): SubmenuNode {
         val typeMark = if (instance.instanceType == InstanceType.POOLED) "[P]" else "[M]"
-        val title = "$typeMark ${instance.templateName} @ ${instance.worldName} (${instance.originChunkX}, ${instance.originChunkZ})"
+        val title =
+            "$typeMark ${instance.templateName} @ ${instance.worldName} (${instance.originChunkX}, ${instance.originChunkZ})"
         return submenuNode("instance_${instance.instanceId}", title, XMaterial.CHEST) {
             action("info", "Info", XMaterial.BOOK) { p ->
                 instanceInfo(p, instance.instanceId.toString())
@@ -1441,17 +1453,14 @@ class RegionRestoreCommands(
                     timerLoreBase += "Audience: ${cfg.restoreAudienceScope}"
                 }
 
-                action(
+                display(
                     "timer_info",
                     "View timer",
                     XMaterial.CLOCK,
                     timerLoreBase
-                ) { _ ->
-                    // Info is shown in lore; keep UI open
-                    null
-                }
+                )
 
-                action("timer_set", "Set / update timer", XMaterial.LIME_DYE) { p ->
+                action("timer_set", "Set / update timer", XMaterial.LIME_DYE, emptyList(), returnLevels = 1) { p ->
                     val intervalResult = menuAPI.promptInt(
                         p,
                         "Interval seconds (>= 1)",
@@ -1463,10 +1472,15 @@ class RegionRestoreCommands(
                         return@action null
                     }
 
-                    setTimerByInstanceId(p, instance.instanceId.toString(), interval, config.notifications.defaultAudienceScope)
+                    setTimerByInstanceId(
+                        p,
+                        instance.instanceId.toString(),
+                        interval,
+                        config.notifications.defaultAudienceScope
+                    )
                 }
 
-                action("timer_clear", "Delete timer", XMaterial.RED_DYE) { p ->
+                action("timer_clear", "Delete timer", XMaterial.RED_DYE, emptyList(), returnLevels = 1) { p ->
                     cancelTimerById(p, instance.instanceId.toString())
                 }
             }
@@ -1503,7 +1517,9 @@ class RegionRestoreCommands(
                 }
             }
 
-            menuAPI.open(menu, player)
+            plugin.launch(plugin.entityDispatcher(player)) {
+                menuAPI.open(menu, player)
+            }
         }
     }
 }
