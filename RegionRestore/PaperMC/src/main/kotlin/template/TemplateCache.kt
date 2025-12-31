@@ -87,7 +87,7 @@ class TemplateCache(
         strategy = KacheStrategy.LRU
         expireAfterAccessDuration = ttlMinutes.minutes
         onEntryRemoved = { evicted, key, old, new ->
-            if (pinnedCache.get(key) !== old) old.template.release()
+            if (!old.isPinned) old.template.release()
         }
     }
 
