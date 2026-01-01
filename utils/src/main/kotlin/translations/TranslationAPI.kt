@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import net.kyori.adventure.audience.Audience
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
@@ -104,6 +105,9 @@ class TranslationAPI(
     @Volatile
     private var initialized = false
 
+    // Placeholder integration for PlaceholderAPI and MiniPlaceholders
+    private val placeholderIntegration = PlaceholderIntegration()
+
     /**
      * Registers a MessageKey enum with a unique prefix.
      *
@@ -161,6 +165,9 @@ class TranslationAPI(
 
             // Clear component cache on reload
             componentCache.clear()
+
+            // Detect available placeholder plugins
+            placeholderIntegration.detectPlugins()
 
             initialized = true
         }
@@ -252,25 +259,41 @@ class TranslationAPI(
      * Uses LRU caching for parsed MiniMessage components.
      *
      * @param key The MessageKey to look up
+     * @param audience Optional audience for PlaceholderAPI/MiniPlaceholders replacement
      * @return The translated Component
      */
-    suspend fun getComponent(key: MessageKey): Component {
+    suspend fun getComponent(key: MessageKey, audience: Audience? = null): Component {
         val fullKey = getFullKey(key)
-        val cacheKey = "$currentLocale:$fullKey"
-
-        // Check cache first
-        val cached = componentCache.get(cacheKey)
-        if (cached != null) {
-            return cached
+        val player = placeholderIntegration.getPlayerFromAudience(audience)
+        
+        // If we have placeholder plugins and an audience, don't cache (placeholders are dynamic)
+        val useCache = player == null && !placeholderIntegration.isMiniPlaceholdersAvailable()
+        
+        if (useCache) {
+            val cacheKey = "$currentLocale:$fullKey"
+            val cached = componentCache.get(cacheKey)
+            if (cached != null) {
+                return cached
+            }
         }
 
-        // Parse and cache
-        val text = getStringByFullKey(fullKey, key.default)
+        // Get and process text
+        var text = getStringByFullKey(fullKey, key.default)
+        
+        // Replace PlaceholderAPI placeholders
+        text = placeholderIntegration.replacePlaceholderApi(text, player)
+
+        // Build resolver with MiniPlaceholders
+        val resolver = placeholderIntegration.buildCombinedResolver(TagResolver.empty(), audience)
+        
         val component = withContext(Dispatchers.Default) {
-            miniMessage.deserialize(text)
+            miniMessage.deserialize(text, resolver)
         }
 
-        componentCache.put(cacheKey, component)
+        if (useCache) {
+            val cacheKey = "$currentLocale:$fullKey"
+            componentCache.put(cacheKey, component)
+        }
         return component
     }
 
@@ -278,14 +301,20 @@ class TranslationAPI(
      * Gets a translated Component with placeholders.
      *
      * @param key The MessageKey to look up
+     * @param audience Optional audience for PlaceholderAPI/MiniPlaceholders replacement
      * @param builder DSL builder for configuring placeholders
      * @return The translated Component with placeholders applied
      */
     suspend fun getComponent(
         key: MessageKey,
+        audience: Audience? = null,
         builder: suspend ComponentBuilder.() -> Unit
     ): Component {
-        val text = getString(key)
+        var text = getString(key)
+        val player = placeholderIntegration.getPlayerFromAudience(audience)
+        
+        // Replace PlaceholderAPI placeholders
+        text = placeholderIntegration.replacePlaceholderApi(text, player)
 
         // Build tag resolver with placeholders
         val componentBuilder = ComponentBuilder(miniMessage) { stringValue ->
@@ -303,7 +332,10 @@ class TranslationAPI(
             }
         }
         componentBuilder.builder()
-        val tagResolver = componentBuilder.build()
+        val builtResolver = componentBuilder.build()
+        
+        // Combine with MiniPlaceholders resolver
+        val tagResolver = placeholderIntegration.buildCombinedResolver(builtResolver, audience)
 
         // Parse with placeholders (not cached as placeholders vary)
         return withContext(Dispatchers.Default) {
@@ -314,24 +346,51 @@ class TranslationAPI(
     /**
      * Synchronous version of getComponent (without caching for string placeholders).
      * Use when not in a coroutine context.
+     *
+     * @param key The MessageKey to look up
+     * @param audience Optional audience for PlaceholderAPI/MiniPlaceholders replacement
+     * @return The translated Component
      */
-    fun getComponentSync(key: MessageKey): Component {
+    fun getComponentSync(key: MessageKey, audience: Audience? = null): Component {
         val fullKey = getFullKey(key)
-        val text = getStringByFullKey(fullKey, key.default)
-        return miniMessage.deserialize(text)
+        var text = getStringByFullKey(fullKey, key.default)
+        val player = placeholderIntegration.getPlayerFromAudience(audience)
+        
+        // Replace PlaceholderAPI placeholders
+        text = placeholderIntegration.replacePlaceholderApi(text, player)
+        
+        // Build resolver with MiniPlaceholders
+        val resolver = placeholderIntegration.buildCombinedResolver(TagResolver.empty(), audience)
+        
+        return miniMessage.deserialize(text, resolver)
     }
 
     /**
      * Synchronous version of getComponent with placeholders.
+     *
+     * @param key The MessageKey to look up
+     * @param audience Optional audience for PlaceholderAPI/MiniPlaceholders replacement
+     * @param builder DSL builder for configuring placeholders
+     * @return The translated Component with placeholders applied
      */
     fun getComponentSync(
         key: MessageKey,
+        audience: Audience? = null,
         builder: SyncComponentBuilder.() -> Unit
     ): Component {
-        val text = getString(key)
+        var text = getString(key)
+        val player = placeholderIntegration.getPlayerFromAudience(audience)
+        
+        // Replace PlaceholderAPI placeholders
+        text = placeholderIntegration.replacePlaceholderApi(text, player)
+        
         val componentBuilder = SyncComponentBuilder(miniMessage)
         componentBuilder.builder()
-        val tagResolver = componentBuilder.build()
+        val builtResolver = componentBuilder.build()
+        
+        // Combine with MiniPlaceholders resolver
+        val tagResolver = placeholderIntegration.buildCombinedResolver(builtResolver, audience)
+        
         return miniMessage.deserialize(text, tagResolver)
     }
 

@@ -6,6 +6,8 @@ plugins {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     compileOnly("io.netty:netty-buffer:4.1.115.Final")
+    compileOnly("me.clip:placeholderapi:2.11.6")
+    compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.0.1")
     api(project(":utils"))
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.8.0")

@@ -54,6 +54,29 @@ enum class ClickResult {
 }
 
 /**
+ * Context containing information about a drop event.
+ */
+data class DropContext(
+    val player: Player,
+    val slot: Int,
+    val itemStack: ItemStack,
+    val inventory: Inventory,
+    val isControlDrop: Boolean
+)
+
+/**
+ * Result of a drop action - determines post-drop behavior.
+ */
+enum class DropResult {
+    /** Allow the drop */
+    ALLOW,
+    /** Cancel the drop entirely */
+    DENY,
+    /** Cancel the drop and close the menu */
+    CLOSE
+}
+
+/**
  * Interface for controlling an open menu instance.
  */
 interface MenuControls<out T : Menu> {

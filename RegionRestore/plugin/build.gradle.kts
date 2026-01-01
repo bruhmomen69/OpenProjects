@@ -16,6 +16,8 @@ dependencies {
     implementation(project(":RegionRestore:nms:PaperMC-1_21_10"))
     implementation(project(":RegionRestore:nms:PaperMC-1_21_11"))
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("me.clip:placeholderapi:2.11.6")
+    compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.0.1")
     implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.21.0")
 }
 

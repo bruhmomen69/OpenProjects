@@ -6,6 +6,9 @@ website: https://github.com/bruhmomen69/RegionRestore
 authors: [bruhmomen69]
 description: High-performance region/arena snapshot + restore with mass cloning
 folia-supported: true
+softdepend:
+  - PlaceholderAPI
+  - MiniPlaceholders
 commands:
   regionrestore:
     description: Main RegionRestore command

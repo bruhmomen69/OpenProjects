@@ -1285,4 +1285,20 @@ class MassClonerService(
             worlds
         }
     }
+
+    /**
+     * Get the total number of configured pools.
+     */
+    fun getPoolCount(): Int = pools.size
+
+    /**
+     * Get the target instance count for a specific pool.
+     *
+     * @param worldName The world name
+     * @param templateName The template name
+     * @return The target count, or null if pool not found
+     */
+    fun getPoolTarget(worldName: String, templateName: String): Int? {
+        return pools[PoolKey(worldName, templateName)]?.count
+    }
 }

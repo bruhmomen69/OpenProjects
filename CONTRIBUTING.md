@@ -6,7 +6,7 @@
 - RegionRestore uses a multi module structure, with `api`, `PaperMC` and `plugin` (packaging) modules, along with NMS modules.
 
 # Working
-Always update the README.md file inside the module you are working on with the current state of the project.
+Always update the README.md file inside the module you are working on with the current state of the project. If your module does not have a readme, then a parent project probably will, so use that instead.
 
 # Tech Stack
 - Use Kotlin for all code.

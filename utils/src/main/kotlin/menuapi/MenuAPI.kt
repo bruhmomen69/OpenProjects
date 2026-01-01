@@ -8,9 +8,11 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.HandlerList
 import org.bukkit.event.Listener
+import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryDragEvent
+import org.bukkit.event.player.PlayerDropItemEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
@@ -383,6 +385,10 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
 
     private inner class MenuListener : Listener {
 
+        private data class DropSource(val slot: Int, val isControlDrop: Boolean)
+
+        private val lastDropSources: MutableMap<UUID, DropSource> = ConcurrentHashMap()
+
         @EventHandler(priority = EventPriority.HIGH)
         fun onInventoryClick(event: InventoryClickEvent) {
             val holder = event.inventory.holder as? MenuHolder<*> ?: return
@@ -488,6 +494,14 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
                 hotbarButton = event.hotbarButton
             )
 
+            // Track drop source slot and whether it was a control-drop (Ctrl+Q)
+            // for any drop within the menu inventory (top inventory).
+            if (context.isDrop && slot in 0 until event.inventory.size) {
+                lastDropSources[player.uniqueId] = DropSource(slot, context.clickType == ClickType.CONTROL_DROP)
+            } else if (!context.isDrop) {
+                lastDropSources.remove(player.uniqueId)
+            }
+
             // Handle click callback
             vItem?.clickHandler?.let { handler ->
                 val result = handler(context, holder.controls)
@@ -563,6 +577,52 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
                     player, holder.controls as MenuControls<PaginatedMenu<Any>>
                 )
                 is ConfirmationMenu -> {}
+            }
+        }
+
+        @EventHandler(priority = EventPriority.HIGH)
+        fun onPlayerDropItem(event: PlayerDropItemEvent) {
+            val player = event.player
+            val holder = openMenus[player.uniqueId] ?: return
+            if (holder.menuApi !== this@MenuAPI) return
+
+            val inventory = holder.inventory
+            val droppedItem = event.itemDrop.itemStack
+
+            // Use the last recorded drop source from the click event
+            val dropSource = lastDropSources.remove(player.uniqueId) ?: return
+            val sourceSlot = dropSource.slot
+            val sourceVItem = holder.slotItems[sourceSlot] ?: return
+
+            // No drop handler or not a tracked item
+            if (sourceVItem.dropHandler == null && sourceVItem.dropListener == null) return
+
+            val isControlDrop = dropSource.isControlDrop
+
+            val context = DropContext(
+                player = player,
+                slot = sourceSlot,
+                itemStack = droppedItem,
+                inventory = inventory,
+                isControlDrop = isControlDrop
+            )
+
+            // Handle drop callback
+            sourceVItem.dropHandler?.let { handler ->
+                val result = handler(context, holder.controls)
+
+                when (result) {
+                    DropResult.ALLOW -> {}
+                    DropResult.DENY -> event.isCancelled = true
+                    DropResult.CLOSE -> {
+                        event.isCancelled = true
+                        Bukkit.getScheduler().runTask(plugin, Runnable { player.closeInventory() })
+                    }
+                }
+            }
+
+            sourceVItem.dropListener?.let { listener ->
+                listener(context, holder.controls)
             }
         }
     }

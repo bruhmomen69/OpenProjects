@@ -39,6 +39,8 @@ class VItem(
     var canBeMovedByPlayer: Boolean = false
     var clickHandler: ((ClickContext, MenuControls<*>) -> ClickResult)? = null
     var clickListener: ((ClickContext, MenuControls<*>) -> Unit)? = null
+    var dropHandler: ((DropContext, MenuControls<*>) -> DropResult)? = null
+    var dropListener: ((DropContext, MenuControls<*>) -> Unit)? = null
 
     // Item flags and properties
     var flags: MutableSet<ItemFlag> = mutableSetOf()
@@ -205,6 +207,50 @@ class VItem(
     }
 
     /**
+     * Set the drop handler.
+     */
+    fun onDrop(handler: (DropContext, MenuControls<*>) -> DropResult) {
+        dropHandler = handler
+    }
+
+    /**
+     * Drop handler that denies the drop after running an action.
+     */
+    fun onDropDeny(action: (DropContext, MenuControls<*>) -> Unit) {
+        dropHandler = { ctx, controls ->
+            action(ctx, controls)
+            DropResult.DENY
+        }
+    }
+
+    /**
+     * Drop handler that allows the drop after running an action.
+     */
+    fun onDropAllow(action: (DropContext, MenuControls<*>) -> Unit) {
+        dropHandler = { ctx, controls ->
+            action(ctx, controls)
+            DropResult.ALLOW
+        }
+    }
+
+    /**
+     * Drop handler that closes the menu after the action.
+     */
+    fun onDropClose(action: (DropContext, MenuControls<*>) -> Unit) {
+        dropHandler = { ctx, controls ->
+            action(ctx, controls)
+            DropResult.CLOSE
+        }
+    }
+
+    /**
+     * Adds a listener separate to the drop handler.
+     */
+    fun dropListener(action: (DropContext, MenuControls<*>) -> Unit) {
+        dropListener = action
+    }
+
+    /**
      * Build this VItem into a Bukkit ItemStack.
      */
     fun build(): ItemStack {
@@ -317,6 +363,8 @@ class VItem(
         copy.canBeMovedByPlayer = canBeMovedByPlayer
         copy.clickHandler = clickHandler
         copy.clickListener = clickListener
+        copy.dropHandler = dropHandler
+        copy.dropListener = dropListener
         copy.flags = flags.toMutableSet()
         copy.unbreakable = unbreakable
         copy.hideTooltip = hideTooltip

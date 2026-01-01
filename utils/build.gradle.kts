@@ -16,6 +16,8 @@ dependencies {
     implementation("net.wesjd:anvilgui:2.0.4-20251228.114051-1")
     api(kotlin("reflect"))
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("me.clip:placeholderapi:2.11.6")
+    compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.0.1")
     compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     compileOnly(libs.bundles.kotlinxEcosystem)
     
@@ -30,6 +32,9 @@ dependencies {
     
     // Database API dependencies
     api("com.zaxxer:HikariCP:7.0.2")
+    
+    // Caffeine cache for ItemAPI
+    api(libs.caffeine)
     compileOnly("com.mysql:mysql-connector-j:9.5.0")
     compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
     compileOnly("org.postgresql:postgresql:42.7.4")

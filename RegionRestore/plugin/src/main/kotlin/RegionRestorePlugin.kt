@@ -22,6 +22,8 @@ import bruh.regionrestore.template.TemplateCache
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.translations.CommandMessages
 import bruh.regionrestore.translations.GuiMessages
+import bruh.regionrestore.hooks.PlaceholderAPIHook
+import bruh.regionrestore.hooks.MiniPlaceholdersHook
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import bruh.zchat.utils.translations.translationApi
@@ -106,6 +108,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         RegionRestoreApiHolder.setApi(api)
 
         setupCommands()
+        setupPlaceholderHooks()
 
         slF4JLogger.info("RegionRestore enabled!")
     }
@@ -173,5 +176,27 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
             }
             .build()
         lamp.register(RegionRestoreCommands(nmsAdapter, templateRepository, schedulerService, config, massClonerService, menuAPI, this, translations))
+    }
+
+    private fun setupPlaceholderHooks() {
+        // Register PlaceholderAPI expansion if available
+        if (server.pluginManager.isPluginEnabled("PlaceholderAPI")) {
+            try {
+                PlaceholderAPIHook(this, massClonerService, templateRepository).register()
+                slF4JLogger.info("PlaceholderAPI expansion registered")
+            } catch (e: Exception) {
+                slF4JLogger.warn("Failed to register PlaceholderAPI expansion", e)
+            }
+        }
+
+        // Register MiniPlaceholders expansion if available
+        if (server.pluginManager.isPluginEnabled("MiniPlaceholders")) {
+            try {
+                MiniPlaceholdersHook.register(massClonerService, templateRepository)
+                slF4JLogger.info("MiniPlaceholders expansion registered")
+            } catch (e: Exception) {
+                slF4JLogger.warn("Failed to register MiniPlaceholders expansion", e)
+            }
+        }
     }
 }

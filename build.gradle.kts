@@ -29,6 +29,9 @@ allprojects {
         maven("https://repo.spaceio.xyz/repository/maven-public/") {
             name = "spaceio-repo"
         }
+        maven("https://repo.extendedclip.com/releases/") {
+            name = "placeholderapi"
+        }
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {
