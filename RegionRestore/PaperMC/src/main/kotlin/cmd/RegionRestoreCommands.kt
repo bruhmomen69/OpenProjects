@@ -78,6 +78,67 @@ class RegionRestoreCommands(
             submenu("templates", tGui(GuiMessages.TEMPLATES_TITLE), XMaterial.BOOK) {
                 paginated(28)
 
+                // Create new template action
+                action(
+                    "create_template",
+                    tGui(GuiMessages.CREATE_TEMPLATE_TITLE),
+                    XMaterial.ANVIL,
+                    listOf(tGui(GuiMessages.CREATE_TEMPLATE_DESC)),
+                    returnLevels = 1
+                ) { p ->
+                    // Prompt for template name
+                    val nameResult = menuAPI.promptText(
+                        p,
+                        tGui(GuiMessages.CREATE_TEMPLATE_NAME_PROMPT),
+                        initialText = "",
+                        validator = { text ->
+                            if (text.isNotBlank()) InputValidation.Valid
+                            else InputValidation.Invalid(tGui(GuiMessages.INPUT_EMPTY))
+                        }
+                    )
+                    val name = nameResult.getOrNull()
+                    if (!nameResult.isSuccess || name == null) {
+                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETE_CANCELLED))
+                        return@action null
+                    }
+
+                    // Prompt for min X
+                    val minXResult = menuAPI.promptInt(p, tGui(GuiMessages.CREATE_TEMPLATE_MIN_X_PROMPT))
+                    val minX = minXResult.getOrNull()
+                    if (!minXResult.isSuccess || minX == null) {
+                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETE_CANCELLED))
+                        return@action null
+                    }
+
+                    // Prompt for min Z
+                    val minZResult = menuAPI.promptInt(p, tGui(GuiMessages.CREATE_TEMPLATE_MIN_Z_PROMPT))
+                    val minZ = minZResult.getOrNull()
+                    if (!minZResult.isSuccess || minZ == null) {
+                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETE_CANCELLED))
+                        return@action null
+                    }
+
+                    // Prompt for max X
+                    val maxXResult = menuAPI.promptInt(p, tGui(GuiMessages.CREATE_TEMPLATE_MAX_X_PROMPT))
+                    val maxX = maxXResult.getOrNull()
+                    if (!maxXResult.isSuccess || maxX == null) {
+                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETE_CANCELLED))
+                        return@action null
+                    }
+
+                    // Prompt for max Z
+                    val maxZResult = menuAPI.promptInt(p, tGui(GuiMessages.CREATE_TEMPLATE_MAX_Z_PROMPT))
+                    val maxZ = maxZResult.getOrNull()
+                    if (!maxZResult.isSuccess || maxZ == null) {
+                        p.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_DELETE_CANCELLED))
+                        return@action null
+                    }
+
+                    // Create template using the same logic as the command
+                    createTemplate(p, name, minX, minZ, maxX, maxZ, p.world.name)
+                    null
+                }
+
                 dynamicItems { _ ->
                     templateNames.map { templateName ->
                         val versions = templateVersionsByName[templateName] ?: emptyList()
@@ -590,6 +651,155 @@ class RegionRestoreCommands(
                                     chunk.x,
                                     chunk.z,
                                     pp.world.name,
+                                    null,
+                                    false,
+                                    false,
+                                    null
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Create instance at original template position
+                submenu("create_original", tGui(GuiMessages.CREATE_INSTANCE_ORIGINAL_TITLE), XMaterial.ENDER_PEARL) {
+                    paginated(28)
+
+                    dynamicItems { p ->
+                        val templates = templateNames
+                        if (templates.isEmpty()) {
+                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_NO_TEMPLATES))
+                            return@dynamicItems emptyList()
+                        }
+
+                        templates.map { templateName ->
+                            actionNode(
+                                id = "create_original_${templateName}",
+                                title = templateName,
+                                material = XMaterial.PAPER,
+                                description = listOf(tGui(GuiMessages.CREATE_INSTANCE_ORIGINAL_DESC)),
+                                returnLevels = 1
+                            ) { pp ->
+                                val templateVersion = templateRepository.loadActiveTemplateVersion(templateName)
+                                if (templateVersion == null) {
+                                    pp.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_NOT_FOUND) {
+                                        unparsed("name", templateName)
+                                    })
+                                    return@actionNode null
+                                }
+
+                                if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
+                                    pp.sendMessage(translations.getComponentSync(CommandMessages.TEMPLATE_VERSION_MISMATCH_WARNING) {
+                                        unparsed("template_version", templateVersion.minecraftVersion)
+                                        unparsed("server_version", nmsAdapter.minecraftVersion)
+                                    })
+                                }
+
+                                val originChunkX = templateVersion.data.minChunkX
+                                val originChunkZ = templateVersion.data.minChunkZ
+
+                                val instanceConfig = InstanceConfig(
+                                    restoreOnBoot = false,
+                                    restoreOnVacate = false,
+                                    restoreIntervalSeconds = null,
+                                    restoreAudienceScope = config.notifications.defaultAudienceScope,
+                                    updateLight = null
+                                )
+
+                                val instance = RegionInstance.create(
+                                    instanceId = java.util.UUID.randomUUID(),
+                                    worldName = pp.world.name,
+                                    templateName = templateName,
+                                    versionId = templateVersion.versionId,
+                                    originChunkX = originChunkX,
+                                    originChunkZ = originChunkZ,
+                                    sizeXChunks = templateVersion.data.sizeXChunks,
+                                    sizeZChunks = templateVersion.data.sizeZChunks,
+                                    instanceType = InstanceType.MANUAL,
+                                    config = instanceConfig
+                                )
+
+                                massClonerService.addManualInstance(instance)
+                                massClonerService.triggerInstanceRestore(instance)
+
+                                pp.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_CREATED_ORIGINAL) {
+                                    unparsed("id", instance.instanceId.toString())
+                                    unparsed("name", templateName)
+                                    unparsed("chunk_x", originChunkX.toString())
+                                    unparsed("chunk_z", originChunkZ.toString())
+                                })
+                                null
+                            }
+                        }
+                    }
+                }
+
+                // Create instance at custom position
+                submenu("create_custom", tGui(GuiMessages.CREATE_INSTANCE_CUSTOM_TITLE), XMaterial.COMPASS) {
+                    paginated(28)
+
+                    dynamicItems { p ->
+                        val templates = templateNames
+                        if (templates.isEmpty()) {
+                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_NO_TEMPLATES))
+                            return@dynamicItems emptyList()
+                        }
+
+                        templates.map { templateName ->
+                            actionNode(
+                                id = "create_custom_${templateName}",
+                                title = templateName,
+                                material = XMaterial.PAPER,
+                                description = listOf(tGui(GuiMessages.CREATE_INSTANCE_CUSTOM_DESC)),
+                                returnLevels = 1
+                            ) { pp ->
+                                // Prompt for world name
+                                val worldResult = menuAPI.promptText(
+                                    pp,
+                                    tGui(GuiMessages.CREATE_INSTANCE_WORLD_PROMPT),
+                                    initialText = pp.world.name,
+                                    validator = { text ->
+                                        if (text.isNotBlank() && Bukkit.getWorld(text) != null) InputValidation.Valid
+                                        else InputValidation.Invalid(tGui(GuiMessages.INPUT_EMPTY))
+                                    }
+                                )
+                                val worldName = worldResult.getOrNull()
+                                if (!worldResult.isSuccess || worldName == null) {
+                                    pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
+                                    return@actionNode null
+                                }
+
+                                // Prompt for chunk X
+                                val chunkXResult = menuAPI.promptInt(
+                                    pp,
+                                    tGui(GuiMessages.CREATE_INSTANCE_CHUNK_X_PROMPT),
+                                    initialValue = pp.location.chunk.x
+                                )
+                                val chunkX = chunkXResult.getOrNull()
+                                if (!chunkXResult.isSuccess || chunkX == null) {
+                                    pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
+                                    return@actionNode null
+                                }
+
+                                // Prompt for chunk Z
+                                val chunkZResult = menuAPI.promptInt(
+                                    pp,
+                                    tGui(GuiMessages.CREATE_INSTANCE_CHUNK_Z_PROMPT),
+                                    initialValue = pp.location.chunk.z
+                                )
+                                val chunkZ = chunkZResult.getOrNull()
+                                if (!chunkZResult.isSuccess || chunkZ == null) {
+                                    pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_CANCELLED))
+                                    return@actionNode null
+                                }
+
+                                // Create the instance at the specified location
+                                createInstance(
+                                    pp,
+                                    templateName,
+                                    chunkX,
+                                    chunkZ,
+                                    worldName,
                                     null,
                                     false,
                                     false,

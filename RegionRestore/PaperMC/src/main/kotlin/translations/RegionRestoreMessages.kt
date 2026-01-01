@@ -207,5 +207,25 @@ enum class GuiMessages(
     CONFIRM_WARNING("confirm_warning", "This cannot be undone."),
     
     // Validation
-    INPUT_EMPTY("input_empty", "Input cannot be empty")
+    INPUT_EMPTY("input_empty", "Input cannot be empty"),
+    
+    // Create template from GUI
+    CREATE_TEMPLATE_TITLE("create_template_title", "Create new template"),
+    CREATE_TEMPLATE_DESC("create_template_desc", "Create a new template from a region selection"),
+    CREATE_TEMPLATE_NAME_PROMPT("create_template_name_prompt", "Template name"),
+    CREATE_TEMPLATE_MIN_X_PROMPT("create_template_min_x_prompt", "Min X coordinate"),
+    CREATE_TEMPLATE_MIN_Z_PROMPT("create_template_min_z_prompt", "Min Z coordinate"),
+    CREATE_TEMPLATE_MAX_X_PROMPT("create_template_max_x_prompt", "Max X coordinate"),
+    CREATE_TEMPLATE_MAX_Z_PROMPT("create_template_max_z_prompt", "Max Z coordinate"),
+    
+    // Instance creation - original position
+    CREATE_INSTANCE_ORIGINAL_TITLE("create_instance_original_title", "Create instance at original position"),
+    CREATE_INSTANCE_ORIGINAL_DESC("create_instance_original_desc", "Create instance at the template's saved location"),
+    
+    // Instance creation - custom position
+    CREATE_INSTANCE_CUSTOM_TITLE("create_instance_custom_title", "Create instance at custom position"),
+    CREATE_INSTANCE_CUSTOM_DESC("create_instance_custom_desc", "Create instance at a specified world and coordinates"),
+    CREATE_INSTANCE_WORLD_PROMPT("create_instance_world_prompt", "World name"),
+    CREATE_INSTANCE_CHUNK_X_PROMPT("create_instance_chunk_x_prompt", "Chunk X coordinate"),
+    CREATE_INSTANCE_CHUNK_Z_PROMPT("create_instance_chunk_z_prompt", "Chunk Z coordinate")
 }

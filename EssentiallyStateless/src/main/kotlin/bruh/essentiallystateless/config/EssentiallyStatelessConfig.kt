@@ -38,9 +38,6 @@ data class EssentiallyStatelessConfig(
     @Comment("Radius in blocks for /near command")
     val nearRadius: Int = 200,
     
-    @Comment("Enable god mode persistence across rejoins (uses player attribute)")
-    val persistGodMode: Boolean = true,
-    
     @Comment("Broadcast format using MiniMessage. Use <message> for the broadcast content.")
     val broadcastFormat: String = "<red>[Broadcast]</red> <message>",
     

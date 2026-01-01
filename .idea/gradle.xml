@@ -20,6 +20,7 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/EssentiallyStateless" />
             <option value="$PROJECT_DIR$/RegionRestore" />
             <option value="$PROJECT_DIR$/RegionRestore/PaperMC" />
             <option value="$PROJECT_DIR$/RegionRestore/api" />
