@@ -4,6 +4,7 @@ import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.PlayerDataManager
 import bruh.zchat.paper.services.BlockService
+import bruh.zchat.paper.services.ChatInputService
 import bruh.zchat.paper.services.MessageFormattingService
 import bruh.zchat.paper.swearfilter.InfractionManager
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -22,7 +23,8 @@ class MenuService(
     private val blockService: BlockService,
     private val playerDataManager: PlayerDataManager,
     private val messageFormattingService: MessageFormattingService,
-    private val infractionManager: InfractionManager
+    private val infractionManager: InfractionManager,
+    private val chatInputService: ChatInputService
 ) : Closeable {
     private val logger = LoggerFactory.getLogger(MenuService::class.java)
     
@@ -66,7 +68,8 @@ class MenuService(
                 menuApi = configurableMenuApi!!,
                 plugin = plugin,
                 configManager = configManager,
-                infractionManager = infractionManager
+                infractionManager = infractionManager,
+                chatInputService = chatInputService
             )
             configurableMenuApi!!.register(swearFilterMenu!!)
             logger.info("Swear filter GUI menu registered")
