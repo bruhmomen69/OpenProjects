@@ -2,7 +2,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     id("buildsrc.convention.kotlin-jvm")
-    id("com.gradleup.shadow") version "9.3.0"
+    alias(libs.plugins.shadow)
     alias(libs.plugins.kotlinPluginSerialization)
 }
 
@@ -15,43 +15,37 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+    compileOnly(libs.paperApi)
+    compileOnly(libs.kotlinStdlib)
 
     // Kyori Adventure
-    compileOnly("net.kyori:adventure-api:4.23.0")
-    compileOnly("net.kyori:adventure-text-serializer-legacy:4.23.0")
-    compileOnly("net.kyori:adventure-text-serializer-gson:4.23.0")
-    compileOnly("net.kyori:adventure-text-minimessage:4.23.0")
+    compileOnly(libs.bundles.adventure)
 
     // Configurate
-    compileOnly("org.spongepowered:configurate-hocon:4.1.2")
+    compileOnly(libs.configurateHocon)
 
     // Lamp
-    compileOnly("io.github.revxrsal:lamp.common:4.0.0-rc.12")
-    compileOnly("io.github.revxrsal:lamp.bukkit:4.0.0-rc.12")
+    compileOnly(libs.bundles.lamp)
 
     // Logging (provided by the server)
-    compileOnly("org.slf4j:slf4j-api:2.0.7")
-    compileOnly("org.slf4j:slf4j-simple:2.0.7")
+    compileOnly(libs.bundles.slf4j)
 
     // PlaceholderAPI integration (optional)
-    compileOnly("me.clip:placeholderapi:2.11.6")
+    compileOnly(libs.placeholderapi)
 
     // Database dependencies (JDBC drivers - HikariCP is provided by utils)
-    compileOnly("com.mysql:mysql-connector-j:9.5.0")
-    compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
-    compileOnly("com.zaxxer:HikariCP:7.0.2")
+    compileOnly(libs.mysql)
+    compileOnly(libs.sqlite)
+    compileOnly(libs.hikaricp)
     compileOnly(libs.caffeine)
 
-    implementation("io.lettuce:lettuce-core:7.2.1.RELEASE")
+    implementation(libs.lettuce)
 
-    implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-api:2.22.0")
-    implementation("com.github.shynixn.mccoroutine:mccoroutine-folia-core:2.22.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.bundles.mccoroutine)
+    implementation(libs.kotlinxCoroutinesCore)
 
     implementation(project(":utils"))
-    implementation(libs.kotlinxSerialization)
+    implementation(libs.kotlinxSerializationJson)
 }
 
 tasks.named<ShadowJar>("shadowJar") {

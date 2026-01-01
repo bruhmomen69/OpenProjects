@@ -4,12 +4,12 @@ plugins {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly(libs.paperApi)
     compileOnly(libs.bundles.kotlinxEcosystem)
-    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+    compileOnly(libs.kotlinxCoroutinesCore)
     
     testImplementation(libs.bundles.kotlinxEcosystem)
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation(libs.kotlinxCoroutinesTest)
+    testImplementation(libs.kotlinTest)
+    testImplementation(libs.junit)
 }

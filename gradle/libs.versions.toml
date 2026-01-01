@@ -5,20 +5,137 @@
 [versions]
 kotlin = "2.1.20"
 kotlinxDatetime = "0.6.1"
-kotlinxSerializationJSON = "1.7.2"
-kotlinxCoroutines = "1.8.1"
+kotlinxSerializationJson = "1.7.2"
+kotlinxSerializationCbor = "1.8.0"
+kotlinxCoroutines = "1.10.2"
 caffeine = "3.1.8"
 
+# Gradle plugins
+shadow = "9.3.0"
+paperweightUserdev = "2.0.0-beta.19"
+runPaper = "3.0.2"
+
+# Minecraft
+paperApi = "1.21.4-R0.1-SNAPSHOT"
+nettyBuffer = "4.1.115.Final"
+
+# MCCoroutine
+mccoroutine = "2.22.0"
+
+# Lamp command framework
+lamp = "4.0.0-rc.12"
+
+# Kyori Adventure
+adventure = "4.23.0"
+
+# Configurate
+configurate = "4.2.0"
+
+# Logging
+slf4j = "2.0.7"
+
+# PlaceholderAPI
+placeholderapi = "2.11.6"
+miniplaceholders = "3.0.1"
+
+# Database
+hikaricp = "7.0.2"
+mysql = "9.5.0"
+sqlite = "3.47.1.0"
+postgresql = "42.7.4"
+lettuce = "7.2.1.RELEASE"
+
+# Cache
+kache = "2.1.1"
+
+# Utilities
+xseries = "13.6.0"
+anvilgui = "2.0.4-20251228.114051-1"
+zstd = "1.5.7-2"
+
+# Testing
+junit = "5.10.2"
+
 [libraries]
+# Kotlin
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlinReflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
+kotlinTest = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+# Kotlinx
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
-kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
-kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinxSerializationJson = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+kotlinxSerializationCbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinxSerializationCbor" }
+kotlinxCoroutinesCore = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinxCoroutinesTest = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+
+# Caffeine
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 
-# Libraries can be bundled together for easier import
+# Paper
+paperApi = { module = "io.papermc.paper:paper-api", version.ref = "paperApi" }
+nettyBuffer = { module = "io.netty:netty-buffer", version.ref = "nettyBuffer" }
+
+# MCCoroutine
+mccoroutineFoliaApi = { module = "com.github.shynixn.mccoroutine:mccoroutine-folia-api", version.ref = "mccoroutine" }
+mccoroutineFoliaCore = { module = "com.github.shynixn.mccoroutine:mccoroutine-folia-core", version.ref = "mccoroutine" }
+
+# Lamp
+lampCommon = { module = "io.github.revxrsal:lamp.common", version.ref = "lamp" }
+lampBukkit = { module = "io.github.revxrsal:lamp.bukkit", version.ref = "lamp" }
+
+# Kyori Adventure
+adventureApi = { module = "net.kyori:adventure-api", version.ref = "adventure" }
+adventureTextSerializerLegacy = { module = "net.kyori:adventure-text-serializer-legacy", version.ref = "adventure" }
+adventureTextSerializerGson = { module = "net.kyori:adventure-text-serializer-gson", version.ref = "adventure" }
+adventureTextSerializerPlain = { module = "net.kyori:adventure-text-serializer-plain", version.ref = "adventure" }
+adventureTextMinimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "adventure" }
+
+# Configurate
+configurateYaml = { module = "org.spongepowered:configurate-yaml", version.ref = "configurate" }
+configurateHocon = { module = "org.spongepowered:configurate-hocon", version.ref = "configurate" }
+configurateExtraKotlin = { module = "org.spongepowered:configurate-extra-kotlin", version.ref = "configurate" }
+
+# Logging
+slf4jApi = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4jSimple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+
+# PlaceholderAPI
+placeholderapi = { module = "me.clip:placeholderapi", version.ref = "placeholderapi" }
+miniplaceholders = { module = "io.github.miniplaceholders:miniplaceholders-api", version.ref = "miniplaceholders" }
+
+# Database
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+mysql = { module = "com.mysql:mysql-connector-j", version.ref = "mysql" }
+sqlite = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+lettuce = { module = "io.lettuce:lettuce-core", version.ref = "lettuce" }
+
+# Cache
+kache = { module = "com.mayakapps.kache:kache", version.ref = "kache" }
+
+# Utilities
+xseries = { module = "com.github.cryptomorin:XSeries", version.ref = "xseries" }
+anvilgui = { module = "net.wesjd:anvilgui", version.ref = "anvilgui" }
+zstd = { module = "com.github.luben:zstd-jni", version.ref = "zstd" }
+
+# Testing
+junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+
 [bundles]
-kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutines"]
+kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerializationJson", "kotlinxCoroutinesCore"]
+adventure = ["adventureApi", "adventureTextSerializerLegacy", "adventureTextSerializerGson", "adventureTextMinimessage"]
+adventureMinimal = ["adventureApi", "adventureTextMinimessage"]
+configurate = ["configurateYaml", "configurateHocon", "configurateExtraKotlin"]
+configurateHocon = ["configurateHocon", "configurateExtraKotlin"]
+lamp = ["lampCommon", "lampBukkit"]
+mccoroutine = ["mccoroutineFoliaApi", "mccoroutineFoliaCore"]
+database = ["hikaricp", "mysql", "sqlite", "postgresql"]
+slf4j = ["slf4jApi", "slf4jSimple"]
 
 [plugins]
 kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+paperweightUserdev = { id = "io.papermc.paperweight.userdev", version.ref = "paperweightUserdev" }
+runPaper = { id = "xyz.jpenilla.run-paper", version.ref = "runPaper" }

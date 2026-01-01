@@ -10,17 +10,16 @@ dependencies {
     api(project(":utils:translations"))
     api(project(":utils:configapi"))
     
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
-    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+    compileOnly(libs.paperApi)
+    compileOnly(libs.kotlinxCoroutinesCore)
     
     // Kotlin reflect for FormInput
-    api(kotlin("reflect"))
+    api(libs.kotlinReflect)
     
     // XSeries and AnvilGUI
-    api("com.github.cryptomorin:XSeries:13.6.0")
-    implementation("net.wesjd:anvilgui:2.0.4-20251228.114051-1")
+    api(libs.xseries)
+    implementation(libs.anvilgui)
     
     // Adventure
-    api("net.kyori:adventure-api:4.23.0")
-    api("net.kyori:adventure-text-minimessage:4.23.0")
+    api(libs.bundles.adventureMinimal)
 }
