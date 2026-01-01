@@ -4,6 +4,8 @@ import bruh.regionrestore.cloner.*
 import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.AudienceScope
+import bruh.regionrestore.selection.SelectionService
+import bruh.regionrestore.selection.SelectionWandService
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.timer.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
@@ -13,6 +15,7 @@ import bruh.zchat.utils.menuapi.*
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
+import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,7 +51,9 @@ class RegionRestoreCommands(
     private val massClonerService: MassClonerService,
     private val menuAPI: MenuAPI,
     private val plugin: JavaPlugin,
-    private val translations: TranslationAPI
+    private val translations: TranslationAPI,
+    private val selectionService: SelectionService,
+    private val selectionWandService: SelectionWandService
 ) {
     
     /** Gets a GUI string (for menu titles, lore, etc. that need strings) */
@@ -1128,7 +1133,7 @@ class RegionRestoreCommands(
         })
     }
 
-    @Subcommand("restore template")
+    @Subcommand("restore template", "template restore")
     @CommandPermission("regionrestore.restore")
     suspend fun restoreTemplate(
         actor: CommandSender,
@@ -1942,6 +1947,77 @@ class RegionRestoreCommands(
             plugin.launch(plugin.entityDispatcher(player)) {
                 menuAPI.open(menu, player)
             }
+        }
+    }
+
+    // ========================================================================
+    // Selection Wand Commands
+    // ========================================================================
+
+    @Subcommand("selection wand")
+    @CommandPermission("regionrestore.wand")
+    suspend fun giveWand(actor: BukkitCommandActor) {
+        val player = actor.requirePlayer()
+
+        if (selectionWandService.giveWand(player)) {
+            player.sendMessage(translations.getComponent(CommandMessages.WAND_GIVEN))
+        } else {
+            player.sendMessage(translations.getComponent(CommandMessages.WAND_ALREADY_HAVE))
+        }
+    }
+
+    @Subcommand("selection")
+    @CommandPermission("regionrestore.selection")
+    suspend fun showSelection(actor: BukkitCommandActor) {
+        val player = actor.requirePlayer()
+        selectionWandService.showSelectionInfo(player)
+        selectionWandService.showSelectionInfo(player)
+    }
+
+    @Subcommand("selection clear")
+    @CommandPermission("regionrestore.selection")
+    suspend fun clearSelection(actor: BukkitCommandActor) {
+        val player = actor.requirePlayer()
+        selectionService.clearSelection(player.uniqueId)
+        player.sendMessage(translations.getComponent(CommandMessages.SELECTION_CLEARED))
+    }
+
+    @Subcommand("selection create")
+    @CommandPermission("regionrestore.template.create")
+    suspend fun createFromSelection(actor: BukkitCommandActor, name: String) {
+        val player = actor.requirePlayer()
+
+        val selection = selectionService.getSelection(player.uniqueId)
+        if (selection == null) {
+            val partial = selectionService.getPartialSelection(player.uniqueId)
+            if (partial == null) {
+                player.sendMessage(translations.getComponent(CommandMessages.SELECTION_NONE))
+            } else {
+                player.sendMessage(translations.getComponent(CommandMessages.SELECTION_INCOMPLETE))
+            }
+            return
+        }
+
+        player.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_FROM_SELECTION) {
+            unparsed("name", name)
+        })
+
+        withContext(plugin.globalRegionDispatcher) {
+            val template = nmsAdapter.serializeArea(
+                selection.world,
+                selection.minChunkX,
+                selection.minChunkZ,
+                selection.maxChunkX,
+                selection.maxChunkZ
+            )
+
+            val descriptionFormat = config.templates.defaultDescriptionFormat
+            val description = descriptionFormat.replace("<player>", player.name)
+            templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)
+
+            player.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_CREATED) {
+                unparsed("name", name)
+            })
         }
     }
 }

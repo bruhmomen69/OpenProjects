@@ -109,7 +109,20 @@ enum class CommandMessages(
     // GUI result messages
     GUI_CLOSED_ACTION("gui_closed_action", "<gray>GUI closed after action: <action>"),
     GUI_CANCELLED("gui_cancelled", "<gray>GUI cancelled"),
-    GUI_CLOSED("gui_closed", "<gray>GUI closed")
+    GUI_CLOSED("gui_closed", "<gray>GUI closed"),
+    
+    // Selection wand messages
+    WAND_GIVEN("wand_given", "<green>Selection wand given. Right-click to set corners."),
+    WAND_ALREADY_HAVE("wand_already_have", "<yellow>You already have a selection wand."),
+    WAND_POS1_SET("wand_pos1_set", "<green>Position 1 set to (<x>, <y>, <z>)"),
+    WAND_POS2_SET("wand_pos2_set", "<green>Position 2 set to (<x>, <y>, <z>)"),
+    WAND_SELECTION_COMPLETE("wand_selection_complete", "<green>Selection complete! <width>x<length> blocks (<chunk_width>x<chunk_length> chunks)"),
+    WAND_WORLD_CHANGED("wand_world_changed", "<yellow>World changed, previous position cleared."),
+    SELECTION_CLEARED("selection_cleared", "<gray>Selection cleared."),
+    SELECTION_NONE("selection_none", "<red>No selection made. Use the wand to select two corners first."),
+    SELECTION_INCOMPLETE("selection_incomplete", "<red>Selection incomplete. Set both corners with the wand."),
+    SELECTION_INFO("selection_info", "<green>Selection: <world> from (<min_x>, <min_z>) to (<max_x>, <max_z>) - <chunk_width>x<chunk_length> chunks"),
+    TEMPLATE_FROM_SELECTION("template_from_selection", "<green>Creating template '<name>' from selection...")
 }
 
 /**

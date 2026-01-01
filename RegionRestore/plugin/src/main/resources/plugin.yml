@@ -14,3 +14,109 @@ commands:
     description: Main RegionRestore command
     aliases: [arena, arenas]
     usage: /regionrestore <subcommand>
+
+permissions:
+  regionrestore.*:
+    description: Grants all RegionRestore permissions
+    default: op
+    children:
+      regionrestore.gui: true
+      regionrestore.template.create: true
+      regionrestore.template.list: true
+      regionrestore.template.info: true
+      regionrestore.template.setactive: true
+      regionrestore.template.delete: true
+      regionrestore.restore: true
+      regionrestore.restorein: true
+      regionrestore.instance.create: true
+      regionrestore.instance.list: true
+      regionrestore.instance.info: true
+      regionrestore.instance.delete: true
+      regionrestore.instance.restore: true
+      regionrestore.cloner.status: true
+      regionrestore.cloner.restore: true
+      regionrestore.cloner.regen: true
+      regionrestore.timer.set: true
+      regionrestore.timer.cancel: true
+      regionrestore.wand: true
+      regionrestore.selection: true
+
+  regionrestore.gui:
+    description: Open the RegionRestore GUI
+    default: op
+
+  regionrestore.template.create:
+    description: Create region templates
+    default: op
+
+  regionrestore.template.list:
+    description: List region templates
+    default: op
+
+  regionrestore.template.info:
+    description: View template info and versions
+    default: op
+
+  regionrestore.template.setactive:
+    description: Set the active template version
+    default: op
+
+  regionrestore.template.delete:
+    description: Delete a template
+    default: op
+
+  regionrestore.restore:
+    description: Restore a template at locations
+    default: op
+
+  regionrestore.restorein:
+    description: Restore a template in a specific world
+    default: op
+
+  regionrestore.instance.create:
+    description: Create manual template instances
+    default: op
+
+  regionrestore.instance.list:
+    description: List template instances
+    default: op
+
+  regionrestore.instance.info:
+    description: View information about a template instance
+    default: op
+
+  regionrestore.instance.delete:
+    description: Delete a template instance
+    default: op
+
+  regionrestore.instance.restore:
+    description: Trigger restore for a template instance
+    default: op
+
+  regionrestore.cloner.status:
+    description: View Mass Cloner status
+    default: op
+
+  regionrestore.cloner.restore:
+    description: Trigger restore for cloner instances
+    default: op
+
+  regionrestore.cloner.regen:
+    description: Regenerate cloner pooled instances
+    default: op
+
+  regionrestore.timer.set:
+    description: Set a repeating restore timer
+    default: op
+
+  regionrestore.timer.cancel:
+    description: Cancel restore timers
+    default: op
+
+  regionrestore.wand:
+    description: Obtain the selection wand
+    default: op
+
+  regionrestore.selection:
+    description: View, clear, or create templates from selection
+    default: op

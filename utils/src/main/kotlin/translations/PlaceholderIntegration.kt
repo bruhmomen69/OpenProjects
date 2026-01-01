@@ -9,13 +9,13 @@ import org.bukkit.OfflinePlayer
 /**
  * Handles integration with PlaceholderAPI and MiniPlaceholders.
  * Detects plugin availability and provides placeholder replacement functionality.
- * 
+ *
  * This class uses inheritance-based providers that are only instantiated when
  * the respective plugins are available. This avoids reflection for method calls
  * while still being defensive about missing dependencies.
  */
 class PlaceholderIntegration {
-    
+
     private var placeholderApiProvider: PlaceholderApiProvider = NoOpPlaceholderApiProvider()
     private var miniPlaceholdersProvider: MiniPlaceholdersProvider = NoOpMiniPlaceholdersProvider()
 
@@ -27,11 +27,12 @@ class PlaceholderIntegration {
         // Check if Bukkit is available (might be running in tests)
         val bukkitAvailable = try {
             Class.forName("org.bukkit.Bukkit")
-            Bukkit.getPluginManager() != null
+            Bukkit.getPluginManager()
+            true
         } catch (e: Exception) {
             false
         }
-        
+
         if (!bukkitAvailable) {
             placeholderApiProvider = NoOpPlaceholderApiProvider()
             miniPlaceholdersProvider = NoOpMiniPlaceholdersProvider()
@@ -99,15 +100,15 @@ class PlaceholderIntegration {
         }
 
         val resolvers = mutableListOf(existingResolver)
-        
+
         // Add global placeholders
         resolvers.add(miniPlaceholdersProvider.globalPlaceholders())
-        
+
         // Add audience placeholders if we have an audience
         if (audience != null) {
             resolvers.add(miniPlaceholdersProvider.audiencePlaceholders())
         }
-        
+
         return TagResolver.resolver(resolvers)
     }
 

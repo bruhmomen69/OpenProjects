@@ -383,9 +383,10 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
     // Event Listener
     // ========================================================================
 
-    private inner class MenuListener : Listener {
+    /** Tracks drop source info for correlating InventoryClickEvent with PlayerDropItemEvent */
+    private data class DropSource(val slot: Int, val isControlDrop: Boolean)
 
-        private data class DropSource(val slot: Int, val isControlDrop: Boolean)
+    private inner class MenuListener : Listener {
 
         private val lastDropSources: MutableMap<UUID, DropSource> = ConcurrentHashMap()
 

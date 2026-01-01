@@ -158,29 +158,27 @@ class TranslationAPI(
      * Must be called after all enums are registered.
      */
     suspend fun load(): Unit = loadMutex.withLock {
-        withContext(Dispatchers.IO) {
-            // Build complete key -> default map from all registered enums
-            val allKeys = buildAllKeysMap()
+        // Build complete key -> default map from all registered enums
+        val allKeys = buildAllKeysMap()
 
-            // Generate/update all language files
-            loader.generateAllLanguageFiles(allKeys)
+        // Generate/update all language files
+        loader.generateAllLanguageFiles(allKeys)
+        
+        // Load English defaults (always needed for fallback)
+        englishDefaults = loader.loadTranslations("en")
 
-            // Load English defaults (always needed for fallback)
-            englishDefaults = loader.loadTranslations("en")
-
-            // Load current locale
-            if (currentLocale != "en") {
-                translations[currentLocale] = loader.loadTranslations(currentLocale)
-            }
-
-            // Clear component cache on reload
-            componentCache.clear()
-
-            // Detect available placeholder plugins
-            placeholderIntegration.detectPlugins()
-
-            initialized = true
+        // Load current locale
+        if (currentLocale != "en") {
+            translations[currentLocale] = loader.loadTranslations(currentLocale)
         }
+
+        // Clear component cache on reload
+        componentCache.clear()
+
+        // Detect available placeholder plugins
+        placeholderIntegration.detectPlugins()
+
+        initialized = true
     }
 
     /**
@@ -518,6 +516,11 @@ class TranslationAPI(
             componentCache.put(key, value)
         }
     }
+
+    /**
+     * Gets all registered prefixes.
+     */
+    fun getRegisteredPrefixes(): Set<String> = prefixToEnum.keys.toSet()
 
     /**
      * Gets all available locales.

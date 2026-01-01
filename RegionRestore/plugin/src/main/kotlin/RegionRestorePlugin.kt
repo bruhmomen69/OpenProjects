@@ -17,6 +17,8 @@ import bruh.regionrestore.config.RegionRestoreConfigLoader
 import bruh.regionrestore.loader.PaperNmsAdapterLoader
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.NotificationService
+import bruh.regionrestore.selection.SelectionService
+import bruh.regionrestore.selection.SelectionWandService
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.template.TemplateCache
 import bruh.regionrestore.timer.SchedulerService
@@ -24,6 +26,8 @@ import bruh.regionrestore.translations.CommandMessages
 import bruh.regionrestore.translations.GuiMessages
 import bruh.regionrestore.hooks.PlaceholderAPIHook
 import bruh.regionrestore.hooks.MiniPlaceholdersHook
+import bruh.zchat.utils.itemapi.ItemAPI
+import bruh.zchat.utils.itemapi.NoOpItemDataStore
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import bruh.zchat.utils.translations.translationApi
@@ -49,14 +53,21 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         private set
     lateinit var translations: TranslationAPI
         private set
+    lateinit var itemAPI: ItemAPI
+        private set
+    lateinit var selectionService: SelectionService
+        private set
+    lateinit var selectionWandService: SelectionWandService
+        private set
 
     override suspend fun onLoadAsync() {
         nmsAdapter = PaperNmsAdapterLoader.load()
         slF4JLogger.info("Loaded NMS adapter for Minecraft version ${nmsAdapter.minecraftVersion}")
 
-
         configLoader = RegionRestoreConfigLoader(dataFolder.toPath(), slF4JLogger)
         config = configLoader.load(nmsAdapter)
+
+        slF4JLogger.info("Loaded configuration")
     }
 
     override suspend fun onEnableAsync() {
@@ -66,12 +77,23 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         translations = translationApi()
         translations.register("commands", CommandMessages::class)
         translations.register("gui", GuiMessages::class)
+        slF4JLogger.info("Translation system initialized")
         // Switch to configured language before loading to ensure correct files are read
         translations.switchLanguage(config.language)
+        slF4JLogger.info("Switched to language ${config.language}")
         translations.load()
-        slF4JLogger.info("Translation system initialized")
+        slF4JLogger.info("Translation system loaded")
 
         menuAPI = MenuAPI(this)
+
+        // Initialize ItemAPI for tracked items (wand, etc.)
+        // Using NoOpItemDataStore since the wand doesn't need database persistence
+        itemAPI = ItemAPI(this, NoOpItemDataStore())
+
+        // Initialize selection system
+        selectionService = SelectionService()
+        selectionWandService = SelectionWandService(this, itemAPI, selectionService, translations)
+        slF4JLogger.info("Selection wand system initialized")
 
         templateRepository = TemplateRepository(dataFolder.toPath(), slF4JLogger, nmsAdapter)
 
@@ -119,6 +141,8 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         massClonerService.saveState()
         schedulerService.cancelAll()
         massClonerService.shutdown()
+        selectionWandService.close()
+        itemAPI.close()
         templateCache.clear()
         templateRepository.save()
 
@@ -175,7 +199,18 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                 }
             }
             .build()
-        lamp.register(RegionRestoreCommands(nmsAdapter, templateRepository, schedulerService, config, massClonerService, menuAPI, this, translations))
+        lamp.register(RegionRestoreCommands(
+            nmsAdapter,
+            templateRepository,
+            schedulerService,
+            config,
+            massClonerService,
+            menuAPI,
+            this,
+            translations,
+            selectionService,
+            selectionWandService
+        ))
     }
 
     private fun setupPlaceholderHooks() {
