@@ -18,7 +18,14 @@ plugins {
 
 // Chat
 include(":app")
+// Utils submodules
 include(":utils")
+include(":utils:core")
+include(":utils:configapi")
+include(":utils:database")
+include(":utils:translations")
+include(":utils:menuapi")
+include(":utils:itemapi")
 include(":ZealousChat")
 // EssentiallyStateless
 include(":EssentiallyStateless")

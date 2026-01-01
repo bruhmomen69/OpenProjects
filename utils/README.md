@@ -2,6 +2,45 @@
 
 Shared utilities for the monorepo plugins including configuration loading, menu systems, and translation support.
 
+## Module Structure
+
+The utils module is split into focused submodules that depend on each other:
+
+```
+utils/
+├── core/          - Base utilities (Utilities.kt)
+├── configapi/     - Configuration loading with Configurate
+├── database/      - Database abstraction with HikariCP (depends on: configapi)
+├── translations/  - Translation/i18n system with Adventure
+├── menuapi/       - Menu/GUI system (depends on: translations, configapi)
+└── itemapi/       - Tracked item system (depends on: menuapi, database)
+```
+
+### Dependency Graph
+
+```
+core
+configapi ─────────┐
+                   ├──> database
+                   │
+translations ──────┼──> menuapi ──> itemapi
+                   │                   │
+                   └───────────────────┘
+```
+
+### Usage
+
+Depend on the aggregator for all utils:
+```kotlin
+implementation(project(":utils"))
+```
+
+Or depend on specific submodules:
+```kotlin
+implementation(project(":utils:menuapi"))
+implementation(project(":utils:database"))
+```
+
 ## Config API
 
 Generic configuration loaders using Configurate with HOCON format.
