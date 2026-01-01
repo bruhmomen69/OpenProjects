@@ -4,6 +4,7 @@ import bruh.zchat.paper.commands.*
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.database.*
 import bruh.zchat.paper.listeners.ChatMessageListener
+import bruh.zchat.paper.menus.MenuService
 import bruh.zchat.paper.listeners.InventoryProtectionListener
 import bruh.zchat.paper.listeners.channel.ChannelCommandListener
 import bruh.zchat.paper.listeners.playerstatus.PlayerAdvancementListener
@@ -51,6 +52,7 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var inventorySnapshotStore: InventorySnapshotStore
     private lateinit var lamp: Lamp<*>
     private lateinit var channelCommandService: ChannelCommandService
+    private lateinit var menuService: MenuService
 
     // Server instance ID for cross-server messaging
     val serverInstanceId = java.util.UUID.randomUUID().toString()
@@ -151,6 +153,17 @@ class PaperMC : SuspendingJavaPlugin() {
         swearFilterService =
             SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
         blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
+
+        // Initialize menu service for GUI menus
+        menuService = MenuService(
+            plugin = this,
+            configManager = configManager,
+            blockService = blockService,
+            playerDataManager = playerDataManager,
+            messageFormattingService = messageFormattingService,
+            infractionManager = infractionManager
+        )
+        menuService.initialize()
 
         // Initialize ChannelCommandService
         channelCommandService = ChannelCommandService(
@@ -258,7 +271,7 @@ class PaperMC : SuspendingJavaPlugin() {
         lamp.register(MessageCommand(privateMessageService, messageFormattingService, this))
 
         // Register block commands
-        lamp.register(MessageCommand.BlockCommand(blockService, messageFormattingService, this))
+        lamp.register(MessageCommand.BlockCommand(blockService, messageFormattingService, menuService, this))
 
         // Register inventory view command
         lamp.register(InventoryViewCommand(this, chatInventoryPlaceholderService))
@@ -281,6 +294,7 @@ class PaperMC : SuspendingJavaPlugin() {
                 messageFormattingService,
                 blockService,
                 alertService,
+                menuService,
                 this
             )
         )
@@ -370,6 +384,11 @@ class PaperMC : SuspendingJavaPlugin() {
         // Close Redis backend resources (if any)
         if (::crossServerMessageBusService.isInitialized) {
             crossServerMessageBusService.close()
+        }
+
+        // Close menu service
+        if (::menuService.isInitialized) {
+            menuService.close()
         }
 
         // Close inventory snapshot store

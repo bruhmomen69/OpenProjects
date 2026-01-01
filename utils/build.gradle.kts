@@ -24,6 +24,10 @@ dependencies {
     api("net.kyori:adventure-text-minimessage:4.23.0")
     implementation("com.mayakapps.kache:kache:2.1.1")
     
+    // Configurate for config API
+    api("org.spongepowered:configurate-hocon:4.2.0")
+    api("org.spongepowered:configurate-extra-kotlin:4.2.0")
+    
     testImplementation(libs.bundles.kotlinxEcosystem)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation(kotlin("test"))
