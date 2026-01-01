@@ -2,7 +2,14 @@ package bruh.zchat.paper
 
 import bruh.zchat.paper.commands.*
 import bruh.zchat.paper.config.ConfigManager
-import bruh.zchat.paper.database.*
+import bruh.zchat.paper.database.BlockMigrationService
+import bruh.zchat.paper.database.DBPlayerQueries
+import bruh.zchat.paper.database.DatabaseMaintenanceService
+import bruh.zchat.paper.database.PlayerDataManager
+import bruh.zchat.paper.database.ZealousChatSchema
+import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.DatabaseDialect
+import bruh.zchat.utils.database.createDatabase
 import bruh.zchat.paper.listeners.ChatMessageListener
 import bruh.zchat.paper.menus.MenuService
 import bruh.zchat.paper.listeners.InventoryProtectionListener
@@ -30,7 +37,7 @@ import revxrsal.commands.bukkit.BukkitLamp
 
 class PaperMC : SuspendingJavaPlugin() {
     private lateinit var configManager: ConfigManager
-    private lateinit var databaseService: DatabaseService
+    private lateinit var database: Database
     private lateinit var playerDataManager: PlayerDataManager
     private lateinit var databaseMaintenanceService: DatabaseMaintenanceService
     private lateinit var scheduledTaskService: ScheduledTaskService
@@ -90,21 +97,27 @@ class PaperMC : SuspendingJavaPlugin() {
             }
         }
 
-        // Initialize database
+        // Initialize database with new API
         val dbConfig = createDatabaseConfig()
-        databaseService = DatabaseService(dbConfig, this)
-        val dbPlayerQueries = DBPlayerQueries(databaseService)
-        playerDataManager = PlayerDataManager(databaseService, dbPlayerQueries)
-
+        database = createDatabase(dbConfig) {
+            schema(ZealousChatSchema)
+        }
+        
         // Run database migrations
         try {
-            val migrationResult = databaseService.migrate()
-            logger.info("Database migrations completed: ${migrationResult.migrationsExecuted} migrations executed")
+            val migrationReport = database.initialize()
+            logger.info("Database migrations completed: ${migrationReport.totalApplied} migrations applied")
+            if (migrationReport.hasChanges) {
+                logger.info(migrationReport.toSummary())
+            }
         } catch (e: Exception) {
             slF4JLogger.error("Failed to run database migrations: ${e.message}", e)
             server.pluginManager.disablePlugin(this)
             return
         }
+        
+        val dbPlayerQueries = DBPlayerQueries(database)
+        playerDataManager = PlayerDataManager(database, dbPlayerQueries)
 
         // Initialize services
         placeholderAPIService = PlaceholderAPIService(configManager, this)
@@ -152,7 +165,7 @@ class PaperMC : SuspendingJavaPlugin() {
         infractionManager = InfractionManager(dbPlayerQueries, playerDataManager)
         swearFilterService =
             SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
-        blockMigrationService = BlockMigrationService(databaseService, dataFolder.toPath(), dbConfig.dataRetentionDays)
+        blockMigrationService = BlockMigrationService(database, dataFolder.toPath(), configManager.storage.database.dataRetentionDays)
 
         // Initialize menu service for GUI menus
         menuService = MenuService(
@@ -183,7 +196,7 @@ class PaperMC : SuspendingJavaPlugin() {
         }
 
         // Initialize maintenance services
-        databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, dbConfig)
+        databaseMaintenanceService = DatabaseMaintenanceService(dbPlayerQueries, configManager.storage.database)
         scheduledTaskService = ScheduledTaskService(
             this,
             configManager,
@@ -200,7 +213,7 @@ class PaperMC : SuspendingJavaPlugin() {
         // Schedule cross-server tasks
         if (configManager.storage.crossServerMessaging.enabled) {
             val isRedisBackend = configManager.storage.crossServerMessaging.backend.equals("redis", ignoreCase = true)
-            if (databaseService.databaseType == DatabaseType.MYSQL) {
+            if (database.dialect == DatabaseDialect.MYSQL || database.dialect == DatabaseDialect.POSTGRES) {
                 // Initialize Redis backend if selected
                 if (isRedisBackend) {
                     try {
@@ -397,8 +410,8 @@ class PaperMC : SuspendingJavaPlugin() {
         }
 
         // Close database
-        if (::databaseService.isInitialized) {
-            databaseService.close()
+        if (::database.isInitialized) {
+            database.close()
         }
 
         // Save configuration
@@ -409,29 +422,21 @@ class PaperMC : SuspendingJavaPlugin() {
         logger.info("ZealousChat disabled!")
     }
 
-    private fun createDatabaseConfig(): bruh.zchat.paper.database.DatabaseConfig {
+    private fun createDatabaseConfig(): bruh.zchat.utils.database.DatabaseConfig {
         val dbConfig = configManager.storage.database
-        val dbType = when (dbConfig.type.lowercase()) {
-            "mysql" -> DatabaseType.MYSQL
-            "sqlite" -> DatabaseType.SQLITE
-            else -> DatabaseType.SQLITE
-        }
-
-        return bruh.zchat.paper.database.DatabaseConfig(
-            type = dbType,
+        return bruh.zchat.utils.database.DatabaseConfig(
+            dialect = dbConfig.type,
             host = dbConfig.host,
             port = dbConfig.port,
             database = dbConfig.database,
             username = dbConfig.username,
             password = dbConfig.password,
             sqliteFile = dbConfig.sqliteFile,
+            poolName = "ZealousChat-Pool",
             poolSize = dbConfig.poolSize,
             connectionTimeout = dbConfig.connectionTimeout,
             maxLifetime = dbConfig.maxLifetime,
-            leakDetectionThreshold = dbConfig.leakDetectionThreshold,
-            autoMigrate = dbConfig.autoMigrate,
-            enableArchive = dbConfig.enableArchive,
-            dataRetentionDays = dbConfig.dataRetentionDays
+            leakDetectionThreshold = dbConfig.leakDetectionThreshold
         )
     }
 
@@ -444,7 +449,7 @@ class PaperMC : SuspendingJavaPlugin() {
                 configManager
             )
 
-            "sql" -> SqlInventorySnapshotStore(databaseService)
+            "sql" -> SqlInventorySnapshotStore(database)
             "redis" -> {
                 val redisCfg = storageCfg.database.redis
                 RedisInventorySnapshotStore(

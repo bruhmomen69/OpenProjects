@@ -1,11 +1,15 @@
 package bruh.zchat.paper.database
 
+import bruh.zchat.paper.config.DatabaseConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
+/**
+ * Service for database maintenance tasks like data retention and optimization.
+ */
 class DatabaseMaintenanceService(
     private val dbPlayerQueries: DBPlayerQueries,
     private val config: DatabaseConfig

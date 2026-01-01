@@ -28,6 +28,12 @@ dependencies {
     api("org.spongepowered:configurate-hocon:4.2.0")
     api("org.spongepowered:configurate-extra-kotlin:4.2.0")
     
+    // Database API dependencies
+    api("com.zaxxer:HikariCP:7.0.2")
+    compileOnly("com.mysql:mysql-connector-j:9.5.0")
+    compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
+    compileOnly("org.postgresql:postgresql:42.7.4")
+    
     testImplementation(libs.bundles.kotlinxEcosystem)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
     testImplementation(kotlin("test"))

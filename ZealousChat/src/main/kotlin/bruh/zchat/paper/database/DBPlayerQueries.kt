@@ -1,35 +1,39 @@
 package bruh.zchat.paper.database
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.DatabaseDialect
+import bruh.zchat.utils.database.TransactionScope
+import bruh.zchat.utils.database.getInstant
+import bruh.zchat.utils.database.getUUIDOrThrow
+import bruh.zchat.utils.database.sql
 import org.slf4j.LoggerFactory
-import java.sql.ResultSet
 import java.time.Instant
 import java.util.*
 
-class DBPlayerQueries(val databaseService: DatabaseService) {
+/**
+ * Database queries for player data, infractions, blocks, and cross-server messaging.
+ */
+class DBPlayerQueries(private val database: Database) {
     private val logger = LoggerFactory.getLogger(DBPlayerQueries::class.java)
     
-    // Expose database type for other classes
-    val databaseType: DatabaseType get() = databaseService.databaseType
-    
-    // Expose executeUpdate method for other classes
-    suspend fun executeUpdate(sql: String, vararg params: Any): Int = withContext(Dispatchers.IO) {
-        databaseService.executeUpdate(sql, *params)
-    }
+    val dialect: DatabaseDialect get() = database.dialect
 
-    // Player data queries
-    suspend fun getPlayerData(uuid: UUID): PlayerDataQueryResult? = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuerySingle(
-                "SELECT uuid, username, first_seen, last_seen, chat_disabled, messages_disabled FROM players WHERE uuid = ?",
+    // ==================== Player Data Queries ====================
+    
+    /**
+     * Gets player data from the database.
+     */
+    suspend fun getPlayerData(uuid: UUID): PlayerDataQueryResult? {
+        return try {
+            database.querySingle(
+                sql("SELECT uuid, username, first_seen, last_seen, chat_disabled, messages_disabled FROM players WHERE uuid = ?"),
                 uuid
             ) { rs ->
                 PlayerDataQueryResult(
-                    uuid = UUID.fromString(rs.getString("uuid")),
+                    uuid = rs.getUUIDOrThrow("uuid"),
                     username = rs.getString("username"),
-                    firstSeen = rs.getTimestamp("first_seen").toInstant(),
-                    lastSeen = rs.getTimestamp("last_seen").toInstant(),
+                    firstSeen = rs.getInstant("first_seen") ?: Instant.EPOCH,
+                    lastSeen = rs.getInstant("last_seen") ?: Instant.EPOCH,
                     chatDisabled = rs.getBoolean("chat_disabled"),
                     messagesDisabled = rs.getBoolean("messages_disabled")
                 )
@@ -40,33 +44,42 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
+    /**
+     * Inserts a new player or updates an existing player's data.
+     */
     suspend fun insertOrUpdatePlayer(
         uuid: UUID,
         username: String,
         now: Instant,
         serverInstanceId: String
-    ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val insertSql = when (databaseService.databaseType) {
-                DatabaseType.MYSQL -> """INSERT IGNORE INTO players
-                (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
-                VALUES (?, ?, ?, ?, ?, ?)"""
-                DatabaseType.SQLITE -> """INSERT OR IGNORE INTO players
-                (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
-                VALUES (?, ?, ?, ?, ?, ?)"""
-            }
-
-            databaseService.executeUpdate(
-                insertSql,
+    ): Boolean {
+        return try {
+            database.execute(
+                sql {
+                    mysql("""
+                        INSERT IGNORE INTO players
+                        (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """)
+                    postgres("""
+                        INSERT INTO players
+                        (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (uuid) DO NOTHING
+                    """)
+                    sqlite("""
+                        INSERT OR IGNORE INTO players
+                        (uuid, username, first_seen, last_seen, online_server_id, online_last_heartbeat)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """)
+                },
                 uuid, username, now, now, serverInstanceId, now
             )
 
-            // Update existing player - update server ID and heartbeat
-            databaseService.executeUpdate(
-                "UPDATE players SET username = ?, last_seen = ?, online_server_id = ?, online_last_heartbeat = ? WHERE uuid = ?",
+            database.execute(
+                sql("UPDATE players SET username = ?, last_seen = ?, online_server_id = ?, online_last_heartbeat = ? WHERE uuid = ?"),
                 username, now, serverInstanceId, now, uuid
             )
-
             true
         } catch (e: Exception) {
             logger.error("Failed to insert/update player $uuid", e)
@@ -74,10 +87,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getPlayerInfractions(playerUuid: UUID): Map<String, Int> = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuery(
-                "SELECT group_name, count FROM player_infractions WHERE player_uuid = ? ORDER BY group_name",
+    /**
+     * Gets all infractions for a player.
+     */
+    suspend fun getPlayerInfractions(playerUuid: UUID): Map<String, Int> {
+        return try {
+            database.query(
+                sql("SELECT group_name, count FROM player_infractions WHERE player_uuid = ? ORDER BY group_name"),
                 playerUuid
             ) { rs ->
                 rs.getString("group_name") to rs.getInt("count")
@@ -88,24 +104,28 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getPlayerInfractionCount(playerUuid: UUID, groupName: String): Int = withContext(Dispatchers.IO) {
-        try {
-            val count = databaseService.executeQuerySingle(
-                "SELECT count FROM player_infractions WHERE player_uuid = ? AND group_name = ?",
+    /**
+     * Gets the infraction count for a player in a specific group.
+     */
+    suspend fun getPlayerInfractionCount(playerUuid: UUID, groupName: String): Int {
+        return try {
+            database.querySingle(
+                sql("SELECT count FROM player_infractions WHERE player_uuid = ? AND group_name = ?"),
                 playerUuid, groupName
-            ) { rs -> rs.getInt("count") }
-            
-            count ?: 0
+            ) { rs -> rs.getInt("count") } ?: 0
         } catch (e: Exception) {
             logger.error("Failed to get infraction count for player $playerUuid, group $groupName", e)
             0
         }
     }
 
-    suspend fun getPlayerBlockedPlayers(playerUuid: UUID): Set<UUID> = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuery(
-                "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
+    /**
+     * Gets all blocked players for a player.
+     */
+    suspend fun getPlayerBlockedPlayers(playerUuid: UUID): Set<UUID> {
+        return try {
+            database.query(
+                sql("SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?"),
                 playerUuid
             ) { rs ->
                 UUID.fromString(rs.getString("blocked_uuid"))
@@ -116,23 +136,30 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getCurrentLastSeenFromDatabase(uuid: UUID): Instant = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuerySingle(
-                "SELECT last_seen FROM players WHERE uuid = ?",
+    /**
+     * Gets the last seen timestamp for a player from the database.
+     */
+    suspend fun getCurrentLastSeenFromDatabase(uuid: UUID): Instant {
+        return try {
+            database.querySingle(
+                sql("SELECT last_seen FROM players WHERE uuid = ?"),
                 uuid
-            ) { rs -> rs.getTimestamp("last_seen").toInstant() } ?: Instant.EPOCH
+            ) { rs -> rs.getInstant("last_seen") } ?: Instant.EPOCH
         } catch (e: Exception) {
             logger.debug("Failed to get last_seen for player $uuid, using epoch", e)
             Instant.EPOCH
         }
     }
 
-    // Infraction queries
-    suspend fun updateInfractionCount(playerUuid: UUID, groupName: String, newCount: Int): Boolean = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                "UPDATE player_infractions SET count = ?, last_updated = CURRENT_TIMESTAMP WHERE player_uuid = ? AND group_name = ?",
+    // ==================== Infraction Queries ====================
+
+    /**
+     * Updates the infraction count for a player in a specific group.
+     */
+    suspend fun updateInfractionCount(playerUuid: UUID, groupName: String, newCount: Int): Boolean {
+        return try {
+            database.execute(
+                sql("UPDATE player_infractions SET count = ?, last_updated = CURRENT_TIMESTAMP WHERE player_uuid = ? AND group_name = ?"),
                 newCount, playerUuid, groupName
             )
             true
@@ -141,11 +168,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             false
         }
     }
-    
-    suspend fun updateInfractionCount(tx: DatabaseService.TransactionContext, playerUuid: UUID, groupName: String, newCount: Int): Boolean {
+
+    /**
+     * Updates infraction count within a transaction.
+     */
+    suspend fun updateInfractionCount(tx: TransactionScope, playerUuid: UUID, groupName: String, newCount: Int): Boolean {
         return try {
-            tx.executeUpdate(
-                "UPDATE player_infractions SET count = ?, last_updated = CURRENT_TIMESTAMP WHERE player_uuid = ? AND group_name = ?",
+            tx.execute(
+                sql("UPDATE player_infractions SET count = ?, last_updated = CURRENT_TIMESTAMP WHERE player_uuid = ? AND group_name = ?"),
                 newCount, playerUuid, groupName
             )
             true
@@ -155,10 +185,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun insertNewInfraction(playerUuid: UUID, groupName: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                "INSERT INTO player_infractions (player_uuid, group_name, count) VALUES (?, ?, 1)",
+    /**
+     * Inserts a new infraction record.
+     */
+    suspend fun insertNewInfraction(playerUuid: UUID, groupName: String): Boolean {
+        return try {
+            database.execute(
+                sql("INSERT INTO player_infractions (player_uuid, group_name, count) VALUES (?, ?, 1)"),
                 playerUuid, groupName
             )
             true
@@ -167,11 +200,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             false
         }
     }
-    
-    suspend fun insertNewInfraction(tx: DatabaseService.TransactionContext, playerUuid: UUID, groupName: String): Boolean {
+
+    /**
+     * Inserts a new infraction within a transaction.
+     */
+    suspend fun insertNewInfraction(tx: TransactionScope, playerUuid: UUID, groupName: String): Boolean {
         return try {
-            tx.executeUpdate(
-                "INSERT INTO player_infractions (player_uuid, group_name, count) VALUES (?, ?, 1)",
+            tx.execute(
+                sql("INSERT INTO player_infractions (player_uuid, group_name, count) VALUES (?, ?, 1)"),
                 playerUuid, groupName
             )
             true
@@ -184,20 +220,26 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
     /**
      * Adds an infraction inside a transaction and returns the new count.
      */
-    suspend fun addInfractionTransactional(playerUuid: UUID, groupName: String): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeTransaction { tx ->
-                val existingCount = tx.executeQuerySingle(
-                    "SELECT count FROM player_infractions WHERE player_uuid = ? AND group_name = ?",
+    suspend fun addInfractionTransactional(playerUuid: UUID, groupName: String): Int {
+        return try {
+            database.transaction {
+                val existingCount = querySingle(
+                    sql("SELECT count FROM player_infractions WHERE player_uuid = ? AND group_name = ?"),
                     playerUuid, groupName
                 ) { rs -> rs.getInt("count") }
 
                 if (existingCount != null) {
                     val updatedCount = existingCount + 1
-                    updateInfractionCount(tx, playerUuid, groupName, updatedCount)
+                    execute(
+                        sql("UPDATE player_infractions SET count = ?, last_updated = CURRENT_TIMESTAMP WHERE player_uuid = ? AND group_name = ?"),
+                        updatedCount, playerUuid, groupName
+                    )
                     updatedCount
                 } else {
-                    insertNewInfraction(tx, playerUuid, groupName)
+                    execute(
+                        sql("INSERT INTO player_infractions (player_uuid, group_name, count) VALUES (?, ?, 1)"),
+                        playerUuid, groupName
+                    )
                     1
                 }
             }
@@ -207,10 +249,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun deleteInfraction(playerUuid: UUID, groupName: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val affectedRows = databaseService.executeUpdate(
-                "DELETE FROM player_infractions WHERE player_uuid = ? AND group_name = ?",
+    /**
+     * Deletes an infraction record.
+     */
+    suspend fun deleteInfraction(playerUuid: UUID, groupName: String): Boolean {
+        return try {
+            val affectedRows = database.execute(
+                sql("DELETE FROM player_infractions WHERE player_uuid = ? AND group_name = ?"),
                 playerUuid, groupName
             )
             affectedRows > 0
@@ -219,11 +264,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             false
         }
     }
-    
-    suspend fun deleteInfraction(tx: DatabaseService.TransactionContext, playerUuid: UUID, groupName: String): Boolean {
+
+    /**
+     * Deletes an infraction within a transaction.
+     */
+    suspend fun deleteInfraction(tx: TransactionScope, playerUuid: UUID, groupName: String): Boolean {
         return try {
-            val affectedRows = tx.executeUpdate(
-                "DELETE FROM player_infractions WHERE player_uuid = ? AND group_name = ?",
+            val affectedRows = tx.execute(
+                sql("DELETE FROM player_infractions WHERE player_uuid = ? AND group_name = ?"),
                 playerUuid, groupName
             )
             affectedRows > 0
@@ -233,10 +281,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun deleteAllInfractions(playerUuid: UUID): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val affectedRows = databaseService.executeUpdate(
-                "DELETE FROM player_infractions WHERE player_uuid = ?",
+    /**
+     * Deletes all infractions for a player.
+     */
+    suspend fun deleteAllInfractions(playerUuid: UUID): Boolean {
+        return try {
+            val affectedRows = database.execute(
+                sql("DELETE FROM player_infractions WHERE player_uuid = ?"),
                 playerUuid
             )
             affectedRows > 0
@@ -245,11 +296,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             false
         }
     }
-    
-    suspend fun deleteAllInfractions(tx: DatabaseService.TransactionContext, playerUuid: UUID): Boolean {
+
+    /**
+     * Deletes all infractions within a transaction.
+     */
+    suspend fun deleteAllInfractions(tx: TransactionScope, playerUuid: UUID): Boolean {
         return try {
-            val affectedRows = tx.executeUpdate(
-                "DELETE FROM player_infractions WHERE player_uuid = ?",
+            val affectedRows = tx.execute(
+                sql("DELETE FROM player_infractions WHERE player_uuid = ?"),
                 playerUuid
             )
             affectedRows > 0
@@ -259,29 +313,32 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun persistInfractions(tx: DatabaseService.TransactionContext, playerUuid: UUID, infractions: Map<String, Int>) {
-        // Delete existing infractions
-        tx.executeUpdate(
-            "DELETE FROM player_infractions WHERE player_uuid = ?",
+    /**
+     * Persists infractions within a transaction.
+     */
+    suspend fun persistInfractions(tx: TransactionScope, playerUuid: UUID, infractions: Map<String, Int>) {
+        tx.execute(
+            sql("DELETE FROM player_infractions WHERE player_uuid = ?"),
             playerUuid
         )
         
-        // Insert current infractions
         infractions.forEach { (groupName, count) ->
-            tx.executeUpdate(
-                """INSERT INTO player_infractions 
-                (player_uuid, group_name, count, last_updated) 
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)""",
+            tx.execute(
+                sql("INSERT INTO player_infractions (player_uuid, group_name, count, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP)"),
                 playerUuid, groupName, count
             )
         }
     }
 
-    // Block queries
-    suspend fun checkBlockExists(blockerUuid: UUID, blockedUuid: UUID): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val existing = databaseService.executeQuerySingle(
-                "SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
+    // ==================== Block Queries ====================
+
+    /**
+     * Checks if a block exists.
+     */
+    suspend fun checkBlockExists(blockerUuid: UUID, blockedUuid: UUID): Boolean {
+        return try {
+            val existing = database.querySingle(
+                sql("SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?"),
                 blockerUuid, blockedUuid
             ) { rs -> rs.getLong("id") }
             existing != null
@@ -290,11 +347,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             false
         }
     }
-    
-    suspend fun checkBlockExists(tx: DatabaseService.TransactionContext, blockerUuid: UUID, blockedUuid: UUID): Boolean {
+
+    /**
+     * Checks if a block exists within a transaction.
+     */
+    suspend fun checkBlockExists(tx: TransactionScope, blockerUuid: UUID, blockedUuid: UUID): Boolean {
         return try {
-            val existing = tx.executeQuerySingle(
-                "SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
+            val existing = tx.querySingle(
+                sql("SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?"),
                 blockerUuid, blockedUuid
             ) { rs -> rs.getLong("id") }
             existing != null
@@ -305,24 +365,32 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
     }
 
     /**
-     * Attempts to create a block entry inside a single transaction.
-     * Performs existence and limit checks using the provided transaction context.
+     * Creates a block with existence and limit checks in a transaction.
      */
     suspend fun createBlockWithChecks(
         blockerUuid: UUID,
         blockedUuid: UUID,
         blockerUsername: String,
         maxBlocksPerPlayer: Int
-    ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeTransaction { tx ->
-                val exists = checkBlockExists(tx, blockerUuid, blockedUuid)
-                if (exists) return@executeTransaction false
+    ): Boolean {
+        return try {
+            database.transaction {
+                val exists = querySingle(
+                    sql("SELECT id FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?"),
+                    blockerUuid, blockedUuid
+                ) { true } != null
+                if (exists) return@transaction false
 
-                val currentBlocks = getBlockCount(tx, blockerUuid)
-                if (currentBlocks >= maxBlocksPerPlayer) return@executeTransaction false
+                val currentBlocks = query(
+                    sql("SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?"),
+                    blockerUuid
+                ) { it }.size
+                if (currentBlocks >= maxBlocksPerPlayer) return@transaction false
 
-                insertBlock(tx, blockerUuid, blockedUuid, blockerUsername)
+                execute(
+                    sql("INSERT INTO player_blocks (blocker_uuid, blocked_uuid, blocked_by_username) VALUES (?, ?, ?)"),
+                    blockerUuid, blockedUuid, blockerUsername
+                )
                 true
             }
         } catch (e: Exception) {
@@ -331,10 +399,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getBlockCount(blockerUuid: UUID): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuery(
-                "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
+    /**
+     * Gets the block count for a player.
+     */
+    suspend fun getBlockCount(blockerUuid: UUID): Int {
+        return try {
+            database.query(
+                sql("SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?"),
                 blockerUuid
             ) { rs -> rs.getString("blocked_uuid") }.size
         } catch (e: Exception) {
@@ -342,11 +413,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             0
         }
     }
-    
-    suspend fun getBlockCount(tx: DatabaseService.TransactionContext, blockerUuid: UUID): Int {
+
+    /**
+     * Gets the block count within a transaction.
+     */
+    suspend fun getBlockCount(tx: TransactionScope, blockerUuid: UUID): Int {
         return try {
-            tx.executeQuery(
-                "SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?",
+            tx.query(
+                sql("SELECT blocked_uuid FROM player_blocks WHERE blocker_uuid = ?"),
                 blockerUuid
             ) { rs -> rs.getString("blocked_uuid") }.size
         } catch (e: Exception) {
@@ -355,12 +429,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun insertBlock(blockerUuid: UUID, blockedUuid: UUID, blockerUsername: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                """INSERT INTO player_blocks 
-                (blocker_uuid, blocked_uuid, blocked_by_username) 
-                VALUES (?, ?, ?)""",
+    /**
+     * Inserts a block record.
+     */
+    suspend fun insertBlock(blockerUuid: UUID, blockedUuid: UUID, blockerUsername: String): Boolean {
+        return try {
+            database.execute(
+                sql("INSERT INTO player_blocks (blocker_uuid, blocked_uuid, blocked_by_username) VALUES (?, ?, ?)"),
                 blockerUuid, blockedUuid, blockerUsername
             )
             true
@@ -369,13 +444,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
             false
         }
     }
-    
-    suspend fun insertBlock(tx: DatabaseService.TransactionContext, blockerUuid: UUID, blockedUuid: UUID, blockerUsername: String): Boolean {
+
+    /**
+     * Inserts a block within a transaction.
+     */
+    suspend fun insertBlock(tx: TransactionScope, blockerUuid: UUID, blockedUuid: UUID, blockerUsername: String): Boolean {
         return try {
-            tx.executeUpdate(
-                """INSERT INTO player_blocks 
-                (blocker_uuid, blocked_uuid, blocked_by_username) 
-                VALUES (?, ?, ?)""",
+            tx.execute(
+                sql("INSERT INTO player_blocks (blocker_uuid, blocked_uuid, blocked_by_username) VALUES (?, ?, ?)"),
                 blockerUuid, blockedUuid, blockerUsername
             )
             true
@@ -385,10 +461,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun deleteBlock(blockerUuid: UUID, blockedUuid: UUID): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val affectedRows = databaseService.executeUpdate(
-                "DELETE FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?",
+    /**
+     * Deletes a block record.
+     */
+    suspend fun deleteBlock(blockerUuid: UUID, blockedUuid: UUID): Boolean {
+        return try {
+            val affectedRows = database.execute(
+                sql("DELETE FROM player_blocks WHERE blocker_uuid = ? AND blocked_uuid = ?"),
                 blockerUuid, blockedUuid
             )
             affectedRows > 0
@@ -398,32 +477,54 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun persistBlockedPlayers(tx: DatabaseService.TransactionContext, playerUuid: UUID, blockedPlayers: Set<UUID>, username: String) {
-        // Delete existing blocked players
-        tx.executeUpdate(
-            "DELETE FROM player_blocks WHERE blocker_uuid = ?",
+    /**
+     * Persists blocked players within a transaction.
+     */
+    suspend fun persistBlockedPlayers(tx: TransactionScope, playerUuid: UUID, blockedPlayers: Set<UUID>, username: String) {
+        tx.execute(
+            sql("DELETE FROM player_blocks WHERE blocker_uuid = ?"),
             playerUuid
         )
         
-        // Insert current blocked players
         blockedPlayers.forEach { blockedUuid ->
-            tx.executeUpdate(
-                """INSERT INTO player_blocks 
-                (blocker_uuid, blocked_uuid, blocked_at, blocked_by_username) 
-                VALUES (?, ?, CURRENT_TIMESTAMP, ?)""",
+            tx.execute(
+                sql("INSERT INTO player_blocks (blocker_uuid, blocked_uuid, blocked_at, blocked_by_username) VALUES (?, ?, CURRENT_TIMESTAMP, ?)"),
                 playerUuid, blockedUuid, username
             )
         }
     }
 
-    // Message bus queries
-    suspend fun claimMessages(serverInstanceId: String, targetServerId: String, batchSize: Int): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                """UPDATE message_bus 
-                   SET status = 'CLAIMED', claimed_by = ?, claimed_at = CURRENT_TIMESTAMP 
-                   WHERE target_server_id = ? AND status = 'PENDING' 
-                   ORDER BY id ASC LIMIT ?""",
+    // ==================== Message Bus Queries ====================
+
+    /**
+     * Claims pending messages for processing.
+     */
+    suspend fun claimMessages(serverInstanceId: String, targetServerId: String, batchSize: Int): Int {
+        return try {
+            database.execute(
+                sql {
+                    mysql("""
+                        UPDATE message_bus 
+                        SET status = 'CLAIMED', claimed_by = ?, claimed_at = CURRENT_TIMESTAMP 
+                        WHERE target_server_id = ? AND status = 'PENDING' 
+                        ORDER BY id ASC LIMIT ?
+                    """)
+                    postgres("""
+                        UPDATE message_bus 
+                        SET status = 'CLAIMED', claimed_by = ?, claimed_at = CURRENT_TIMESTAMP 
+                        WHERE id IN (
+                            SELECT id FROM message_bus 
+                            WHERE target_server_id = ? AND status = 'PENDING' 
+                            ORDER BY id ASC LIMIT ?
+                        )
+                    """)
+                    sqlite("""
+                        UPDATE message_bus 
+                        SET status = 'CLAIMED', claimed_by = ?, claimed_at = CURRENT_TIMESTAMP 
+                        WHERE target_server_id = ? AND status = 'PENDING' 
+                        ORDER BY id ASC LIMIT ?
+                    """)
+                },
                 serverInstanceId, targetServerId, batchSize
             )
         } catch (e: Exception) {
@@ -432,12 +533,17 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getClaimedMessages(serverInstanceId: String): List<ClaimedMessage> = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuery(
-                """SELECT id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload
-                   FROM message_bus
-                   WHERE claimed_by = ? AND status = 'CLAIMED'""",
+    /**
+     * Gets all claimed messages for a server instance.
+     */
+    suspend fun getClaimedMessages(serverInstanceId: String): List<ClaimedMessage> {
+        return try {
+            database.query(
+                sql("""
+                    SELECT id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload
+                    FROM message_bus
+                    WHERE claimed_by = ? AND status = 'CLAIMED'
+                """),
                 serverInstanceId
             ) { rs ->
                 ClaimedMessage(
@@ -456,6 +562,9 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
+    /**
+     * Inserts a message into the message bus.
+     */
     suspend fun insertMessageBus(
         targetServerId: String,
         type: String,
@@ -464,12 +573,14 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         recipientUuid: UUID,
         recipientUsername: String,
         payload: String
-    ): Boolean = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                """INSERT INTO message_bus 
-                   (target_server_id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload, status) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')""",
+    ): Boolean {
+        return try {
+            database.execute(
+                sql("""
+                    INSERT INTO message_bus 
+                    (target_server_id, type, sender_uuid, sender_username, recipient_uuid, recipient_username, payload, status) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+                """),
                 targetServerId, type, senderUuid, senderUsername, recipientUuid, recipientUsername, payload
             )
             true
@@ -479,16 +590,19 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun updateMessageStatus(id: Long, status: String, error: String? = null): Boolean = withContext(Dispatchers.IO) {
-        try {
+    /**
+     * Updates the status of a message.
+     */
+    suspend fun updateMessageStatus(id: Long, status: String, error: String? = null): Boolean {
+        return try {
             if (error == null) {
-                databaseService.executeUpdate(
-                    "UPDATE message_bus SET status = ?, delivered_at = CURRENT_TIMESTAMP, error = NULL WHERE id = ?",
+                database.execute(
+                    sql("UPDATE message_bus SET status = ?, delivered_at = CURRENT_TIMESTAMP, error = NULL WHERE id = ?"),
                     status, id
                 )
             } else {
-                databaseService.executeUpdate(
-                    "UPDATE message_bus SET status = ?, delivered_at = CURRENT_TIMESTAMP, error = ? WHERE id = ?",
+                database.execute(
+                    sql("UPDATE message_bus SET status = ?, delivered_at = CURRENT_TIMESTAMP, error = ? WHERE id = ?"),
                     status, error, id
                 )
             }
@@ -499,12 +613,17 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun reclaimStaleMessages(cutoff: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                """UPDATE message_bus 
-                   SET status = 'PENDING', claimed_by = NULL, claimed_at = NULL 
-                   WHERE status = 'CLAIMED' AND claimed_at < ?""",
+    /**
+     * Reclaims stale messages that were claimed but not processed.
+     */
+    suspend fun reclaimStaleMessages(cutoff: Instant): Int {
+        return try {
+            database.execute(
+                sql("""
+                    UPDATE message_bus 
+                    SET status = 'PENDING', claimed_by = NULL, claimed_at = NULL 
+                    WHERE status = 'CLAIMED' AND claimed_at < ?
+                """),
                 cutoff
             )
         } catch (e: Exception) {
@@ -513,10 +632,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun deleteOldMessages(cutoff: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                "DELETE FROM message_bus WHERE created_at < ?",
+    /**
+     * Deletes old messages from the message bus.
+     */
+    suspend fun deleteOldMessages(cutoff: Instant): Int {
+        return try {
+            database.execute(
+                sql("DELETE FROM message_bus WHERE created_at < ?"),
                 cutoff
             )
         } catch (e: Exception) {
@@ -525,17 +647,19 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getSenderPresence(
-        senderUuid: UUID,
-        cutoff: Instant
-    ): String? = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuerySingle(
-                """SELECT online_server_id FROM players
-                   WHERE uuid = ?
-                   AND online_server_id IS NOT NULL
-                   AND online_last_heartbeat IS NOT NULL
-                   AND online_last_heartbeat >= ?""",
+    /**
+     * Gets the server presence for a sender.
+     */
+    suspend fun getSenderPresence(senderUuid: UUID, cutoff: Instant): String? {
+        return try {
+            database.querySingle(
+                sql("""
+                    SELECT online_server_id FROM players
+                    WHERE uuid = ?
+                    AND online_server_id IS NOT NULL
+                    AND online_last_heartbeat IS NOT NULL
+                    AND online_last_heartbeat >= ?
+                """),
                 senderUuid, cutoff
             ) { rs -> rs.getString("online_server_id") }
         } catch (e: Exception) {
@@ -544,10 +668,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun getUsername(uuid: UUID): String? = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeQuerySingle(
-                "SELECT username FROM players WHERE uuid = ?",
+    /**
+     * Gets a player's username by UUID.
+     */
+    suspend fun getUsername(uuid: UUID): String? {
+        return try {
+            database.querySingle(
+                sql("SELECT username FROM players WHERE uuid = ?"),
                 uuid
             ) { rs -> rs.getString("username") }
         } catch (e: Exception) {
@@ -556,15 +683,21 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    // Maintenance queries
-    suspend fun archiveOldInfractions(cutoffDate: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                """INSERT INTO player_infractions_archive 
-                (player_uuid, group_name, count, last_updated, created_at, archived_at)
-                SELECT player_uuid, group_name, count, last_updated, created_at, CURRENT_TIMESTAMP
-                FROM player_infractions 
-                WHERE last_updated < ?""",
+    // ==================== Maintenance Queries ====================
+
+    /**
+     * Archives old infractions.
+     */
+    suspend fun archiveOldInfractions(cutoffDate: Instant): Int {
+        return try {
+            database.execute(
+                sql("""
+                    INSERT INTO player_infractions_archive 
+                    (player_uuid, group_name, count, last_updated, created_at, archived_at)
+                    SELECT player_uuid, group_name, count, last_updated, created_at, CURRENT_TIMESTAMP
+                    FROM player_infractions 
+                    WHERE last_updated < ?
+                """),
                 cutoffDate
             )
         } catch (e: Exception) {
@@ -573,10 +706,13 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun cleanupOldInfractions(cutoffDate: Instant): Int = withContext(Dispatchers.IO) {
-        try {
-            databaseService.executeUpdate(
-                "DELETE FROM player_infractions WHERE last_updated < ?",
+    /**
+     * Cleans up old infractions.
+     */
+    suspend fun cleanupOldInfractions(cutoffDate: Instant): Int {
+        return try {
+            database.execute(
+                sql("DELETE FROM player_infractions WHERE last_updated < ?"),
                 cutoffDate
             )
         } catch (e: Exception) {
@@ -585,19 +721,29 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    suspend fun vacuumDatabase(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            when (databaseService.databaseType) {
-                DatabaseType.SQLITE -> {
-                    databaseService.executeUpdate("VACUUM")
-                    databaseService.executeUpdate("ANALYZE")
+    /**
+     * Optimizes the database.
+     */
+    suspend fun vacuumDatabase(): Boolean {
+        return try {
+            when (database.dialect) {
+                DatabaseDialect.SQLITE -> {
+                    database.execute(sql("VACUUM"))
+                    database.execute(sql("ANALYZE"))
                 }
-                DatabaseType.MYSQL -> {
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_infractions")
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_infractions_archive")
-                    databaseService.executeUpdate("OPTIMIZE TABLE player_blocks")
-                    databaseService.executeUpdate("OPTIMIZE TABLE message_bus")
-                    databaseService.executeUpdate("OPTIMIZE TABLE players")
+                DatabaseDialect.MYSQL -> {
+                    database.execute(sql("OPTIMIZE TABLE player_infractions"))
+                    database.execute(sql("OPTIMIZE TABLE player_infractions_archive"))
+                    database.execute(sql("OPTIMIZE TABLE player_blocks"))
+                    database.execute(sql("OPTIMIZE TABLE message_bus"))
+                    database.execute(sql("OPTIMIZE TABLE players"))
+                }
+                DatabaseDialect.POSTGRES -> {
+                    database.execute(sql("VACUUM ANALYZE player_infractions"))
+                    database.execute(sql("VACUUM ANALYZE player_infractions_archive"))
+                    database.execute(sql("VACUUM ANALYZE player_blocks"))
+                    database.execute(sql("VACUUM ANALYZE message_bus"))
+                    database.execute(sql("VACUUM ANALYZE players"))
                 }
             }
             true
@@ -607,7 +753,8 @@ class DBPlayerQueries(val databaseService: DatabaseService) {
         }
     }
 
-    // Data classes for query results
+    // ==================== Data Classes ====================
+
     data class PlayerDataQueryResult(
         val uuid: UUID,
         val username: String,

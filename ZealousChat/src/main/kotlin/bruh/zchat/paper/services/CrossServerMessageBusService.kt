@@ -4,8 +4,8 @@ import bruh.zchat.paper.PaperMC
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.config.StorageConfig
 import bruh.zchat.paper.database.DBPlayerQueries
-import bruh.zchat.paper.database.DatabaseType
 import bruh.zchat.paper.database.PlayerDataManager
+import bruh.zchat.utils.database.DatabaseDialect
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.services.channel.ChannelFormattingService
 import bruh.zchat.paper.services.channel.ChannelInstanceKey
@@ -186,7 +186,7 @@ class CrossServerMessageBusService(
 
     suspend fun pollMessages() = withContext(Dispatchers.IO) {
         val config = configManager.storage.crossServerMessaging
-        if (!config.enabled || dbPlayerQueries.databaseType != DatabaseType.MYSQL || isRedisBackend) return@withContext
+        if (!config.enabled || dbPlayerQueries.dialect != DatabaseDialect.MYSQL || isRedisBackend) return@withContext
 
         try {
             // 1. Claim messages

@@ -429,6 +429,191 @@ All VItem properties are configurable:
 | `require-name` | Boolean | Must have display name |
 | `require-lore` | Boolean | Must have lore |
 
+## Database API
+
+Coroutine-friendly database API with HikariCP connection pooling, code-based migrations, and multi-dialect support.
+
+### Quick Start (Recommended)
+
+```kotlin
+// Create database with DSL syntax (recommended)
+val database = createDatabase(config) {
+    schema(MySchema)
+    schema(OtherSchema)  // Multiple schemas supported
+}
+
+// Initialize and run migrations
+val report = database.initialize()
+logger.info("Migrations applied: ${report.totalApplied}")
+
+// Use the database
+val players = database.query(sql("SELECT * FROM players WHERE uuid = ?"), uuid) { rs ->
+    PlayerData(rs.getString("uuid"), rs.getString("name"))
+}
+
+// On disable
+database.close()
+```
+
+### Auto-Loading Config
+
+If no config is provided, it loads from `pluginDataFolder/database.conf`:
+
+```kotlin
+// Config loaded automatically from database.conf
+val database = createDatabase {
+    schema(MySchema)
+}
+```
+
+### DatabaseConfig
+
+```kotlin
+@ConfigSerializable
+data class DatabaseConfig(
+    val dialect: String = "sqlite",  // "sqlite", "mysql", "postgres"
+    val host: String = "localhost",
+    val port: Int = 3306,
+    val database: String = "plugin_data",
+    val username: String = "",
+    val password: String = "",
+    val sqliteFile: String = "database.db",
+    val poolName: String = "DBPool",
+    val poolSize: Int = 8,
+    val connectionTimeout: Long = 30_000,
+    val maxLifetime: Long = 1_800_000,
+    val idleTimeout: Long = 600_000,
+    val leakDetectionThreshold: Long = 30_000
+)
+```
+
+### Dialect-Aware Queries (DialectQuery DSL)
+
+```kotlin
+// Same SQL for all dialects
+val query = sql("SELECT * FROM players WHERE uuid = ?")
+
+// Per-dialect SQL
+val insertPlayer = sql {
+    mysql("INSERT IGNORE INTO players (uuid, name) VALUES (?, ?)")
+    postgres("INSERT INTO players (uuid, name) VALUES (?, ?) ON CONFLICT DO NOTHING")
+    sqlite("INSERT OR IGNORE INTO players (uuid, name) VALUES (?, ?)")
+}
+
+// Grouped dialects
+val autoIncrement = sql {
+    mysqlAndPostgres("BIGINT AUTO_INCREMENT")
+    sqlite("INTEGER PRIMARY KEY AUTOINCREMENT")
+}
+
+// Default with overrides
+val booleanType = sql {
+    default("BOOLEAN")
+    sqlite("INTEGER")
+}
+```
+
+### Query Methods
+
+```kotlin
+// Query multiple rows
+val players = database.query(sql("SELECT * FROM players"), mapper = { rs ->
+    Player(rs.getString("uuid"), rs.getString("name"))
+})
+
+// Query single row
+val player = database.querySingle(sql("SELECT * FROM players WHERE uuid = ?"), uuid) { rs ->
+    Player(rs.getString("uuid"), rs.getString("name"))
+}
+
+// Execute update/insert/delete
+val affected = database.execute(sql("UPDATE players SET name = ? WHERE uuid = ?"), name, uuid)
+
+// Batch operations
+val updates = database.executeBatch(
+    sql("INSERT INTO players (uuid, name) VALUES (?, ?)"),
+    listOf(arrayOf(uuid1, name1), arrayOf(uuid2, name2))
+)
+```
+
+### Transactions
+
+```kotlin
+database.transaction {
+    val count = querySingle(sql("SELECT count FROM items WHERE id = ?"), itemId) { it.getInt(1) } ?: 0
+    execute(sql("UPDATE items SET count = ? WHERE id = ?"), count + 1, itemId)
+}
+```
+
+### Code-Based Migrations
+
+```kotlin
+object MySchema : DatabaseSchema("myschema") {
+    override val migrations = listOf(
+        migration(1, "Create players table") {
+            execute(sql {
+                mysql("""
+                    CREATE TABLE players (
+                        uuid VARCHAR(36) PRIMARY KEY,
+                        name VARCHAR(16) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE players (
+                        uuid TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            })
+        },
+        migration(2, "Add last_seen column") {
+            execute(sql("ALTER TABLE players ADD COLUMN last_seen TIMESTAMP"))
+        }
+    )
+}
+```
+
+### ResultSet Extensions
+
+```kotlin
+database.query(sql("SELECT * FROM players"), uuid) { rs ->
+    PlayerData(
+        uuid = rs.getUUIDOrThrow("uuid"),
+        name = rs.getString("name"),
+        lastSeen = rs.getInstant("last_seen"),
+        score = rs.getIntOrNull("score")
+    )
+}
+```
+
+Available extensions:
+- `getUUID(column)` / `getUUIDOrThrow(column)`
+- `getInstant(column)` / `getInstantOrThrow(column)`
+- `getInstantFromEpochMs(column)`
+- `getStringOrNull(column)`, `getIntOrNull(column)`, `getLongOrNull(column)`
+- `getBooleanOrNull(column)`, `getDoubleOrNull(column)`, `getBytesOrNull(column)`
+
+### File Structure
+
+```
+utils/src/main/kotlin/database/
+├── Database.kt              # Main class + JavaPlugin extensions
+├── DatabaseConfig.kt        # @ConfigSerializable config
+├── DatabaseDialect.kt       # SQLITE, MYSQL, POSTGRES enum
+├── DatabaseException.kt     # Custom exceptions
+├── DialectQuery.kt          # Dialect-aware SQL DSL
+├── TransactionScope.kt      # Transaction context
+├── ResultSetExtensions.kt   # ResultSet helpers
+└── migration/
+    ├── DatabaseSchema.kt    # Abstract schema base
+    ├── Migration.kt         # Migration data class
+    ├── MigrationBuilder.kt  # DSL for migrations
+    ├── MigrationRunner.kt   # Executes migrations
+    └── MigrationReport.kt   # Migration results
+```
+
 ## Dependencies
 
 The utils module includes:
@@ -436,3 +621,5 @@ The utils module includes:
 - AnvilGUI for anvil input menus
 - Kyori Adventure for text components
 - Configurate HOCON for configuration
+- HikariCP for database connection pooling
+- JDBC drivers for MySQL, SQLite, PostgreSQL (compileOnly)

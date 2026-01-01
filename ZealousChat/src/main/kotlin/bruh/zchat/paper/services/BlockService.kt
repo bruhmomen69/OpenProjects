@@ -3,7 +3,6 @@ package bruh.zchat.paper.services
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.enums.MessageKey
 import bruh.zchat.paper.database.DBPlayerQueries
-import bruh.zchat.paper.database.DatabaseService
 import bruh.zchat.paper.database.PlayerDataManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -136,10 +135,14 @@ class BlockService(
     
     suspend fun clearBlocks(playerUuid: UUID): Boolean = withContext(Dispatchers.IO) {
         try {
-            val affectedRows = dbPlayerQueries.databaseService.executeUpdate(
-                "DELETE FROM player_blocks WHERE blocker_uuid = ?",
-                playerUuid
-            )
+            // Delete all blocks where this player is the blocker
+            val blockedPlayers = dbPlayerQueries.getPlayerBlockedPlayers(playerUuid)
+            var deleted = false
+            for (blockedUuid in blockedPlayers) {
+                if (dbPlayerQueries.deleteBlock(playerUuid, blockedUuid)) {
+                    deleted = true
+                }
+            }
             
             // Update player cache
             val playerData = playerDataManager.getPlayerData(playerUuid)
@@ -147,7 +150,7 @@ class BlockService(
                 playerDataManager.updatePlayerBlockedPlayers(playerUuid, emptySet())
             }
             
-            affectedRows > 0
+            deleted || blockedPlayers.isEmpty()
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -217,17 +220,21 @@ class BlockService(
     
     suspend fun clearAllBlocks(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val affectedRows = dbPlayerQueries.databaseService.executeUpdate(
-                "DELETE FROM player_blocks"
-            )
-            
-            // Update all online player caches
+            // Get all online players and clear their blocks
             val onlinePlayers = playerDataManager.getOnlinePlayerData()
-            onlinePlayers.forEach { (uuid, _) ->
+            var anyDeleted = false
+            
+            for ((uuid, _) in onlinePlayers) {
+                val blockedPlayers = dbPlayerQueries.getPlayerBlockedPlayers(uuid)
+                for (blockedUuid in blockedPlayers) {
+                    if (dbPlayerQueries.deleteBlock(uuid, blockedUuid)) {
+                        anyDeleted = true
+                    }
+                }
                 playerDataManager.updatePlayerBlockedPlayers(uuid, emptySet())
             }
             
-            affectedRows > 0
+            anyDeleted || onlinePlayers.isEmpty()
         } catch (e: Exception) {
             e.printStackTrace()
             false

@@ -29,6 +29,7 @@ enum class SwearFilterActions {
     VIEW_PLAYER_INFRACTIONS,
     CLEAR_PLAYER_INFRACTIONS,
     TOGGLE_FILTER,
+    BACK_TO_MAIN,
     PREVIOUS_PAGE,
     NEXT_PAGE
 }
@@ -83,6 +84,13 @@ class SwearFilterMenu(
             ))
             ClickResult.DENY
         },
+        SwearFilterActions.BACK_TO_MAIN to { ctx: ClickContext, instance: ConfigurableMenuInstance<SwearFilterActions> ->
+            val playerId = ctx.player.uniqueId
+            playerViews[playerId] = SwearFilterView.MAIN
+            playerPages[playerId] = 0
+            refreshDisplay(instance)
+            ClickResult.DENY
+        },
         SwearFilterActions.PREVIOUS_PAGE to { ctx: ClickContext, instance: ConfigurableMenuInstance<SwearFilterActions> ->
             val currentPage = playerPages[ctx.player.uniqueId] ?: 0
             if (currentPage > 0) {
@@ -92,9 +100,24 @@ class SwearFilterMenu(
             ClickResult.DENY
         },
         SwearFilterActions.NEXT_PAGE to { ctx: ClickContext, instance: ConfigurableMenuInstance<SwearFilterActions> ->
-            val currentPage = playerPages[ctx.player.uniqueId] ?: 0
-            playerPages[ctx.player.uniqueId] = currentPage + 1
-            refreshDisplay(instance)
+            val playerId = ctx.player.uniqueId
+            val view = playerViews[playerId] ?: SwearFilterView.MAIN
+
+            if (view == SwearFilterView.PLAYER_INFRACTIONS) {
+                val itemsPerPage = (config.rows - 1) * 9 - 2
+                if (itemsPerPage > 0) {
+                    val totalItems = Bukkit.getOnlinePlayers().size
+                    if (totalItems > 0) {
+                        val maxPage = (totalItems - 1) / itemsPerPage
+                        val currentPage = playerPages[playerId] ?: 0
+                        if (currentPage < maxPage) {
+                            playerPages[playerId] = currentPage + 1
+                            refreshDisplay(instance)
+                        }
+                    }
+                }
+            }
+
             ClickResult.DENY
         }
     )
@@ -139,6 +162,7 @@ class SwearFilterMenu(
 
     private fun displayMainView(instance: ConfigurableMenuInstance<SwearFilterActions>) {
         val filterConfig = configManager.config.swearFilter
+        val size = instance.inventory.size
         
         // Status indicator at slot 4
         val statusItem = ItemStack(if (filterConfig.enabled) Material.LIME_DYE else Material.GRAY_DYE)
@@ -152,17 +176,25 @@ class SwearFilterMenu(
                 miniMessage.deserialize("<gray>Blocked message: ${if (filterConfig.enableBlockedMessage) "Yes" else "No"}</gray>")
             ))
         }
-        instance.setItemAt(4, statusItem)
+        if (4 in 0 until size) {
+            instance.setItemAt(4, statusItem)
+        }
 
         // Display filter groups starting at slot 10
         filterConfig.filterGroups.forEachIndexed { index, group ->
             if (index >= 21) return@forEachIndexed // Max 21 groups displayed
             
             val groupItem = createGroupItem(group)
-            instance.setItemAt(10 + index + (index / 7) * 2, groupItem)
+            val slot = 10 + index + (index / 7) * 2
+            if (slot in 0 until size) {
+                instance.setItemAt(slot, groupItem)
+                instance.registerActionSlot(slot, SwearFilterActions.VIEW_GROUP_DETAILS)
+            }
         }
 
-        // View player infractions button at slot 40
+        // View player infractions button.
+        // Prefer slot 40 on larger menus; otherwise, clamp to last available slot.
+        val infractionsSlot = if (size > 40) 40 else size - 1
         val infractionsItem = ItemStack(Material.BOOK)
         infractionsItem.editMeta { meta ->
             meta.displayName(miniMessage.deserialize("<yellow><bold>View Player Infractions</bold></yellow>"))
@@ -170,7 +202,10 @@ class SwearFilterMenu(
                 miniMessage.deserialize("<gray>Click to view online players' infractions</gray>")
             ))
         }
-        instance.setItemAt(40, infractionsItem)
+        if (infractionsSlot in 0 until size) {
+            instance.setItemAt(infractionsSlot, infractionsItem)
+            instance.registerActionSlot(infractionsSlot, SwearFilterActions.VIEW_PLAYER_INFRACTIONS)
+        }
     }
 
     private fun createGroupItem(group: FilterGroup): ItemStack {
@@ -204,6 +239,7 @@ class SwearFilterMenu(
             meta.displayName(miniMessage.deserialize("<gray>Back to Main</gray>"))
         }
         instance.setItemAt(0, backItem)
+        instance.registerActionSlot(0, SwearFilterActions.BACK_TO_MAIN)
         
         // Show info that editing requires config changes
         val infoItem = ItemStack(Material.OAK_SIGN)

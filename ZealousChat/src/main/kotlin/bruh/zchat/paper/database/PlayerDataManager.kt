@@ -1,16 +1,18 @@
 package bruh.zchat.paper.database
 
+import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.sql
+import bruh.zchat.utils.database.getInstant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.entity.Player
 import org.slf4j.LoggerFactory
-import java.sql.ResultSet
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class PlayerDataManager(
-    private val databaseService: DatabaseService,
+    private val database: Database,
     private val dbPlayerQueries: DBPlayerQueries
 ) {
     private val logger = LoggerFactory.getLogger(PlayerDataManager::class.java)
@@ -115,8 +117,8 @@ class PlayerDataManager(
 
     suspend fun clearAllToggleStates() = withContext(Dispatchers.IO) {
         try {
-            databaseService.executeUpdate(
-                "UPDATE players SET chat_disabled = ?, messages_disabled = ?",
+            database.execute(
+                sql("UPDATE players SET chat_disabled = ?, messages_disabled = ?"),
                 false,
                 false
             )
@@ -157,8 +159,8 @@ class PlayerDataManager(
         }
 
         try {
-            return@withContext databaseService.executeQuerySingle(
-                "SELECT chat_disabled, messages_disabled FROM players WHERE uuid = ?",
+            return@withContext database.querySingle(
+                sql("SELECT chat_disabled, messages_disabled FROM players WHERE uuid = ?"),
                 uuid
             ) { rs ->
                 ToggleState(
@@ -174,8 +176,8 @@ class PlayerDataManager(
 
     suspend fun setChatDisabled(uuid: UUID, disabled: Boolean) = withContext(Dispatchers.IO) {
         try {
-            databaseService.executeUpdate(
-                "UPDATE players SET chat_disabled = ? WHERE uuid = ?",
+            database.execute(
+                sql("UPDATE players SET chat_disabled = ? WHERE uuid = ?"),
                 disabled,
                 uuid
             )
@@ -191,8 +193,8 @@ class PlayerDataManager(
 
     suspend fun setMessagesDisabled(uuid: UUID, disabled: Boolean) = withContext(Dispatchers.IO) {
         try {
-            databaseService.executeUpdate(
-                "UPDATE players SET messages_disabled = ? WHERE uuid = ?",
+            database.execute(
+                sql("UPDATE players SET messages_disabled = ? WHERE uuid = ?"),
                 disabled,
                 uuid
             )
@@ -243,15 +245,15 @@ class PlayerDataManager(
                 
                 if (isServerSwitch) {
                     // Likely server switch - update last_seen but keep presence data
-                    databaseService.executeUpdate(
-                        "UPDATE players SET last_seen = ? WHERE uuid = ?",
+                    database.execute(
+                        sql("UPDATE players SET last_seen = ? WHERE uuid = ?"),
                         now, player.uniqueId
                     )
                     logger.debug("Skipping presence update for ${player.name} - likely server switch detected (timeSinceJoin: ${timeSinceJoin}s, timeSinceLastSeen: ${timeSinceLastSeen}s)")
                 } else {
                     // Normal quit - update last_seen and clear presence data
-                    databaseService.executeUpdate(
-                        "UPDATE players SET last_seen = ?, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
+                    database.execute(
+                        sql("UPDATE players SET last_seen = ?, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?"),
                         now, player.uniqueId
                     )
                 }
@@ -262,8 +264,8 @@ class PlayerDataManager(
                 logger.debug("Saved player data for ${player.name}: ${playerData.infractions.size} infractions, ${playerData.blockedPlayers.size} blocked players")
             } else {
                 // Player data not in cache, still update database to ensure presence data is cleared
-                databaseService.executeUpdate(
-                    "UPDATE players SET last_seen = ?, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?",
+                database.execute(
+                    sql("UPDATE players SET last_seen = ?, online_server_id = NULL, online_last_heartbeat = NULL WHERE uuid = ?"),
                     now, player.uniqueId
                 )
                 logger.debug("Updated database for ${player.name} (data not in cache)")
@@ -282,12 +284,12 @@ class PlayerDataManager(
             // Batch update for all online players
             // Using a single query is more efficient than iterating
             val placeholders = onlineUuids.joinToString(",") { "?" }
-            val sql = "UPDATE players SET online_last_heartbeat = CURRENT_TIMESTAMP WHERE online_server_id = ? AND uuid IN ($placeholders)"
+            val sqlString = "UPDATE players SET online_last_heartbeat = CURRENT_TIMESTAMP WHERE online_server_id = ? AND uuid IN ($placeholders)"
             
             val params = mutableListOf<Any>(serverInstanceId)
             params.addAll(onlineUuids)
             
-            databaseService.executeUpdate(sql, *params.toTypedArray())
+            database.execute(sql(sqlString), *params.toTypedArray())
             logger.debug("Updated heartbeats for ${onlineUuids.size} online players on server $serverInstanceId")
         } catch (e: Exception) {
             logger.error("Failed to update heartbeats for server $serverInstanceId", e)
@@ -307,12 +309,12 @@ class PlayerDataManager(
         
         // Query database
         try {
-            return@withContext databaseService.executeQuerySingle(
-                "SELECT online_server_id, online_last_heartbeat FROM players WHERE uuid = ?",
+            return@withContext database.querySingle(
+                sql("SELECT online_server_id, online_last_heartbeat FROM players WHERE uuid = ?"),
                 uuid
             ) { rs ->
                 val serverId = rs.getString("online_server_id")
-                val lastHeartbeat = rs.getTimestamp("online_last_heartbeat")?.toInstant()
+                val lastHeartbeat = rs.getInstant("online_last_heartbeat")
                 
                 if (serverId != null && lastHeartbeat != null && lastHeartbeat.isAfter(cutoff)) {
                     serverId
@@ -333,11 +335,11 @@ class PlayerDataManager(
         
         // Query database
         try {
-            val matches = databaseService.executeQuery(
-                "SELECT uuid, username, last_seen FROM players WHERE LOWER(username) = LOWER(?) ORDER BY last_seen DESC LIMIT 6",
+            val matches = database.query(
+                sql("SELECT uuid, username, last_seen FROM players WHERE LOWER(username) = LOWER(?) ORDER BY last_seen DESC LIMIT 6"),
                 username
             ) { rs ->
-                val lastSeen = rs.getTimestamp("last_seen")?.toInstant() ?: Instant.EPOCH
+                val lastSeen = rs.getInstant("last_seen") ?: Instant.EPOCH
                 Triple(UUID.fromString(rs.getString("uuid")), rs.getString("username"), lastSeen)
             }
 
@@ -399,29 +401,17 @@ class PlayerDataManager(
     // NEW: Persist individual player data
     private suspend fun persistPlayerData(playerData: PlayerData) {
         try {
-            databaseService.executeTransaction { tx ->
+            database.transaction {
                 // Persist infractions
-                persistInfractions(tx, playerData)
+                dbPlayerQueries.persistInfractions(this, playerData.uuid, playerData.infractions)
                 // Persist blocked players
-                persistBlockedPlayers(tx, playerData)
+                dbPlayerQueries.persistBlockedPlayers(this, playerData.uuid, playerData.blockedPlayers, playerData.username)
             }
             playerData.isDirty = false
         } catch (e: Exception) {
             logger.error("Failed to persist dirty data for player ${playerData.uuid}", e)
             throw e
         }
-    }
-    
-
-    
-    
-    // NEW: Helper methods for persisting specific data
-    private suspend fun persistInfractions(tx: DatabaseService.TransactionContext, playerData: PlayerData) {
-        dbPlayerQueries.persistInfractions(tx, playerData.uuid, playerData.infractions)
-    }
-    
-    private suspend fun persistBlockedPlayers(tx: DatabaseService.TransactionContext, playerData: PlayerData) {
-        dbPlayerQueries.persistBlockedPlayers(tx, playerData.uuid, playerData.blockedPlayers, playerData.username)
     }
 }
 

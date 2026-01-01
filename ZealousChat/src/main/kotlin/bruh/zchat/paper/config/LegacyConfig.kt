@@ -1,6 +1,5 @@
 package bruh.zchat.paper.config
 
-import bruh.zchat.paper.database.DatabaseType
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
 

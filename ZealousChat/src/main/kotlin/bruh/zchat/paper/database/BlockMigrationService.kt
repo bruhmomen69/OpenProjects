@@ -1,9 +1,10 @@
 package bruh.zchat.paper.database
 
+import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.DatabaseDialect
+import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.spongepowered.configurate.ConfigurationNode
-import org.spongepowered.configurate.loader.ConfigurationLoader
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
@@ -19,7 +20,7 @@ data class MigrationResult(
 )
 
 class BlockMigrationService(
-    private val databaseService: DatabaseService,
+    private val database: Database,
     private val dataFolder: Path,
     private val retentionDays: Int = 30
 ) {
@@ -43,7 +44,7 @@ class BlockMigrationService(
             val blocksNode = node.node("blocks")
             
             var migratedCount = 0
-            databaseService.executeTransaction { tx ->
+            database.transaction {
                 for (entry in blocksNode.childrenMap()) {
                     try {
                         val playerUUID = UUID.fromString(entry.key.toString())
@@ -54,21 +55,23 @@ class BlockMigrationService(
                         for (blockedUUID in blockedList) {
                             try {
                                 // Check if player exists, create if not
-                                ensurePlayerExists(tx, playerUUID)
-                                ensurePlayerExists(tx, blockedUUID)
+                                ensurePlayerExists(playerUUID)
+                                ensurePlayerExists(blockedUUID)
                                 
                                 // Insert block record
-                                val insertSql = when (databaseService.databaseType) {
-                                    DatabaseType.MYSQL -> """INSERT IGNORE INTO player_blocks
-                                    (blocker_uuid, blocked_uuid, blocked_by_username)
-                                    VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))"""
-                                    DatabaseType.SQLITE -> """INSERT OR IGNORE INTO player_blocks
-                                    (blocker_uuid, blocked_uuid, blocked_by_username)
-                                    VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))"""
-                                }
-
-                                val insertResult = tx.executeUpdate(
-                                    insertSql,
+                                val insertResult = execute(
+                                    sql {
+                                        mysql("""INSERT IGNORE INTO player_blocks
+                                            (blocker_uuid, blocked_uuid, blocked_by_username)
+                                            VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))""")
+                                        postgres("""INSERT INTO player_blocks
+                                            (blocker_uuid, blocked_uuid, blocked_by_username)
+                                            VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))
+                                            ON CONFLICT DO NOTHING""")
+                                        sqlite("""INSERT OR IGNORE INTO player_blocks
+                                            (blocker_uuid, blocked_uuid, blocked_by_username)
+                                            VALUES (?, ?, (SELECT username FROM players WHERE uuid = ?))""")
+                                    },
                                     playerUUID, blockedUUID, playerUUID
                                 )
                                 
@@ -105,15 +108,15 @@ class BlockMigrationService(
         }
     }
     
-    private suspend fun ensurePlayerExists(tx: DatabaseService.TransactionContext, uuid: UUID) {
-        val exists = tx.executeQuerySingle(
-            "SELECT COUNT(*) as count FROM players WHERE uuid = ?",
+    private suspend fun bruh.zchat.utils.database.TransactionScope.ensurePlayerExists(uuid: UUID) {
+        val exists = querySingle(
+            sql("SELECT COUNT(*) as count FROM players WHERE uuid = ?"),
             uuid
         ) { rs -> rs.getInt("count") } ?: 0
         
         if (exists == 0) {
-            tx.executeUpdate(
-                "INSERT INTO players (uuid, username) VALUES (?, ?)",
+            execute(
+                sql("INSERT INTO players (uuid, username) VALUES (?, ?)"),
                 uuid, "Unknown"
             )
         }
@@ -125,8 +128,8 @@ class BlockMigrationService(
             
             val cutoffDate = Instant.now().minus(retentionDays.toLong(), ChronoUnit.DAYS)
             
-            val deletedCount = databaseService.executeUpdate(
-                "DELETE FROM player_blocks WHERE blocked_at < ?",
+            val deletedCount = database.execute(
+                sql("DELETE FROM player_blocks WHERE blocked_at < ?"),
                 cutoffDate
             )
             

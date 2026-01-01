@@ -38,9 +38,7 @@ dependencies {
     // PlaceholderAPI integration (optional)
     compileOnly("me.clip:placeholderapi:2.11.6")
 
-    // Database dependencies
-    implementation("org.flywaydb:flyway-core:11.19.0")
-    implementation("org.flywaydb:flyway-mysql:11.19.0")
+    // Database dependencies (JDBC drivers - HikariCP is provided by utils)
     compileOnly("com.mysql:mysql-connector-j:9.5.0")
     compileOnly("org.xerial:sqlite-jdbc:3.47.1.0")
     compileOnly("com.zaxxer:HikariCP:7.0.2")
@@ -61,7 +59,6 @@ tasks.named<ShadowJar>("shadowJar") {
 
     relocate("com.github.shynixn", "bruh.zchat.paper.dependencies.com.github.shynixn")
     relocate("com.fasterxml.jackson", "bruh.zchat.paper.dependencies.com.fasterxml.jackson")
-    relocate("org.flywaydb", "bruh.zchat.paper.dependencies.org.flywaydb")
     relocate("io.lettuce", "bruh.zchat.paper.dependencies.io.lettuce")
     relocate("io.netty", "bruh.zchat.paper.dependencies.io.netty")
 
