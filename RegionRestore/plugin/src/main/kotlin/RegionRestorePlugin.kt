@@ -27,7 +27,7 @@ import bruh.regionrestore.translations.GuiMessages
 import bruh.regionrestore.hooks.PlaceholderAPIHook
 import bruh.regionrestore.hooks.MiniPlaceholdersHook
 import bruh.zchat.utils.itemapi.ItemAPI
-import bruh.zchat.utils.itemapi.NoOpItemDataStore
+import bruh.zchat.utils.itemapi.HoconItemDataStore
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import bruh.zchat.utils.translations.translationApi
@@ -87,8 +87,9 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         menuAPI = MenuAPI(this)
 
         // Initialize ItemAPI for tracked items (wand, etc.)
-        // Using NoOpItemDataStore since the wand doesn't need database persistence
-        itemAPI = ItemAPI(this, NoOpItemDataStore())
+        // Using HoconItemDataStore for file-based persistence
+        val itemsDataStore = HoconItemDataStore(dataFolder.toPath().resolve("items"))
+        itemAPI = ItemAPI(this, itemsDataStore)
 
         // Initialize selection system
         selectionService = SelectionService()

@@ -2,7 +2,7 @@ package bruh.zchat.utils.itemapi
 
 import java.io.Closeable
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 /**
  * Interface for persisting TrackedItemInstance data.
@@ -85,21 +85,4 @@ interface ItemDataStore : Closeable {
      * Closes any resources held by the store.
      */
     override fun close()
-}
-
-/**
- * A no-op implementation of ItemDataStore for items that don't need persistence.
- * All operations return empty/null results.
- */
-class NoOpItemDataStore : ItemDataStore {
-    override suspend fun load(instanceId: UUID): TrackedItemInstance? = null
-    override suspend fun save(instance: TrackedItemInstance) {}
-    override suspend fun delete(instanceId: UUID): Boolean = false
-    override suspend fun deleteByOwner(ownerUuid: UUID): Int = 0
-    override suspend fun findByOwner(ownerUuid: UUID): List<TrackedItemInstance> = emptyList()
-    override suspend fun findByItemId(itemId: String): List<TrackedItemInstance> = emptyList()
-    override suspend fun updateLastInteracted(instanceId: UUID, timestamp: Instant) {}
-    override suspend fun count(): Long = 0
-    override suspend fun countByItemId(itemId: String): Long = 0
-    override fun close() {}
 }
