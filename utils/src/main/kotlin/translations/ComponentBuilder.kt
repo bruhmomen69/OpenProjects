@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 
 /**
  * DSL builder for constructing MiniMessage components with placeholders.
@@ -11,7 +12,9 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
  */
 class ComponentBuilder internal constructor(
     private val miniMessage: MiniMessage,
-    private val stringCache: suspend (String) -> Component
+    private val stringCache: suspend (String) -> Component,
+    private val cacheKeyBuilder: StringBuilder?,
+    private val plainTextSerializer: PlainTextComponentSerializer
 ) {
     private val resolvers = mutableListOf<TagResolver>()
     private val pendingStringPlaceholders = mutableListOf<Pair<String, String>>()
@@ -23,6 +26,13 @@ class ComponentBuilder internal constructor(
      * @param component The Component to insert
      */
     fun placeholder(key: String, component: Component) {
+        if (cacheKeyBuilder != null) {
+            val plain = plainTextSerializer.serialize(component)
+            cacheKeyBuilder.append("|pc:")
+            cacheKeyBuilder.append(key)
+            cacheKeyBuilder.append('=')
+            cacheKeyBuilder.append(plain.hashCode())
+        }
         resolvers.add(Placeholder.component(key, component))
     }
 
@@ -33,6 +43,12 @@ class ComponentBuilder internal constructor(
      * @param value The string value to parse as MiniMessage (will be cached)
      */
     fun placeholder(key: String, value: String) {
+        if (cacheKeyBuilder != null) {
+            cacheKeyBuilder.append("|ps:")
+            cacheKeyBuilder.append(key)
+            cacheKeyBuilder.append('=')
+            cacheKeyBuilder.append(value)
+        }
         pendingStringPlaceholders.add(key to value)
     }
 
@@ -43,6 +59,12 @@ class ComponentBuilder internal constructor(
      * @param value The raw string value (will not be parsed)
      */
     fun unparsed(key: String, value: String) {
+        if (cacheKeyBuilder != null) {
+            cacheKeyBuilder.append("|pu:")
+            cacheKeyBuilder.append(key)
+            cacheKeyBuilder.append('=')
+            cacheKeyBuilder.append(value)
+        }
         resolvers.add(Placeholder.unparsed(key, value))
     }
 
@@ -70,7 +92,9 @@ class ComponentBuilder internal constructor(
  * String placeholders are parsed directly without caching.
  */
 class SyncComponentBuilder internal constructor(
-    private val miniMessage: MiniMessage
+    private val miniMessage: MiniMessage,
+    private val cacheKeyBuilder: StringBuilder?,
+    private val plainTextSerializer: PlainTextComponentSerializer
 ) {
     private val resolvers = mutableListOf<TagResolver>()
 
@@ -78,6 +102,13 @@ class SyncComponentBuilder internal constructor(
      * Adds a component placeholder.
      */
     fun placeholder(key: String, component: Component) {
+        if (cacheKeyBuilder != null) {
+            val plain = plainTextSerializer.serialize(component)
+            cacheKeyBuilder.append("|pc:")
+            cacheKeyBuilder.append(key)
+            cacheKeyBuilder.append('=')
+            cacheKeyBuilder.append(plain.hashCode())
+        }
         resolvers.add(Placeholder.component(key, component))
     }
 
@@ -85,6 +116,12 @@ class SyncComponentBuilder internal constructor(
      * Adds a string placeholder that will be parsed as MiniMessage.
      */
     fun placeholder(key: String, value: String) {
+        if (cacheKeyBuilder != null) {
+            cacheKeyBuilder.append("|ps:")
+            cacheKeyBuilder.append(key)
+            cacheKeyBuilder.append('=')
+            cacheKeyBuilder.append(value)
+        }
         val component = miniMessage.deserialize(value)
         resolvers.add(Placeholder.component(key, component))
     }
@@ -93,6 +130,12 @@ class SyncComponentBuilder internal constructor(
      * Adds an unparsed string placeholder.
      */
     fun unparsed(key: String, value: String) {
+        if (cacheKeyBuilder != null) {
+            cacheKeyBuilder.append("|pu:")
+            cacheKeyBuilder.append(key)
+            cacheKeyBuilder.append('=')
+            cacheKeyBuilder.append(value)
+        }
         resolvers.add(Placeholder.unparsed(key, value))
     }
 

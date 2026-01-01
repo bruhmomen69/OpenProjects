@@ -2,21 +2,23 @@ package bruh.zchat.utils.translations
 
 import org.bukkit.plugin.java.JavaPlugin
 import java.nio.file.Path
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Creates a TranslationAPI instance for this plugin.
  * Translation files will be stored in <plugin.dataFolder>/translations/
  *
  * @param cacheMaxSize Maximum number of cached MiniMessage components (default 1000)
- * @param cacheTtlMinutes Time-to-live for cached components in minutes (default 30)
+ * @param cacheTtl Time-to-live for cached components (default 20 seconds)
  * @return A new TranslationAPI instance
  */
 fun JavaPlugin.translationApi(
     cacheMaxSize: Long = 1000,
-    cacheTtlMinutes: Int = 30
+    cacheTtl: Duration = 20.seconds
 ): TranslationAPI {
     val translationsPath = dataFolder.toPath().resolve("translations")
-    return TranslationAPI(translationsPath, cacheMaxSize, cacheTtlMinutes)
+    return TranslationAPI(translationsPath, cacheMaxSize, cacheTtl)
 }
 
 /**
@@ -24,14 +26,14 @@ fun JavaPlugin.translationApi(
  *
  * @param subdirectory The subdirectory name within the plugin's data folder
  * @param cacheMaxSize Maximum number of cached MiniMessage components (default 1000)
- * @param cacheTtlMinutes Time-to-live for cached components in minutes (default 30)
+ * @param cacheTtl Time-to-live for cached components (default 20 seconds)
  * @return A new TranslationAPI instance
  */
 fun JavaPlugin.translationApi(
     subdirectory: String,
     cacheMaxSize: Long = 1000,
-    cacheTtlMinutes: Int = 30
+    cacheTtl: Duration = 20.seconds
 ): TranslationAPI {
     val translationsPath = dataFolder.toPath().resolve(subdirectory)
-    return TranslationAPI(translationsPath, cacheMaxSize, cacheTtlMinutes)
+    return TranslationAPI(translationsPath, cacheMaxSize, cacheTtl)
 }

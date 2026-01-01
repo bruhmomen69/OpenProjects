@@ -3,6 +3,7 @@ package bruh.zchat.utils.translations
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -10,11 +11,13 @@ import net.kyori.adventure.audience.Audience
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
-import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Data class representing a registered enum category.
@@ -45,6 +48,11 @@ internal data class RegisteredEnum(
  * - Automatic fallback to default values
  * - ISO-639 language file generation
  *
+ * Caching:
+ * - Components are cached per (locale, key, custom placeholders)
+ * - Uses LRU + expire-after-write with a short TTL (default 20 seconds)
+ * - Third-party placeholders (PlaceholderAPI, MiniPlaceholders) are *not* part of cache keys
+ *
  * Usage:
  * ```kotlin
  * val translations = TranslationAPI(dataFolder.toPath().resolve("translations"))
@@ -57,7 +65,7 @@ internal data class RegisteredEnum(
  *
  * // Get component with placeholders
  * val component = translations.getComponent(GuiMessages.GREETING) {
- *     placeholder("player", playerName)
+ *     unparsed("player", playerName)
  * }
  *
  * // Switch language
@@ -67,10 +75,11 @@ internal data class RegisteredEnum(
 class TranslationAPI(
     private val translationsDirectory: Path,
     private val cacheMaxSize: Long = 1000,
-    private val cacheTtlMinutes: Int = 30
+    private val cacheTtl: Duration = 20.seconds
 ) {
     private val loader = TranslationLoader(translationsDirectory)
     private val miniMessage = MiniMessage.miniMessage()
+    private val plainTextSerializer = PlainTextComponentSerializer.plainText()
 
     // Registered enums: enumClass -> RegisteredEnum
     private val registeredEnums = ConcurrentHashMap<KClass<*>, RegisteredEnum>()
@@ -89,10 +98,11 @@ class TranslationAPI(
     private var englishDefaults: Properties = Properties()
 
     // LRU cache for parsed MiniMessage components
-    // Cache key format: "<locale>:<fullKey>" or "mm:<miniMessageString>"
+    // Cache key format: "comp:<locale>|<fullKey>[|placeholder-signature]" or "mm:<miniMessageString>"
     private val componentCache = InMemoryKache<String, Component>(maxSize = cacheMaxSize) {
         strategy = KacheStrategy.LRU
-        expireAfterAccessDuration = cacheTtlMinutes.minutes
+        // Short TTL to keep placeholder-backed data reasonably fresh
+        expireAfterWriteDuration = cacheTtl
     }
 
     // Mutex for load operations
@@ -264,36 +274,29 @@ class TranslationAPI(
      */
     suspend fun getComponent(key: MessageKey, audience: Audience? = null): Component {
         val fullKey = getFullKey(key)
-        val player = placeholderIntegration.getPlayerFromAudience(audience)
-        
-        // If we have placeholder plugins and an audience, don't cache (placeholders are dynamic)
-        val useCache = player == null && !placeholderIntegration.isMiniPlaceholdersAvailable()
-        
-        if (useCache) {
-            val cacheKey = "$currentLocale:$fullKey"
-            val cached = componentCache.get(cacheKey)
-            if (cached != null) {
-                return cached
-            }
+        val cacheKey = buildBaseCacheKey(fullKey, audience)
+
+        // Fast path: cached component
+        val cached = componentCache.get(cacheKey)
+        if (cached != null) {
+            return cached
         }
 
         // Get and process text
         var text = getStringByFullKey(fullKey, key.default)
-        
-        // Replace PlaceholderAPI placeholders
+        val player = placeholderIntegration.getPlayerFromAudience(audience)
+
+        // Replace PlaceholderAPI placeholders (not part of cache key by design)
         text = placeholderIntegration.replacePlaceholderApi(text, player)
 
-        // Build resolver with MiniPlaceholders
+        // Build resolver with MiniPlaceholders (also not part of cache key)
         val resolver = placeholderIntegration.buildCombinedResolver(TagResolver.empty(), audience)
-        
+
         val component = withContext(Dispatchers.Default) {
             miniMessage.deserialize(text, resolver)
         }
 
-        if (useCache) {
-            val cacheKey = "$currentLocale:$fullKey"
-            componentCache.put(cacheKey, component)
-        }
+        componentCache.put(cacheKey, component)
         return component
     }
 
@@ -310,37 +313,57 @@ class TranslationAPI(
         audience: Audience? = null,
         builder: suspend ComponentBuilder.() -> Unit
     ): Component {
-        var text = getString(key)
+        val fullKey = getFullKey(key)
+        var text = getStringByFullKey(fullKey, key.default)
         val player = placeholderIntegration.getPlayerFromAudience(audience)
-        
-        // Replace PlaceholderAPI placeholders
+
+        // Replace PlaceholderAPI placeholders (not part of cache key by design)
         text = placeholderIntegration.replacePlaceholderApi(text, player)
 
-        // Build tag resolver with placeholders
-        val componentBuilder = ComponentBuilder(miniMessage) { stringValue ->
-            // Cache string -> Component conversions
-            val stringCacheKey = "mm:$stringValue"
-            val cached = componentCache.get(stringCacheKey)
-            if (cached != null) {
-                cached
-            } else {
-                val parsed = withContext(Dispatchers.Default) {
-                    miniMessage.deserialize(stringValue)
+        // Base cache key for this message
+        val baseKey = buildBaseCacheKey(fullKey, audience)
+        val keyBuilder = StringBuilder(baseKey)
+
+        // Build tag resolver with custom placeholders and string caching
+        val componentBuilder = ComponentBuilder(
+            miniMessage = miniMessage,
+            stringCache = { stringValue ->
+                val stringCacheKey = "mm:$stringValue"
+                val cached = componentCache.get(stringCacheKey)
+                if (cached != null) {
+                    cached
+                } else {
+                    val parsed = withContext(Dispatchers.Default) {
+                        miniMessage.deserialize(stringValue)
+                    }
+                    componentCache.put(stringCacheKey, parsed)
+                    parsed
                 }
-                componentCache.put(stringCacheKey, parsed)
-                parsed
-            }
-        }
+            },
+            cacheKeyBuilder = keyBuilder,
+            plainTextSerializer = plainTextSerializer
+        )
+
         componentBuilder.builder()
+
+        // Now that placeholder signatures have been appended, check cache
+        val finalCacheKey = keyBuilder.toString()
+        val cached = componentCache.get(finalCacheKey)
+        if (cached != null) {
+            return cached
+        }
+
         val builtResolver = componentBuilder.build()
-        
-        // Combine with MiniPlaceholders resolver
+
+        // Combine with MiniPlaceholders resolver (not part of cache key)
         val tagResolver = placeholderIntegration.buildCombinedResolver(builtResolver, audience)
 
-        // Parse with placeholders (not cached as placeholders vary)
-        return withContext(Dispatchers.Default) {
+        val component = withContext(Dispatchers.Default) {
             miniMessage.deserialize(text, tagResolver)
         }
+
+        componentCache.put(finalCacheKey, component)
+        return component
     }
 
     /**
@@ -353,16 +376,26 @@ class TranslationAPI(
      */
     fun getComponentSync(key: MessageKey, audience: Audience? = null): Component {
         val fullKey = getFullKey(key)
+        val cacheKey = buildBaseCacheKey(fullKey, audience)
+
+        // Fast path: cached component
+        val cached = cacheGetBlocking(cacheKey)
+        if (cached != null) {
+            return cached
+        }
+
         var text = getStringByFullKey(fullKey, key.default)
         val player = placeholderIntegration.getPlayerFromAudience(audience)
-        
-        // Replace PlaceholderAPI placeholders
+
+        // Replace PlaceholderAPI placeholders (not part of cache key)
         text = placeholderIntegration.replacePlaceholderApi(text, player)
-        
-        // Build resolver with MiniPlaceholders
+
+        // Build resolver with MiniPlaceholders (also not part of cache key)
         val resolver = placeholderIntegration.buildCombinedResolver(TagResolver.empty(), audience)
-        
-        return miniMessage.deserialize(text, resolver)
+
+        val component = miniMessage.deserialize(text, resolver)
+        cachePutBlocking(cacheKey, component)
+        return component
     }
 
     /**
@@ -378,20 +411,39 @@ class TranslationAPI(
         audience: Audience? = null,
         builder: SyncComponentBuilder.() -> Unit
     ): Component {
-        var text = getString(key)
+        val fullKey = getFullKey(key)
+        var text = getStringByFullKey(fullKey, key.default)
         val player = placeholderIntegration.getPlayerFromAudience(audience)
-        
-        // Replace PlaceholderAPI placeholders
+
+        // Replace PlaceholderAPI placeholders (not part of cache key)
         text = placeholderIntegration.replacePlaceholderApi(text, player)
-        
-        val componentBuilder = SyncComponentBuilder(miniMessage)
+
+        // Base cache key for this message
+        val baseKey = buildBaseCacheKey(fullKey, audience)
+        val keyBuilder = StringBuilder(baseKey)
+
+        val componentBuilder = SyncComponentBuilder(
+            miniMessage = miniMessage,
+            cacheKeyBuilder = keyBuilder,
+            plainTextSerializer = plainTextSerializer
+        )
         componentBuilder.builder()
+
+        // Check cache after placeholder signatures have been appended
+        val finalCacheKey = keyBuilder.toString()
+        val cached = cacheGetBlocking(finalCacheKey)
+        if (cached != null) {
+            return cached
+        }
+
         val builtResolver = componentBuilder.build()
-        
-        // Combine with MiniPlaceholders resolver
+
+        // Combine with MiniPlaceholders resolver (not part of cache key)
         val tagResolver = placeholderIntegration.buildCombinedResolver(builtResolver, audience)
-        
-        return miniMessage.deserialize(text, tagResolver)
+
+        val component = miniMessage.deserialize(text, tagResolver)
+        cachePutBlocking(finalCacheKey, component)
+        return component
     }
 
     /**
@@ -409,9 +461,63 @@ class TranslationAPI(
     }
 
     /**
-     * Gets all registered prefixes.
+     * Builds the base cache key for a translation component.
+     * If the audience is a per-recipient target (player / CommandSender), a stable
+     * audience identifier is appended to avoid cross-recipient cache pollution.
+     * Otherwise, the key is global for the given locale + full key.
      */
-    fun getRegisteredPrefixes(): Set<String> = prefixToEnum.keys.toSet()
+    private fun buildBaseCacheKey(fullKey: String, audience: Audience?): String {
+        val audienceId = buildAudienceId(audience)
+        return if (audienceId != null) {
+            "comp:$currentLocale|$fullKey|aud=$audienceId"
+        } else {
+            "comp:$currentLocale|$fullKey"
+        }
+    }
+
+    /**
+     * Builds a stable audience identifier when possible.
+     *
+     * - If the audience is a player (OfflinePlayer), we use its UUID.
+     * - If the audience is a Bukkit CommandSender, we use its name.
+     * - Otherwise, we return null and treat the audience as a multi-recipient target.
+     */
+    private fun buildAudienceId(audience: Audience?): String? {
+        if (audience == null) return null
+
+        // Prefer player UUID when available (covers Player as well)
+        val offlinePlayer = placeholderIntegration.getPlayerFromAudience(audience)
+        if (offlinePlayer != null) {
+            return "player:${offlinePlayer.uniqueId}"
+        }
+
+        // Fallback: detect CommandSender via reflection to avoid hard dependency
+        return try {
+            val senderClass = Class.forName("org.bukkit.command.CommandSender")
+            if (!senderClass.isInstance(audience)) {
+                null
+            } else {
+                val nameMethod = senderClass.getMethod("getName")
+                val name = nameMethod.invoke(audience) as? String ?: return null
+                "sender:$name"
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Blocking wrappers for using the suspend Kache API from synchronous contexts.
+     */
+    private fun cacheGetBlocking(key: String): Component? = runBlocking {
+        componentCache.get(key)
+    }
+
+    private fun cachePutBlocking(key: String, value: Component) {
+        runBlocking {
+            componentCache.put(key, value)
+        }
+    }
 
     /**
      * Gets all available locales.
