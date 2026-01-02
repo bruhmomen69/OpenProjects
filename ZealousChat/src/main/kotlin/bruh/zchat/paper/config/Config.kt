@@ -106,7 +106,7 @@ data class PermissionConfig(
     
     @field:Comment("Permission required for players to use inventory placeholders in chat.")
     val inventoryPlaceholderPermission: String = "zchat.inventory.placeholders",
-    
+
     @field:Comment("Permission required for players to bypass the swear filter.")
     val swearFilterBypassPermission: String = "zchat.bypass.swearfilter"
 )
@@ -306,6 +306,7 @@ data class SwearFilterConfig(
             type = "regex",
             distance = 3,
             filters = listOf("(?i)\\bshit\\b", "(?i)\\bfuck\\b"),
+            exclusions = listOf("classic", "(?i)\\bfuckle\\b"),
             punishments = mapOf(
                 1 to listOf("warn {player} You are not allowed to use that word."),
                 3 to listOf("kick {player} You have been warned about your language."),
@@ -317,6 +318,7 @@ data class SwearFilterConfig(
             type = "smart",
             distance = 2,
             filters = listOf("shit", "fuck", "boobs"),
+            exclusions = listOf("lass", "classic"),
             punishments = mapOf(
                 1 to listOf("warn {player} You are not allowed to use that word."),
                 3 to listOf("kick {player} You have been warned about your language."),
@@ -334,6 +336,7 @@ data class SwearFilterConfig(
                 "(?i)\\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?:[a-z]{2,63})(?::\\d{1,5})?(?:/\\S*)?\\b",
                 "(?i)\\b(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d{1,5})?(?:/\\S*)?\\b"
             ),
+            exclusions = listOf("(?i)\\.example\\.com", "(?i)\\.mydomain\\.org"),
             punishments = mapOf(
                 1 to listOf("warn {player} You are not allowed to use that word."),
                 3 to listOf("kick {player} You have been warned about your language."),
@@ -418,5 +421,13 @@ data class FilterGroup(
     val filters: List<String> = emptyList(),
 
     @field:Comment("A map of infraction counts to a list of punishment commands.")
-    val punishments: Map<Int, List<String>> = emptyMap()
+    val punishments: Map<Int, List<String>> = emptyMap(),
+
+    @field:Comment("A list of exclusion patterns. If a message contains an exclusion, it will not be blocked even if it matches a filter.\n" +
+            "For non-regex filter types: Checks each matched word against exclusions (case-insensitive).\n" +
+            "For regex filter types: Checks both the exact matched text AND the full surrounding word against exclusions.\n" +
+            "  The message is only blocked if NEITHER the matched text nor the surrounding word has an exclusion.\n" +
+            "Exclusions without regex metacharacters use simple contains matching (case-insensitive).\n" +
+            "Exclusions with regex metacharacters are treated as regex patterns (case-insensitive).")
+    val exclusions: List<String> = emptyList()
 )

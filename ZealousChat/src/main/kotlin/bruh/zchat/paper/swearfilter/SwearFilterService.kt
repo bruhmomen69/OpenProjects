@@ -27,6 +27,68 @@ class SwearFilterService(
 ) {
     private val regexCache = ConcurrentHashMap<String, Regex>()
 
+    /**
+     * Checks if a string contains regex metacharacters.
+     */
+    private fun hasRegexMetaChars(text: String): Boolean {
+        val regexMetaChars = setOf('.', '*', '+', '?', '^', '$', '[', ']', '(', ')', '{', '}', '|', '\\')
+        return text.any { it in regexMetaChars }
+    }
+
+    /**
+     * Checks if an exclusion pattern matches the given text.
+     * Uses simple case-insensitive contains if no regex metacharacters present.
+     * Uses regex matching if regex metacharacters are present.
+     */
+    private fun exclusionMatches(exclusion: String, text: String): Boolean {
+        return if (hasRegexMetaChars(exclusion)) {
+            try {
+                Regex(exclusion, RegexOption.IGNORE_CASE).containsMatchIn(text)
+            } catch (e: PatternSyntaxException) {
+                plugin.logger.warning("Invalid regex exclusion pattern will be ignored: $exclusion")
+                false
+            }
+        } else {
+            text.lowercase().contains(exclusion.lowercase())
+        }
+    }
+
+    /**
+     * Extracts the full word containing the given match range.
+     */
+    private fun extractSurroundingWord(text: String, matchRange: IntRange): String {
+        var start = matchRange.first
+        var end = matchRange.last + 1
+
+        // Find word start (go backwards until we hit a non-word character or string boundary)
+        while (start > 0 && text[start - 1].isLetterOrDigit()) {
+            start--
+        }
+
+        // Find word end (go forwards until we hit a non-word character or string boundary)
+        while (end < text.length && text[end].isLetterOrDigit()) {
+            end++
+        }
+
+        return text.substring(start, end)
+    }
+
+    /**
+     * Checks if the given matched text has an exclusion that applies.
+     * For regex filter types: checks against the matched text.
+     * For non-regex filter types: checks if the matched word contains any exclusion.
+     */
+    private fun hasExclusion(group: FilterGroup, matchedText: String): Boolean {
+        if (group.exclusions.isEmpty()) {
+            return false
+        }
+
+        // Check the matched text against all exclusions
+        return group.exclusions.any { exclusion ->
+            exclusionMatches(exclusion, matchedText)
+        }
+    }
+
     fun checkMessage(player: Player, message: String): Boolean {
         if (!configManager.config.swearFilter.enabled) {
             return false
@@ -61,34 +123,53 @@ class SwearFilterService(
 
     private fun isMatch(group: FilterGroup, message: String): Boolean {
         return when (group.type.lowercase()) {
-            "regex" -> group.filters.any { pattern ->
-                val regex = regexCache.getOrPut(pattern) {
-                    try {
-                        Regex(pattern)
-                    } catch (e: PatternSyntaxException) {
-                        plugin.logger.warning("Invalid regex pattern in swear filter config will be ignored: $pattern")
-                        Regex("\\b\\B") // A regex that never matches.
+            "regex" -> {
+                group.filters.any { pattern ->
+                    val regex = regexCache.getOrPut(pattern) {
+                        try {
+                            Regex(pattern)
+                        } catch (e: PatternSyntaxException) {
+                            plugin.logger.warning("Invalid regex pattern in swear filter config will be ignored: $pattern")
+                            Regex("\\b\\B") // A regex that never matches.
+                        }
+                    }
+                    regex.findAll(message).any { match ->
+                        val matchedText = match.value
+                        val surroundingWord = extractSurroundingWord(message, match.range)
+
+                        // Check exclusions for both the matched text and the surrounding word
+                        // Only block if neither has an exclusion
+                        !hasExclusion(group, matchedText) && !hasExclusion(group, surroundingWord)
                     }
                 }
-                regex.containsMatchIn(message)
             }
 
             "levenshtein" -> {
                 val words = message.split(Regex("\\s+"))
-                words.any { word ->
+                // Find all words that match the filter
+                val matchedWords = words.filter { word ->
                     group.filters.any { filterWord ->
                         Levenshtein.distance(word.lowercase(), filterWord.lowercase()) <= group.distance
                     }
+                }
+                // Check if any matched word doesn't have an exclusion
+                matchedWords.any { matchedWord ->
+                    !hasExclusion(group, matchedWord)
                 }
             }
 
             "dice-sorensen", "dice" -> {
                 val threshold = group.distance / 100.0
                 val words = message.split(Regex("\\s+"))
-                words.any { word ->
+                // Find all words that match the filter
+                val matchedWords = words.filter { word ->
                     group.filters.any { filterWord ->
                         DiceSorensen.coefficient(word.lowercase(), filterWord.lowercase()) >= threshold
                     }
+                }
+                // Check if any matched word doesn't have an exclusion
+                matchedWords.any { matchedWord ->
+                    !hasExclusion(group, matchedWord)
                 }
             }
 
@@ -97,7 +178,8 @@ class SwearFilterService(
                 val scalingFactor = group.distance / 5.0
 
                 val words = message.split(Regex("\\s+"))
-                words.any { word ->
+                // Find all words that match the filter
+                val matchedWords = words.filter { word ->
                     group.filters.any { filterWord ->
                         val lowerWord = word.lowercase()
                         val lowerFilter = filterWord.lowercase()
@@ -112,6 +194,10 @@ class SwearFilterService(
 
                         levenshteinMatch || diceMatch
                     }
+                }
+                // Check if any matched word doesn't have an exclusion
+                matchedWords.any { matchedWord ->
+                    !hasExclusion(group, matchedWord)
                 }
             }
 
