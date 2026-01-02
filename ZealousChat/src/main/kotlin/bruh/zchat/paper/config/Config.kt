@@ -42,10 +42,7 @@ data class Config(
     val blocks: BlockConfig = BlockConfig(),
     
     @field:Comment("Configurable swear filter settings and punishments")
-    val swearFilter: SwearFilterConfig = SwearFilterConfig(),
-    
-    @field:Comment("GUI configuration for in-game management menus")
-    val gui: GuiConfig = GuiConfig()
+    val swearFilter: SwearFilterConfig = SwearFilterConfig()
 )
 
 @ConfigSerializable
@@ -422,19 +419,4 @@ data class FilterGroup(
 
     @field:Comment("A map of infraction counts to a list of punishment commands.")
     val punishments: Map<Int, List<String>> = emptyMap()
-)
-
-@ConfigSerializable
-data class GuiConfig(
-    @field:Comment("Enable GUI menus for in-game management. Menu layouts are configurable via HOCON files in the menus/ folder.")
-    val enabled: Boolean = true,
-    
-    @field:Comment("Enable the block list management GUI (/blocklist command opens GUI instead of text list)")
-    val enableBlockListGui: Boolean = true,
-    
-    @field:Comment("Enable the swear filter management GUI for admins (/zchat swearfilter command)")
-    val enableSwearFilterGui: Boolean = true,
-    
-    @field:Comment("Permission required to access the swear filter management GUI")
-    val swearFilterGuiPermission: String = "zchat.admin.swearfilter.gui"
 )

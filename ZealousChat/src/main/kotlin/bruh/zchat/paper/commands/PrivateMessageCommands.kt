@@ -2,7 +2,6 @@ package bruh.zchat.paper.commands
 
 import bruh.zchat.paper.config.ConfigManager
 import bruh.zchat.paper.enums.MessageKey
-import bruh.zchat.paper.menus.MenuService
 import bruh.zchat.paper.services.*
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
@@ -59,7 +58,6 @@ class MessageCommand(
     class BlockCommand(
         private val blockService: BlockService,
         private val messageFormattingService: MessageFormattingService,
-        private val menuService: MenuService,
         private val plugin: JavaPlugin
     ) {
         @Command("block")
@@ -95,11 +93,7 @@ class MessageCommand(
             }
 
             val player = actor.sender() as Player
-            
-            // Try to open GUI, fall back to text list if GUI is disabled
-            if (!menuService.openBlockListGui(player)) {
-                blockService.showBlockList(player)
-            }
+            blockService.showBlockList(player)
         }
     }
 }
@@ -211,7 +205,6 @@ class ChatAdminCommands(
     private val messageFormattingService: MessageFormattingService,
     private val blockService: BlockService,
     private val alertService: AlertService,
-    private val menuService: MenuService,
     private val plugin: JavaPlugin
 ) {
     @Subcommand("toggle chat")
@@ -385,21 +378,6 @@ class ChatAdminCommands(
         } else {
             alertService.forceDisableAlerts(targetPlayer)
             actor.reply(MiniMessage.miniMessage().deserialize("<red>Disabled alerts for ${targetPlayer.name}</red>"))
-        }
-    }
-
-    @Subcommand("swearfilter")
-    @CommandPermission("zchat.admin.swearfilter.gui")
-    fun swearFilterGui(actor: BukkitCommandActor) {
-        if (actor.sender() !is Player) {
-            actor.reply(messageFormattingService.getConfigMessage(MessageKey.COMMANDS_PLAYER_ONLY))
-            return
-        }
-
-        val player = actor.sender() as Player
-        
-        if (!menuService.openSwearFilterGui(player)) {
-            actor.reply(MiniMessage.miniMessage().deserialize("<red>Swear filter GUI is disabled in config.</red>"))
         }
     }
 
