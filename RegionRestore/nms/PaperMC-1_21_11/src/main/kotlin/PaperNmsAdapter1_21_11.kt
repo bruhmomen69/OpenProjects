@@ -1,5 +1,8 @@
 package bruh.regionrestore.nms.v1_21_11
 
+import bruh.regionrestore.nms.ChunkByChunkRestore
+import bruh.regionrestore.nms.PaperNmsAdapter
+import bruh.regionrestore.nms.RegionTemplate
 import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray
 import com.github.luben.zstd.Zstd
 import com.github.shynixn.mccoroutine.folia.launch
@@ -27,9 +30,6 @@ import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.slf4j.LoggerFactory
-import bruh.regionrestore.nms.ChunkByChunkRestore
-import bruh.regionrestore.nms.PaperNmsAdapter
-import bruh.regionrestore.nms.RegionTemplate
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.time.Instant
@@ -76,7 +76,8 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
             STATE_VISIBLE_FIELD.isAccessible = true
         }
 
-        private val RESTORE_POOL = Executors.newFixedThreadPool((Runtime.getRuntime().availableProcessors() - 3).coerceAtLeast(2))
+        private val RESTORE_POOL =
+            Executors.newFixedThreadPool((Runtime.getRuntime().availableProcessors() - 3).coerceAtLeast(2))
 
         private val logger = LoggerFactory.getLogger("RegionRestore NMS")
     }
@@ -96,7 +97,8 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
     ) {
         val level = (world as CraftWorld).handle
         val chunkDataKey = Pair(templateChunkX, templateChunkZ)
-        val chunkData = template.chunkData[chunkDataKey] ?: throw IllegalStateException("Chunk data not found for $chunkDataKey")
+        val chunkData =
+            template.chunkData[chunkDataKey] ?: throw IllegalStateException("Chunk data not found for $chunkDataKey")
         val fBuffer = FriendlyByteBuf(chunkData)
 
         val movedChunkPos = ChunkPos(
@@ -106,7 +108,8 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
 
         val chonkHandle = if (IS_FOLIA) {
             level.getChunkIfLoaded(movedChunkPos.x, movedChunkPos.z)?.let { return@let it }
-                ?: world.getChunkAtAsync(movedChunkPos.x, movedChunkPos.z).thenApply { (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk }.join()
+                ?: world.getChunkAtAsync(movedChunkPos.x, movedChunkPos.z)
+                    .thenApply { (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk }.join()
         } else {
             level.getChunk(movedChunkPos.x, movedChunkPos.z, ChunkStatus.FULL, true)!! as LevelChunk
         }
@@ -147,8 +150,9 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
                 fBuffer.readInt() + absBlockZOffset
             )
 
-            val blockEnt = (getConstructor(className) ?: throw IllegalStateException("Map has unknown item type $className"))
-                .newInstance(blockPos, chonkHandle.getBlockState(blockPos))
+            val blockEnt =
+                (getConstructor(className) ?: throw IllegalStateException("Map has unknown item type $className"))
+                    .newInstance(blockPos, chonkHandle.getBlockState(blockPos))
             blockEnt.setLevel(level)
 
             val itemCount = fBuffer.readShort()

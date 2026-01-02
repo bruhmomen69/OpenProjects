@@ -79,7 +79,7 @@ data class RestoreConfig(
     @Comment("Do the restore fully async? Will probably explode your server.")
     val asyncRestore: Boolean? = null,
     @Comment("Stream large restores as chunks are loaded? Makes the restore use more time on CPU, but it will not load all chunks at once, which provides a performance improvement for large sections.")
-    val streamingRestore: Boolean = true
+    val streamingRestore: Boolean = false
 )
 
 @ConfigSerializable
