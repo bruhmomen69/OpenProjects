@@ -446,7 +446,8 @@ class SchedulerService(
                 val allTime = end - start
                 val totalActiveTime = totalTime.load()
                 val activeTimePer = totalActiveTime / restoreFutures.size
-                plugin.slF4JLogger.info("Restore took ${totalActiveTime}ms active, ${allTime - activeTimePer}ms total. \nNote that the `streamingRestore` is on in your config, and causes a higher active time, but reduces memory usage and chunk load.")
+                plugin.slF4JLogger.info("Restore took ${totalActiveTime}ms active, ${allTime - activeTimePer}ms total.")
+                plugin.slF4JLogger.info("Note that `streamingRestore` is on in your config, and causes a higher active time, but reduces memory usage and chunk load.")
             } else {
                 // Legacy mode: preload all chunks, then restore all, then release all
                 var chunkHandles: List<ChunkTicketHandle> = emptyList()
