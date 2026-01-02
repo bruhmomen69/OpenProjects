@@ -60,7 +60,6 @@ class PaperMC : SuspendingJavaPlugin() {
     private lateinit var lamp: Lamp<*>
     private lateinit var channelCommandService: ChannelCommandService
     private lateinit var menuService: MenuService
-    private lateinit var chatInputService: ChatInputService
 
     // Server instance ID for cross-server messaging
     val serverInstanceId = java.util.UUID.randomUUID().toString()
@@ -166,7 +165,6 @@ class PaperMC : SuspendingJavaPlugin() {
         infractionManager = InfractionManager(dbPlayerQueries, playerDataManager)
         swearFilterService =
             SwearFilterService(this, configManager, infractionManager, alertService, messageFormattingService)
-        chatInputService = ChatInputService(this)
         blockMigrationService = BlockMigrationService(database, dataFolder.toPath(), configManager.storage.database.dataRetentionDays)
 
         // Initialize menu service for GUI menus
@@ -176,8 +174,7 @@ class PaperMC : SuspendingJavaPlugin() {
             blockService = blockService,
             playerDataManager = playerDataManager,
             messageFormattingService = messageFormattingService,
-            infractionManager = infractionManager,
-            chatInputService = chatInputService
+            infractionManager = infractionManager
         )
         menuService.initialize()
 
@@ -405,11 +402,6 @@ class PaperMC : SuspendingJavaPlugin() {
         // Close menu service
         if (::menuService.isInitialized) {
             menuService.close()
-        }
-
-        // Close chat input service
-        if (::chatInputService.isInitialized) {
-            chatInputService.close()
         }
 
         // Close inventory snapshot store
