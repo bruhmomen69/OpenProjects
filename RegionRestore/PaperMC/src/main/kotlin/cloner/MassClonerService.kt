@@ -790,16 +790,8 @@ class MassClonerService(
             targetChunkZ = instance.originChunkZ,
             sizeXChunks = instance.sizeXChunks,
             sizeZChunks = instance.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    world,
-                    templateVersion.data,
-                    instance.originChunkX,
-                    instance.originChunkZ,
-                    plugin,
-                    updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = updateLight
         )
 
         schedulerService.scheduleRestore(job, null, emptyList(), pool.restoreAudienceScope)
@@ -836,16 +828,8 @@ class MassClonerService(
             targetChunkZ = instance.originChunkZ,
             sizeXChunks = instance.sizeXChunks,
             sizeZChunks = instance.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    world,
-                    templateVersion.data,
-                    instance.originChunkX,
-                    instance.originChunkZ,
-                    plugin,
-                    updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = updateLight
         )
 
         schedulerService.scheduleRepeatingRestore(job, interval, pool.restoreAudienceScope)
@@ -1010,16 +994,8 @@ class MassClonerService(
                         targetChunkZ = instance.originChunkZ,
                         sizeXChunks = instance.sizeXChunks,
                         sizeZChunks = instance.sizeZChunks,
-                        restoreAction = {
-                            nmsAdapter.restoreTemplate(
-                                world,
-                                templateVersion.data,
-                                instance.originChunkX,
-                                instance.originChunkZ,
-                                plugin,
-                                updateLight
-                            )
-                        }
+                        template = templateVersion.data,
+                        updateLight = updateLight
                     )
 
                     schedulerService.scheduleRestore(job, null, emptyList(), scope)
@@ -1105,16 +1081,8 @@ class MassClonerService(
             targetChunkZ = instance.originChunkZ,
             sizeXChunks = instance.sizeXChunks,
             sizeZChunks = instance.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    world,
-                    templateVersion.data,
-                    instance.originChunkX,
-                    instance.originChunkZ,
-                    plugin,
-                    updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = updateLight
         )
     }
 

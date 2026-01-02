@@ -1037,16 +1037,8 @@ class RegionRestoreCommands(
             targetChunkZ = templateVersion.data.minChunkZ,
             sizeXChunks = templateVersion.data.sizeXChunks,
             sizeZChunks = templateVersion.data.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    targetWorld,
-                    templateVersion.data,
-                    templateVersion.data.minChunkX,
-                    templateVersion.data.minChunkZ,
-                    plugin,
-                    config.restore.updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = config.restore.updateLight
         )
 
         schedulerService.scheduleRestore(job, null, emptyList(), scope)
@@ -1108,16 +1100,8 @@ class RegionRestoreCommands(
             targetChunkZ = templateVersion.data.minChunkZ,
             sizeXChunks = templateVersion.data.sizeXChunks,
             sizeZChunks = templateVersion.data.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    targetWorld,
-                    templateVersion.data,
-                    templateVersion.data.minChunkX,
-                    templateVersion.data.minChunkZ,
-                    plugin,
-                    config.restore.updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = config.restore.updateLight
         )
 
         schedulerService.scheduleRestore(
@@ -1169,16 +1153,8 @@ class RegionRestoreCommands(
             targetChunkZ = templateVersion.data.minChunkZ,
             sizeXChunks = templateVersion.data.sizeXChunks,
             sizeZChunks = templateVersion.data.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    targetWorld,
-                    templateVersion.data,
-                    templateVersion.data.minChunkX,
-                    templateVersion.data.minChunkZ,
-                    plugin,
-                    config.restore.updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = config.restore.updateLight
         )
 
         schedulerService.scheduleRestore(job, null, emptyList(), config.notifications.defaultAudienceScope)
@@ -1246,16 +1222,8 @@ class RegionRestoreCommands(
             targetChunkZ = targetChunkZ,
             sizeXChunks = templateVersion.data.sizeXChunks,
             sizeZChunks = templateVersion.data.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(
-                    targetWorld,
-                    templateVersion.data,
-                    targetChunkX,
-                    targetChunkZ,
-                    plugin,
-                    config.restore.updateLight
-                )
-            }
+            template = templateVersion.data,
+            updateLight = config.restore.updateLight
         )
 
         schedulerService.scheduleRestore(job, null, emptyList(), config.notifications.defaultAudienceScope)

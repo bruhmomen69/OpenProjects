@@ -112,7 +112,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
 
         notificationService = NotificationService(this, config.notifications)
 
-        schedulerService = SchedulerService(this, notificationService, config.restore, config.notifications)
+        schedulerService = SchedulerService(this, notificationService, config.restore, config.notifications, nmsAdapter)
 
         massClonerService = MassClonerService(this, nmsAdapter, templateRepository, schedulerService, config.massCloner, config.restore, templateCache)
         massClonerService.initialize()

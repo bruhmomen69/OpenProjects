@@ -1,18 +1,18 @@
 package bruh.regionrestore.timer
 
-import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
-import com.github.shynixn.mccoroutine.folia.asyncDispatcher
-import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
-import com.github.shynixn.mccoroutine.folia.launch
-import com.github.shynixn.mccoroutine.folia.regionDispatcher
-import kotlinx.coroutines.*
-import org.bukkit.Chunk
-import org.bukkit.World
 import bruh.regionrestore.config.NotificationsConfig
 import bruh.regionrestore.config.RestoreConfig
+import bruh.regionrestore.nms.ChunkByChunkRestore
+import bruh.regionrestore.nms.PaperNmsAdapter
+import bruh.regionrestore.nms.RegionTemplate
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
 import bruh.regionrestore.notification.NotificationService
+import com.github.shynixn.mccoroutine.folia.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.future.await
+import org.bukkit.Chunk
+import org.bukkit.World
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -23,7 +23,7 @@ import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.ceil
-import kotlin.time.Clock
+import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -34,7 +34,8 @@ data class RestoreJob(
     val targetChunkZ: Int,
     val sizeXChunks: Int = 1,
     val sizeZChunks: Int = 1,
-    val restoreAction: suspend () -> Unit
+    val template: RegionTemplate,
+    val updateLight: Boolean = false
 ) {
     var isRunning = false
         @Synchronized get
@@ -50,11 +51,13 @@ data class RestoreJob(
     val maxBlockZ: Int = (targetChunkZ + sizeZChunks) * 16 - 1
 }
 
+@OptIn(ExperimentalAtomicApi::class)
 class SchedulerService(
     private val plugin: SuspendingJavaPlugin,
     private val notificationService: NotificationService,
     private val restoreConfig: RestoreConfig,
-    private val notificationsConfig: NotificationsConfig
+    private val notificationsConfig: NotificationsConfig,
+    private val nmsAdapter: PaperNmsAdapter
 ) {
     private val restoreJobs = ConcurrentHashMap<UUID, RestoreJob>()
     private val countdownJobs = ConcurrentHashMap<UUID, Job>()
@@ -308,11 +311,7 @@ class SchedulerService(
         job.isRunning = true
         activeRestores.incrementAndGet()
 
-        var chunkHandles: List<ChunkTicketHandle> = emptyList()
-
         try {
-            chunkHandles = preloadChunks(job)
-
             val startedConfig = NotificationConfig.fromEventConfig(notificationsConfig.restoreStarted)
             if (startedConfig != null) {
                 notificationService.sendNotification(
@@ -326,10 +325,151 @@ class SchedulerService(
                 )
             }
 
+            val start = System.currentTimeMillis()
 
-            withContext(if (restoreConfig.asyncRestore ?: false) plugin.asyncDispatcher else plugin.globalRegionDispatcher) {
-                val start = System.currentTimeMillis()
-                job.restoreAction()
+            // Check if adapter supports chunk-by-chunk streaming
+            if (nmsAdapter is ChunkByChunkRestore &&
+                restoreConfig.streamingRestore &&
+                job.sizeXChunks * job.sizeZChunks >
+                (restoreConfig.taskChunkLoadThrottle * 0.9)
+                    .roundToLong()
+                    .coerceAtLeast(100)
+                    .coerceAtMost(1000)
+            ) {
+                // Streaming mode: restore chunks as they load
+                val chunkAdapter = nmsAdapter as ChunkByChunkRestore
+                val restoreFutures = mutableListOf<CompletableFuture<Unit>>()
+                val totalTime = AtomicLong(0)
+                val async = restoreConfig.asyncRestore ?: true
+
+                for ((templateChunkX, templateChunkZ) in job.template.chunkData.keys) {
+                    val targetChunkX = templateChunkX - job.template.minChunkX + job.targetChunkX
+                    val targetChunkZ = templateChunkZ - job.template.minChunkZ + job.targetChunkZ
+
+                    // Start async chunk load
+                    val chunkFuture = job.world.getChunkAtAsync(targetChunkX, targetChunkZ)
+                    val key = ChunkKey(job.world.uid, targetChunkX, targetChunkZ)
+                    val wasLoaded = job.world.isChunkLoaded(targetChunkX, targetChunkZ)
+                    val dispatcher =
+                        if (async)
+                            plugin.asyncDispatcher
+                        else
+                            plugin.regionDispatcher(
+                                job.world,
+                                targetChunkX,
+                                targetChunkZ
+                            )
+
+                    restoreFutures.add(
+                        chunkFuture.handle { chunk, throwable ->
+                            if (throwable != null || chunk == null) {
+                                plugin.slF4JLogger.error(
+                                    "Failed to load chunk at $targetChunkX, $targetChunkZ",
+                                    throwable
+                                )
+                                return@handle CompletableFuture.completedFuture(Unit)
+                            }
+
+                            val future = CompletableFuture<Unit>()
+                            plugin.launch(dispatcher) {
+                                // Create ticket handle for tracking
+                                val newCount = incrementTicketRef(key)
+                                if (newCount == 1) {
+                                    try {
+                                        chunk.addPluginChunkTicket(plugin)
+                                        ChunkTicketHandle(key, chunk, hadTicket = true, wasLoaded = wasLoaded)
+                                    } catch (t: Exception) {
+                                        // Roll back ref count and continue without a ticket
+                                        decrementTicketRef(key)
+                                        ChunkTicketHandle(key, chunk, hadTicket = false, wasLoaded = wasLoaded)
+
+                                        plugin.slF4JLogger.error(
+                                            "Failed to ticket chunk at $targetChunkX, $targetChunkZ",
+                                            t
+                                        )
+                                        future.complete(Unit)
+                                    }
+                                }
+
+                                val handle = ChunkTicketHandle(
+                                    key = key,
+                                    chunk = chunk,
+                                    hadTicket = newCount == 1,
+                                    wasLoaded = wasLoaded
+                                )
+
+                                try {
+                                    // Restore this chunk immediately
+                                    val begin = System.currentTimeMillis()
+                                    chunkAdapter.restoreSingleChunk(
+                                        job.world,
+                                        job.template,
+                                        templateChunkX,
+                                        templateChunkZ,
+                                        job.targetChunkX,
+                                        job.targetChunkZ,
+                                        plugin,
+                                        job.updateLight
+                                    )
+                                    val completeTime = System.currentTimeMillis()
+                                    totalTime.addAndFetch(completeTime - begin)
+
+                                    // Release ticket immediately after restore
+                                    releaseChunkTickets(listOf(handle))
+                                    future.complete(Unit)
+                                } catch (e: Exception) {
+                                    plugin.slF4JLogger.error(
+                                        "Failed to restore chunk at $targetChunkX, $targetChunkZ",
+                                        e
+                                    )
+                                    releaseChunkTickets(listOf(handle))
+                                    future.completeExceptionally(e)
+                                }
+                            }
+
+                            return@handle future
+                        }.thenCompose { it }
+                    )
+
+                    // Throttle if this wasn't already loaded
+                    if (!wasLoaded) {
+                        @OptIn(ExperimentalAtomicApi::class)
+                        if (chunkLoads.incrementAndFetch() % restoreConfig.taskChunkLoadThrottle == 0L) {
+                            delay(48)
+                        }
+                    }
+                }
+
+                // Wait for all chunks to complete
+                CompletableFuture.allOf(*restoreFutures.toTypedArray()).await()
+                val end = System.currentTimeMillis()
+                val allTime = end - start
+                val totalActiveTime = totalTime.load()
+                val activeTimePer = totalActiveTime / restoreFutures.size
+                plugin.slF4JLogger.info("Restore took ${totalActiveTime}ms active, ${allTime - activeTimePer}ms total. \nNote that the `streamingRestore` is on in your config, and causes a higher active time, but reduces memory usage and chunk load.")
+            } else {
+                // Legacy mode: preload all chunks, then restore all, then release all
+                var chunkHandles: List<ChunkTicketHandle> = emptyList()
+                try {
+                    chunkHandles = preloadChunks(job)
+
+                    withContext(
+                        if (restoreConfig.asyncRestore
+                                ?: false
+                        ) plugin.asyncDispatcher else plugin.globalRegionDispatcher
+                    ) {
+                        nmsAdapter.restoreTemplate(
+                            job.world,
+                            job.template,
+                            job.targetChunkX,
+                            job.targetChunkZ,
+                            plugin,
+                            job.updateLight
+                        )
+                    }
+                } finally {
+                    releaseChunkTickets(chunkHandles)
+                }
                 val end = System.currentTimeMillis()
                 plugin.slF4JLogger.info("Restore took ${end - start}ms")
             }
@@ -366,7 +506,6 @@ class SchedulerService(
                 )
             }
         } finally {
-            releaseChunkTickets(chunkHandles)
             job.isRunning = false
             activeRestores.decrementAndGet()
         }

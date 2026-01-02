@@ -77,7 +77,9 @@ data class RestoreConfig(
     @Comment("Update light after restoring chunks? Can cause some delay before chunk update packets while light updates. This can also cause a lot of async cpu usage, and most servers do not need it.")
     val updateLight: Boolean = false,
     @Comment("Do the restore fully async? Will probably explode your server.")
-    val asyncRestore: Boolean? = null
+    val asyncRestore: Boolean? = null,
+    @Comment("Stream large restores as chunks are loaded? Makes the restore use more time on CPU, but it will not load all chunks at once, which provides a performance improvement for large sections.")
+    val streamingRestore: Boolean = true
 )
 
 @ConfigSerializable

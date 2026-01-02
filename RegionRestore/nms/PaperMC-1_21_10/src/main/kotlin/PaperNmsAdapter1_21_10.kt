@@ -27,6 +27,7 @@ import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.slf4j.LoggerFactory
+import bruh.regionrestore.nms.ChunkByChunkRestore
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.nms.RegionTemplate
 import java.lang.reflect.Constructor
@@ -35,12 +36,13 @@ import java.time.Instant
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
 
-class PaperNmsAdapter1_21_10 : PaperNmsAdapter {
+class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
     companion object {
         private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 100) {
             strategy = KacheStrategy.LRU
@@ -77,13 +79,111 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter {
             STATE_VISIBLE_FIELD.isAccessible = true
         }
 
-        private val RESTORE_POOL = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+        private val RESTORE_POOL = Executors.newFixedThreadPool((Runtime.getRuntime().availableProcessors() - 3).coerceAtLeast(2))
 
         private val logger = LoggerFactory.getLogger("RegionRestore NMS")
     }
 
     override val minecraftVersion = "1.21.10"
     override val supportsAsync = true
+
+    override suspend fun restoreSingleChunk(
+        world: World,
+        template: RegionTemplate,
+        templateChunkX: Int,
+        templateChunkZ: Int,
+        targetChunkX: Int,
+        targetChunkZ: Int,
+        plugin: JavaPlugin,
+        updateLight: Boolean
+    ) {
+        val level = (world as CraftWorld).handle
+        val chunkDataKey = Pair(templateChunkX, templateChunkZ)
+        val chunkData = template.chunkData[chunkDataKey] ?: throw IllegalStateException("Chunk data not found for $chunkDataKey")
+        val fBuffer = FriendlyByteBuf(chunkData)
+
+        val movedChunkPos = ChunkPos(
+            templateChunkX - template.minChunkX + targetChunkX,
+            templateChunkZ - template.minChunkZ + targetChunkZ
+        )
+
+        val chonkHandle = if (IS_FOLIA) {
+            level.getChunkIfLoaded(movedChunkPos.x, movedChunkPos.z)?.let { return@let it }
+                ?: world.getChunkAtAsync(movedChunkPos.x, movedChunkPos.z).thenApply { (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk }.join()
+        } else {
+            level.getChunk(movedChunkPos.x, movedChunkPos.z, ChunkStatus.FULL, true)!! as LevelChunk
+        }
+
+        val chunk = CraftChunk(chonkHandle)
+
+        val relightFuture = CompletableFuture<Unit>()
+
+        // Restore this chunk
+        val restore = restoreChunk(template, targetChunkX, targetChunkZ, level, chunkData, chunk, fBuffer, chonkHandle)
+
+        // Re-light this chunk
+        if (!updateLight) relightFuture.complete(Unit)
+        else if (level.lightEngine is ThreadedLevelLightEngine) level.lightEngine.`starlight$serverRelightChunks`(
+            mutableListOf(movedChunkPos),
+            {},
+            { relightFuture.complete(Unit) }
+        )
+        else {
+            level.lightEngine.propagateLightSources(movedChunkPos)
+            relightFuture.complete(Unit)
+        }
+
+        val beMap = chonkHandle.blockEntities
+        val absBlockXOffset = (targetChunkX - template.minChunkX).shl(4)
+        val absBlockZOffset = (targetChunkZ - template.minChunkZ).shl(4)
+
+        val invTileCount = fBuffer.readShort()
+        for (i in 0 until invTileCount) {
+            val classNameByteSize = fBuffer.readShort().toInt()
+            val classNameBytes = ByteArray(classNameByteSize)
+            fBuffer.readBytes(classNameBytes)
+            val className = String(classNameBytes, Charsets.UTF_8)
+
+            val blockPos = BlockPos(
+                fBuffer.readInt() + absBlockXOffset,
+                fBuffer.readInt(),
+                fBuffer.readInt() + absBlockZOffset
+            )
+
+            val blockEnt = (getConstructor(className) ?: throw IllegalStateException("Map has unknown item type $className"))
+                .newInstance(blockPos, chonkHandle.getBlockState(blockPos))
+            blockEnt.setLevel(level)
+
+            val itemCount = fBuffer.readShort()
+            for (j in 0 until itemCount) {
+                val invPos = fBuffer.readShort()
+                val invByteLen = fBuffer.readShort()
+                val invBytes = ByteArray(invByteLen.toInt())
+                fBuffer.readBytes(invBytes)
+                val iStack = ItemStack.deserializeBytes(invBytes)
+                blockEnt.setItem(invPos.toInt(), (iStack as CraftItemStack).handle)
+            }
+
+            beMap[blockPos] = blockEnt
+            level.setBlockEntity(blockEnt)
+        }
+
+        plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
+            relightFuture.join()
+            val levelChunk = level.getChunk(chunk.x, chunk.z)
+            val players = level.getChunkSource().chunkMap.getPlayers(levelChunk.pos, false)
+            if (players.isNotEmpty()) {
+                val packet = ClientboundLevelChunkWithLightPacket(
+                    levelChunk, level.lightEngine, BitSet(), BitSet(), true
+                )
+                for (player in players) {
+                    player.connection.send(packet)
+                }
+            }
+        }
+    }
+
+    override fun getRestoreExecutor(): ExecutorService = RESTORE_POOL
 
     override fun serializeChunkDataToByteBuf(chunkData: Map<Pair<Int, Int>, ByteBuf>): ByteBuf {
         val chunks = chunkData.entries.chunked(600)

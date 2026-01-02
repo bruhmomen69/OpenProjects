@@ -294,9 +294,8 @@ private class PaperRestoreSchedulerApi(
             targetChunkZ = originChunkZ,
             sizeXChunks = templateVersion.data.sizeXChunks,
             sizeZChunks = templateVersion.data.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(world, templateVersion.data, originChunkX, originChunkZ, plugin)
-            }
+            template = templateVersion.data,
+            updateLight = false
         )
 
         scheduleRestore(job, countdownSeconds, announcePoints, audienceScope)
@@ -353,9 +352,8 @@ private class PaperRestoreSchedulerApi(
             targetChunkZ = originChunkZ,
             sizeXChunks = templateVersion.data.sizeXChunks,
             sizeZChunks = templateVersion.data.sizeZChunks,
-            restoreAction = {
-                nmsAdapter.restoreTemplate(world, templateVersion.data, originChunkX, originChunkZ, plugin)
-            }
+            template = templateVersion.data,
+            updateLight = false
         )
 
         schedulerService.scheduleRepeatingRestore(job, intervalSeconds, audienceScope)
