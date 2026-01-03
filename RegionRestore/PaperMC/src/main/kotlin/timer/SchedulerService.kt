@@ -306,6 +306,8 @@ class SchedulerService(
                     maxBlockZ = job.maxBlockZ
                 )
             }
+            
+            job.future.completeExceptionally(Exception("Maximum concurrent restores reached"))
             return
         }
 
@@ -392,7 +394,7 @@ class SchedulerService(
                                     }
                                 }
 
-                                delay(40) // Try to be next tick after load to drastically reduce errors.
+                                delay(42) // Try to be next tick after load to drastically reduce errors.
 
                                 val handle = ChunkTicketHandle(
                                     key = key,

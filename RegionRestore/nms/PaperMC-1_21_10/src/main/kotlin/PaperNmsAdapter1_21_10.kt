@@ -8,6 +8,7 @@ import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
+import kotlinx.coroutines.future.await
 import net.minecraft.core.BlockPos
 import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket
@@ -18,6 +19,7 @@ import net.minecraft.world.level.block.entity.BaseContainerBlockEntity
 import net.minecraft.world.level.chunk.ChunkAccess
 import net.minecraft.world.level.chunk.LevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus
+import net.minecraft.world.level.levelgen.Heightmap
 import org.bukkit.Chunk
 import org.bukkit.World
 import org.bukkit.block.BlockState
@@ -119,7 +121,17 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
         val relightFuture = CompletableFuture<Unit>()
 
         // Restore this chunk
-        val restore = restoreChunk(template, targetChunkX, targetChunkZ, level, chunkData, chunk, fBuffer, chonkHandle)
+        val restore = restoreChunk(
+            template,
+            targetChunkX,
+            targetChunkZ,
+            level,
+            chunkData,
+            chunk,
+            fBuffer,
+            chonkHandle,
+            updateLight
+        )
 
         // Re-light this chunk
         if (!updateLight) relightFuture.complete(Unit)
@@ -169,8 +181,9 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
         }
 
         plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
-            relightFuture.join()
+            relightFuture.await()
             val levelChunk = level.getChunk(chunk.x, chunk.z)
+            levelChunk.initializeLightSources()
             val players = level.getChunkSource().chunkMap.getPlayers(levelChunk.pos, false)
             if (players.isNotEmpty()) {
                 val packet = ClientboundLevelChunkWithLightPacket(
@@ -397,7 +410,17 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             completions.add(CompletableFuture.supplyAsync({
                 // Restore this chunk
                 val restore =
-                    restoreChunk(template, originChunkX, originChunkZ, level, chunkData, chunk, fBuffer, chonkHandle)
+                    restoreChunk(
+                        template,
+                        originChunkX,
+                        originChunkZ,
+                        level,
+                        chunkData,
+                        chunk,
+                        fBuffer,
+                        chonkHandle,
+                        updateLight
+                    )
                 // Re-light this chunk
                 if (!updateLight) relightFuture.complete(Unit)
                 else if (level.lightEngine is ThreadedLevelLightEngine) level.lightEngine.`starlight$serverRelightChunks`(
@@ -461,6 +484,7 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
 
             plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
                 val levelChunk = level.getChunk(chunk.x, chunk.z)
+                levelChunk.initializeLightSources()
                 val players = level.getChunkSource().chunkMap.getPlayers(levelChunk.pos, false)
                 if (players.isNotEmpty()) {
                     // Ensure light has updated before sending
@@ -495,6 +519,7 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
         chunk: Chunk,
         fBuffer: FriendlyByteBuf,
         chonkHandle: ChunkAccess,
+        updateLight: Boolean
     ): ChunkRestoreData {
         chunkData.readerIndex(0)
 
@@ -513,34 +538,54 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             }
         }
 
-        val skyNibbleSize = fBuffer.readShort()
-        val skyNibbles = arrayOfNulls<SWMRNibbleArray>(skyNibbleSize.toInt())
-        for (i in 0 until skyNibbleSize) {
-            val old = fBuffer.readShort().toInt()
-            if (old != 0 && old != 1) {
-                val bytes = fBuffer.readInt()
-                val array = ByteArray(bytes)
-                fBuffer.readBytes(array)
-                skyNibbles[i] = SWMRNibbleArray(array)
-            } else {
-                skyNibbles[i] = SWMRNibbleArray(null)
+
+        if (!updateLight) {
+            val skyNibbleSize = fBuffer.readShort()
+            val skyNibbles = arrayOfNulls<SWMRNibbleArray>(skyNibbleSize.toInt())
+            for (i in 0 until skyNibbleSize) {
+                val old = fBuffer.readShort().toInt()
+                if (old != 0 && old != 1) {
+                    val bytes = fBuffer.readInt()
+                    val array = ByteArray(bytes)
+                    fBuffer.readBytes(array)
+                    skyNibbles[i] = SWMRNibbleArray(array)
+                } else {
+                    skyNibbles[i] = SWMRNibbleArray(null)
+                }
+            }
+            val blockNibbleSize = fBuffer.readShort()
+            val blockNibbles = arrayOfNulls<SWMRNibbleArray>(blockNibbleSize.toInt())
+            for (i in 0 until blockNibbleSize) {
+                val old = fBuffer.readShort().toInt()
+                if (old != 0 && old != 1) {
+                    val bytes = fBuffer.readInt()
+                    val array = ByteArray(bytes)
+                    fBuffer.readBytes(array)
+                    blockNibbles[i] = SWMRNibbleArray(array)
+                } else {
+                    blockNibbles[i] = SWMRNibbleArray(null)
+                }
+            }
+            chonkHandle.`starlight$setSkyNibbles`(skyNibbles as Array<out SWMRNibbleArray>)
+            chonkHandle.`starlight$setBlockNibbles`(blockNibbles as Array<out SWMRNibbleArray>)
+        } else {
+            val skyNibbleSize = fBuffer.readShort()
+            for (i in 0 until skyNibbleSize) {
+                val old = fBuffer.readShort().toInt()
+                if (old != 0 && old != 1) {
+                    val bytes = fBuffer.readInt()
+                    fBuffer.readerIndex(fBuffer.readerIndex() + bytes)
+                }
+            }
+            val blockNibbleSize = fBuffer.readShort()
+            for (i in 0 until blockNibbleSize) {
+                val old = fBuffer.readShort().toInt()
+                if (old != 0 && old != 1) {
+                    val bytes = fBuffer.readInt()
+                    fBuffer.readerIndex(fBuffer.readerIndex() + bytes)
+                }
             }
         }
-        val blockNibbleSize = fBuffer.readShort()
-        val blockNibbles = arrayOfNulls<SWMRNibbleArray>(blockNibbleSize.toInt())
-        for (i in 0 until blockNibbleSize) {
-            val old = fBuffer.readShort().toInt()
-            if (old != 0 && old != 1) {
-                val bytes = fBuffer.readInt()
-                val array = ByteArray(bytes)
-                fBuffer.readBytes(array)
-                blockNibbles[i] = SWMRNibbleArray(array)
-            } else {
-                blockNibbles[i] = SWMRNibbleArray(null)
-            }
-        }
-        chonkHandle.`starlight$setSkyNibbles`(skyNibbles as Array<out SWMRNibbleArray>)
-        chonkHandle.`starlight$setBlockNibbles`(blockNibbles as Array<out SWMRNibbleArray>)
 
         val skyEmptinessMap = BooleanArray(fBuffer.readInt())
         for (i in 0 until skyEmptinessMap.size) {
@@ -554,6 +599,17 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
         }
         chonkHandle.`starlight$setBlockEmptinessMap`(blockEmptinessMap)
 
+        val heightmaps = fBuffer.readShort().toInt()
+        for (i in 0 until heightmaps) {
+            val heightmapName = fBuffer.readUtf(8192)
+            val heightmap = Heightmap.Types.valueOf(heightmapName)
+            if (heightmap.sendToClient()) {
+                val heightmapData = fBuffer.readLongArray()
+                chonkHandle.setHeightmap(heightmap, heightmapData)
+            } else {
+                fBuffer.readerIndex(fBuffer.readerIndex() + 8)
+            }
+        }
 
         return ChunkRestoreData(template, originChunkX, originChunkZ, level, chunkData, chunk, fBuffer, chonkHandle)
     }
@@ -625,6 +681,16 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                 fBuffer.writeInt(blockEmptinessMap.size)
                 for (bool in blockEmptinessMap) {
                     fBuffer.writeBoolean(bool)
+                }
+
+                val heightmaps = nmsChunk.getHeightmaps()
+                    .filter { entry1 -> entry1.key.sendToClient() }
+                    .associate { entry -> entry.key to entry.value.rawData.clone() }
+
+                fBuffer.writeShort(heightmaps.size)
+                for (heightmap in heightmaps) {
+                    fBuffer.writeUtf(heightmap.key.name)
+                    fBuffer.writeLongArray(heightmap.value)
                 }
 
                 val invTiles =
