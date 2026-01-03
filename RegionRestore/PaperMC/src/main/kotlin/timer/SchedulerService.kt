@@ -35,7 +35,8 @@ data class RestoreJob(
     val sizeXChunks: Int = 1,
     val sizeZChunks: Int = 1,
     val template: RegionTemplate,
-    val updateLight: Boolean = false
+    val updateLight: Boolean = false,
+    val future: CompletableFuture<RestoreJob> = CompletableFuture()
 ) {
     var isRunning = false
         @Synchronized get
@@ -508,9 +509,15 @@ class SchedulerService(
                     maxBlockZ = job.maxBlockZ
                 )
             }
+
+            job.future.completeExceptionally(e)
         } finally {
             job.isRunning = false
             activeRestores.decrementAndGet()
+
+            if (!job.future.isDone) {
+                job.future.complete(job)
+            }
         }
     }
 
