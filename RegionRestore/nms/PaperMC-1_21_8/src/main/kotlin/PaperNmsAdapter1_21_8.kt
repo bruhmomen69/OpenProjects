@@ -4,11 +4,11 @@ import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray
 import com.github.luben.zstd.Zstd
 import com.github.shynixn.mccoroutine.folia.launch
 import com.github.shynixn.mccoroutine.folia.regionDispatcher
-import kotlinx.coroutines.Job
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.future.await
 import net.minecraft.core.BlockPos
 import net.minecraft.network.FriendlyByteBuf
@@ -17,7 +17,6 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ThreadedLevelLightEngine
 import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity
-import net.minecraft.world.level.chunk.ChunkAccess
 import net.minecraft.world.level.chunk.LevelChunk
 import net.minecraft.world.level.chunk.status.ChunkStatus
 import net.minecraft.world.level.levelgen.Heightmap
@@ -44,7 +43,11 @@ import java.util.concurrent.Executors
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
 
+@OptIn(ExperimentalAtomicApi::class)
 class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
     companion object {
         private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 100) {
@@ -181,20 +184,34 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
             level.setBlockEntity(blockEnt)
         }
 
-        return plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
-            relightFuture.await()
-            val levelChunk = level.getChunk(chunk.x, chunk.z)
-            levelChunk.initializeLightSources()
-            val players = level.getChunkSource().chunkMap.getPlayers(levelChunk.pos, false)
-            if (players.isNotEmpty()) {
-                val packet = ClientboundLevelChunkWithLightPacket(
-                    levelChunk, level.lightEngine, BitSet(), BitSet(), true
-                )
-                for (player in players) {
-                    player.connection.send(packet)
+        // Censor the curse word in this kotlin class name.
+        val `j*b` = Job()
+
+        relightFuture.await()
+        val players = level.getChunkSource().chunkMap.getPlayers(chonkHandle.pos, false)
+        if (players.isNotEmpty()) {
+            val bitset = BitSet()
+            for (layer in 0..level.lightEngine.lightSectionCount) {
+                bitset.set(layer, true)
+            }
+            val packet = ClientboundLevelChunkWithLightPacket(
+                chonkHandle, level.lightEngine, bitset, bitset, true
+            )
+
+            // Send the packets, once all sent, complete the j*b.
+            val remaining = AtomicInt(players.size)
+            for (player in players) {
+                player.connection.send(packet) {
+                    if (remaining.decrementAndFetch() == 0) {
+                        `j*b`.complete()
+                    }
                 }
             }
+        } else {
+            `j*b`.complete()
         }
+
+        return `j*b`
     }
 
     override fun getRestoreExecutor(): ExecutorService = RESTORE_POOL
@@ -479,20 +496,24 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
                     blockEnt.setItem(invPos.toInt(), (iStack as CraftItemStack).handle)
                 }
 
-                beMap[blockPos] = blockEnt
-                level.setBlockEntity(blockEnt)
+            beMap[blockPos] = blockEnt
+            level.setBlockEntity(blockEnt)
+        }
+
+            val bitset = BitSet()
+            for (layer in 0..level.lightEngine.lightSectionCount) {
+                bitset.set(layer, true)
             }
 
             plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
-                val levelChunk = level.getChunk(chunk.x, chunk.z)
-                levelChunk.initializeLightSources()
-                val players = level.getChunkSource().chunkMap.getPlayers(levelChunk.pos, false)
+                val players = level.getChunkSource().chunkMap.getPlayers(chonkHandle.pos, false)
+
                 if (players.isNotEmpty()) {
                     // Ensure light has updated before sending
-                    relightCompletions[levelChunk.pos]?.whenComplete(
+                    relightCompletions[chonkHandle.pos]?.whenComplete(
                         { _, _ ->
                             val packet = ClientboundLevelChunkWithLightPacket(
-                                levelChunk, level.lightEngine, BitSet(), BitSet(), true
+                                chonkHandle, level.lightEngine, bitset, bitset, true
                             )
                             for (player in players) {
                                 player.connection.send(packet)
@@ -500,7 +521,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
                         }
                     ) ?: run {
                         val packet = ClientboundLevelChunkWithLightPacket(
-                            levelChunk, level.lightEngine, BitSet(), BitSet(), true
+                            chonkHandle, level.lightEngine, bitset, bitset, true
                         )
                         for (player in players) {
                             player.connection.send(packet)
@@ -519,7 +540,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
         chunkData: ByteBuf,
         chunk: Chunk,
         fBuffer: FriendlyByteBuf,
-        chonkHandle: ChunkAccess,
+        chonkHandle: LevelChunk,
         doFullRelight: Boolean
     ): ChunkRestoreData {
         chunkData.readerIndex(0)
@@ -594,20 +615,12 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
             skyEmptinessMap[i] = fBuffer.readBoolean()
         }
         chonkHandle.`starlight$setSkyEmptinessMap`(skyEmptinessMap)
-        if (!doFullRelight) {
-            // Do partial light
-            level.lightEngine.`starlight$getLightEngine`().skyLightEngine.light(level.lightEngine.`starlight$getLightEngine`().lightAccess, chonkHandle, skyEmptinessMap.toTypedArray())
-        }
 
         val blockEmptinessMap = BooleanArray(fBuffer.readInt())
         for (i in 0 until blockEmptinessMap.size) {
             blockEmptinessMap[i] = fBuffer.readBoolean()
         }
         chonkHandle.`starlight$setBlockEmptinessMap`(blockEmptinessMap)
-        if (!doFullRelight) {
-            // Do partial light
-            level.lightEngine.`starlight$getLightEngine`().blockLightEngine.light(level.lightEngine.`starlight$getLightEngine`().lightAccess, chonkHandle, blockEmptinessMap.toTypedArray())
-        }
 
         val heightmaps = fBuffer.readShort().toInt()
         for (i in 0 until heightmaps) {
@@ -744,6 +757,6 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
         val chunkData: ByteBuf,
         val chunk: Chunk,
         val fBuffer: FriendlyByteBuf,
-        val chonkHandle: ChunkAccess
+        val chonkHandle: LevelChunk
     )
 }

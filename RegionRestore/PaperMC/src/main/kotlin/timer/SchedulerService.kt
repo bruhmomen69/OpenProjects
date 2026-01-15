@@ -20,8 +20,10 @@ import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -68,12 +70,10 @@ class SchedulerService(
     private val notificationsConfig: NotificationsConfig,
     private val nmsAdapter: PaperNmsAdapter
 ) {
-    private val restoreJobs = ConcurrentHashMap<UUID, RestoreJob>()
     private val countdownJobs = ConcurrentHashMap<UUID, Job>()
     private val repeatingJobs = ConcurrentHashMap<UUID, Job>()
-    private val activeRestores = AtomicInteger(0)
 
-    @OptIn(ExperimentalAtomicApi::class)
+    private val activeRestores = AtomicInt(0)
     private val chunkLoads = AtomicLong(0)
 
     private data class ChunkKey(
@@ -297,7 +297,7 @@ class SchedulerService(
             return
         }
 
-        if (activeRestores.get() >= restoreConfig.maxConcurrentRestores) {
+        if (activeRestores.load() >= restoreConfig.maxConcurrentRestores) {
             val config = NotificationConfig.fromEventConfig(
                 notificationsConfig.restoreSkipped,
                 mapOf("reason" to "maximum concurrent restores (${restoreConfig.maxConcurrentRestores}) reached")
@@ -320,7 +320,7 @@ class SchedulerService(
         }
 
         job.isRunning = true
-        activeRestores.incrementAndGet()
+        activeRestores.incrementAndFetch()
 
         try {
             val startedConfig = NotificationConfig.fromEventConfig(notificationsConfig.restoreStarted)
@@ -518,7 +518,7 @@ class SchedulerService(
                 val allTime = end - start
                 val totalActiveTime = totalTime.load()
                 val activeTimePer = totalActiveTime / restoreFutures.size
-                plugin.slF4JLogger.info("Restore took ${totalActiveTime}ms active, ${allTime - activeTimePer}ms total.")
+                plugin.slF4JLogger.info("Restore Timer: ${totalActiveTime}ms active (restore time + packet writing cpu-time aggregated, is usually mostly packet time), ${allTime - activeTimePer}ms total (wall clock, includes active wall clock time, chunk loading, and more).")
                 plugin.slF4JLogger.info("Note that `streamingRestore` is on in your config, and causes a higher active time, but reduces memory usage and chunk load.")
             } else {
                 // Legacy mode: preload all chunks, then restore all, then release all
@@ -582,7 +582,7 @@ class SchedulerService(
             job.future.completeExceptionally(e)
         } finally {
             job.isRunning = false
-            activeRestores.decrementAndGet()
+            activeRestores.decrementAndFetch()
 
             if (!job.future.isDone) {
                 job.future.complete(job)
