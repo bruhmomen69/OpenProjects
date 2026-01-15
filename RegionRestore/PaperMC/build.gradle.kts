@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     id("buildsrc.convention.kotlin-jvm")
     alias(libs.plugins.kotlinPluginSerialization)
@@ -18,4 +20,8 @@ dependencies {
     api(libs.zstd)
     implementation(libs.kotlinReflect)
     implementation(libs.kache)
+}
+val compileKotlin: KotlinCompile by tasks
+compileKotlin.compilerOptions {
+    freeCompilerArgs.set(listOf("-Xnon-local-break-continue"))
 }

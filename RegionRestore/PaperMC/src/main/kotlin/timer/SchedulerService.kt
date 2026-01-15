@@ -9,8 +9,11 @@ import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
 import bruh.regionrestore.notification.NotificationService
 import com.github.shynixn.mccoroutine.folia.*
+import it.unimi.dsi.fastutil.longs.Long2ObjectArrayMap
 import kotlinx.coroutines.*
+import kotlinx.coroutines.future.asCompletableFuture
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.sync.Mutex
 import org.bukkit.Chunk
 import org.bukkit.World
 import java.util.*
@@ -23,9 +26,14 @@ import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
+fun asLong(x: Int, z: Int): Long {
+    return x.toLong() and 4294967295L or ((z.toLong() and 4294967295L) shl 32)
+}
 
 data class RestoreJob(
     val id: UUID,
@@ -306,7 +314,7 @@ class SchedulerService(
                     maxBlockZ = job.maxBlockZ
                 )
             }
-            
+
             job.future.completeExceptionally(Exception("Maximum concurrent restores reached"))
             return
         }
@@ -342,6 +350,7 @@ class SchedulerService(
                 // Streaming mode: restore chunks as they load
                 val chunkAdapter = nmsAdapter as ChunkByChunkRestore
                 val restoreFutures = mutableListOf<CompletableFuture<Unit>>()
+                val restoreMap = Long2ObjectArrayMap<Mutex>(job.sizeXChunks * job.sizeZChunks)
                 val totalTime = AtomicLong(0)
                 val async = restoreConfig.asyncRestore ?: true
 
@@ -355,13 +364,26 @@ class SchedulerService(
                     val wasLoaded = job.world.isChunkLoaded(targetChunkX, targetChunkZ)
                     val dispatcher =
                         if (async)
-                            plugin.asyncDispatcher
+                            Dispatchers.Default
                         else
                             plugin.regionDispatcher(
                                 job.world,
                                 targetChunkX,
                                 targetChunkZ
                             )
+
+                    // Setup mutexes from one thread as the map is not thread safe.
+                    val localLock = restoreMap.computeIfAbsent(asLong(targetChunkX, targetChunkZ)) { Mutex() }
+                    val neighbourMutexes = arrayOf(
+                        Triple(targetChunkX, targetChunkZ + 1, restoreMap.computeIfAbsent(asLong(targetChunkX, targetChunkZ + 1)) { Mutex() }),
+                        Triple(targetChunkX, targetChunkZ - 1, restoreMap.computeIfAbsent(asLong(targetChunkX, targetChunkZ - 1)) { Mutex() }),
+                        Triple(targetChunkX + 1, targetChunkZ + 1, restoreMap.computeIfAbsent(asLong(targetChunkX + 1, targetChunkZ + 1)) { Mutex() }),
+                        Triple(targetChunkX + 1, targetChunkZ, restoreMap.computeIfAbsent(asLong(targetChunkX + 1, targetChunkZ)) { Mutex() }),
+                        Triple(targetChunkX + 1, targetChunkZ - 1, restoreMap.computeIfAbsent(asLong(targetChunkX + 1, targetChunkZ - 1)) { Mutex() }),
+                        Triple(targetChunkX - 1, targetChunkZ + 1, restoreMap.computeIfAbsent(asLong(targetChunkX - 1, targetChunkZ + 1)) { Mutex() }),
+                        Triple(targetChunkX - 1, targetChunkZ, restoreMap.computeIfAbsent(asLong(targetChunkX - 1, targetChunkZ)) { Mutex() }),
+                        Triple(targetChunkX - 1, targetChunkZ - 1, restoreMap.computeIfAbsent(asLong(targetChunkX - 1, targetChunkZ - 1)) { Mutex() }),
+                    )
 
                     restoreFutures.add(
                         chunkFuture.handle { chunk, throwable ->
@@ -403,10 +425,39 @@ class SchedulerService(
                                     wasLoaded = wasLoaded
                                 )
 
+
+                                // Lock this and neighbours before doing shit
+                                var locked = false
+                                val spinId = (Math.random() * 1000).roundToInt()
+                                while (!locked) {
+                                    run {
+                                        localLock.lock()
+                                        for ((x, z, mutex) in neighbourMutexes) {
+                                            if (mutex.isLocked) {
+                                                // Unlock local lock
+                                                localLock.unlock()
+                                                // Await remote lock availability.
+                                                plugin.slF4JLogger.debug("Task $spinId: Spinning on remote lock for chunk $x, $z")
+                                                mutex.lock()
+                                                mutex.unlock()
+                                                plugin.slF4JLogger.debug("Task $spinId: Spun remote lock for chunk $x, $z")
+                                                // Delay by random amount to avoid lock contention
+                                                delay((Math.random() * 4).roundToLong())
+                                                return@run
+                                            }
+                                            // Otherwise, lock is not locked, new lock cannot be locked as our local lock is locked, continue.
+                                        }
+
+                                        locked = true
+                                    }
+                                }
+                                plugin.slF4JLogger.debug("Locked chunk $targetChunkX, $targetChunkZ")
+
+                                // Actually run the restores
                                 try {
                                     // Restore this chunk immediately
                                     val begin = System.currentTimeMillis()
-                                    chunkAdapter.restoreSingleChunk(
+                                    val nextTickFuture = chunkAdapter.restoreSingleChunk(
                                         job.world,
                                         job.template,
                                         templateChunkX,
@@ -416,10 +467,20 @@ class SchedulerService(
                                         plugin,
                                         job.updateLight
                                     )
+
+                                    // Unlock pre-await
+                                    if (locked) {
+                                        localLock.unlock()
+                                        locked = false
+                                        plugin.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ")
+                                    }
+
                                     val completeTime = System.currentTimeMillis()
                                     totalTime.addAndFetch(completeTime - begin)
 
-                                    // Release ticket immediately after restore
+                                    nextTickFuture.asCompletableFuture().await()
+
+                                    // Release ticket immediately after restore and tick tasks have completed.
                                     releaseChunkTickets(listOf(handle))
                                     future.complete(Unit)
                                 } catch (e: Exception) {
@@ -429,6 +490,12 @@ class SchedulerService(
                                     )
                                     releaseChunkTickets(listOf(handle))
                                     future.completeExceptionally(e)
+                                } finally {
+                                    if (locked) {
+                                        localLock.unlock()
+                                        locked = false
+                                        plugin.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ (e-case)")
+                                    }
                                 }
                             }
 

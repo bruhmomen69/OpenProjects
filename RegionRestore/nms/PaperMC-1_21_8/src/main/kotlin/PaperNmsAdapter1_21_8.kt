@@ -4,6 +4,7 @@ import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray
 import com.github.luben.zstd.Zstd
 import com.github.shynixn.mccoroutine.folia.launch
 import com.github.shynixn.mccoroutine.folia.regionDispatcher
+import kotlinx.coroutines.Job
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import io.netty.buffer.ByteBuf
@@ -98,7 +99,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
         targetChunkZ: Int,
         plugin: JavaPlugin,
         updateLight: Boolean
-    ) {
+    ): Job {
         val level = (world as CraftWorld).handle
         val chunkDataKey = Pair(templateChunkX, templateChunkZ)
         val chunkData = template.chunkData[chunkDataKey] ?: throw IllegalStateException("Chunk data not found for $chunkDataKey")
@@ -180,7 +181,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
             level.setBlockEntity(blockEnt)
         }
 
-        plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
+        return plugin.launch(plugin.regionDispatcher(world, chunk.x, chunk.z)) {
             relightFuture.await()
             val levelChunk = level.getChunk(chunk.x, chunk.z)
             levelChunk.initializeLightSources()
@@ -519,7 +520,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
         chunk: Chunk,
         fBuffer: FriendlyByteBuf,
         chonkHandle: ChunkAccess,
-        updateLight: Boolean
+        doFullRelight: Boolean
     ): ChunkRestoreData {
         chunkData.readerIndex(0)
 
@@ -539,7 +540,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
         }
 
 
-        if (!updateLight) {
+        if (!doFullRelight) {
             val skyNibbleSize = fBuffer.readShort()
             val skyNibbles = arrayOfNulls<SWMRNibbleArray>(skyNibbleSize.toInt())
             for (i in 0 until skyNibbleSize) {
@@ -568,6 +569,7 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
             }
             chonkHandle.`starlight$setSkyNibbles`(skyNibbles as Array<out SWMRNibbleArray>)
             chonkHandle.`starlight$setBlockNibbles`(blockNibbles as Array<out SWMRNibbleArray>)
+
         } else {
             val skyNibbleSize = fBuffer.readShort()
             for (i in 0 until skyNibbleSize) {
@@ -592,12 +594,20 @@ class PaperNmsAdapter1_21_8 : PaperNmsAdapter, ChunkByChunkRestore {
             skyEmptinessMap[i] = fBuffer.readBoolean()
         }
         chonkHandle.`starlight$setSkyEmptinessMap`(skyEmptinessMap)
+        if (!doFullRelight) {
+            // Do partial light
+            level.lightEngine.`starlight$getLightEngine`().skyLightEngine.light(level.lightEngine.`starlight$getLightEngine`().lightAccess, chonkHandle, skyEmptinessMap.toTypedArray())
+        }
 
         val blockEmptinessMap = BooleanArray(fBuffer.readInt())
         for (i in 0 until blockEmptinessMap.size) {
             blockEmptinessMap[i] = fBuffer.readBoolean()
         }
         chonkHandle.`starlight$setBlockEmptinessMap`(blockEmptinessMap)
+        if (!doFullRelight) {
+            // Do partial light
+            level.lightEngine.`starlight$getLightEngine`().blockLightEngine.light(level.lightEngine.`starlight$getLightEngine`().lightAccess, chonkHandle, blockEmptinessMap.toTypedArray())
+        }
 
         val heightmaps = fBuffer.readShort().toInt()
         for (i in 0 until heightmaps) {
