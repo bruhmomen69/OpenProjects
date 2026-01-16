@@ -74,7 +74,7 @@ data class RestoreConfig(
     val unload: Boolean = true,
     @Comment("Instant unload chunks? If not, then we use paper's unload queue which helps reduce per-tick lag.")
     val unloadInstant: Boolean = false,
-    @Comment("Update light after restoring chunks? Can cause some delay before chunk update packets while light updates. This can also cause a lot of async cpu usage, and most servers do not need it.")
+    @Comment("Relight chunks after restoring chunks? Can cause some delay before chunk update packets while light updates. This can also cause a lot of async cpu usage, and most servers do not need it.")
     val updateLight: Boolean = false,
     @Comment("Do the restore fully async? May cause server instability. `null` here means enable when compatible.")
     val asyncRestore: Boolean? = null,
