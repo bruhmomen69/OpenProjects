@@ -19,12 +19,7 @@ import org.bukkit.World
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicLong
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.concurrent.atomics.decrementAndFetch
-import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.concurrent.atomics.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.ceil
@@ -76,10 +71,21 @@ class SchedulerService(
     private val activeRestores = AtomicInt(0)
     private val chunkLoads = AtomicLong(0)
 
+    private val chunkTicketRefs = ConcurrentHashMap<ChunkKey, Int>()
+    private val cbcLocks = ConcurrentHashMap<Long, ChunkLock>()
+
     private data class ChunkKey(
         val worldId: UUID,
         val x: Int,
         val z: Int
+    )
+
+    private data class ChunkLock(
+        val x: Int,
+        val z: Int,
+        val lock: Mutex = Mutex(),
+        val lockAccessCnt: AtomicInt = AtomicInt(0),
+        var objectAccessCnt: Int = 0
     )
 
     private data class ChunkTicketHandle(
@@ -88,8 +94,6 @@ class SchedulerService(
         val hadTicket: Boolean,
         val wasLoaded: Boolean
     )
-
-    private val chunkTicketRefs = ConcurrentHashMap<ChunkKey, Int>()
 
     private fun incrementTicketRef(key: ChunkKey): Int =
         chunkTicketRefs.merge(key, 1) { a, b -> a + b }!!
@@ -100,6 +104,26 @@ class SchedulerService(
             if (next <= 0) null else next
         }
         return newCount ?: 0
+    }
+
+    /**
+     * Thread safety: Relies on CHM#lock to lock based on key so multiple concurrent accesses are safe.
+     */
+    private fun accessChunkLock(x: Int, z: Int): ChunkLock {
+        return cbcLocks.compute(asLong(x, z)) { key, value ->
+            val finalValue = value ?: ChunkLock(x, z)
+            finalValue.objectAccessCnt++
+            finalValue
+        }!!
+    }
+
+    /**
+     * Thread safety: Relies on CHM#lock to lock based on key so multiple concurrent accesses are safe.
+     */
+    private fun releaseChunkLock(lock: ChunkLock) {
+        cbcLocks.compute(asLong(lock.x, lock.z)) { key, value ->
+            if (--lock.objectAccessCnt == 0) null else value
+        }
     }
 
     private suspend fun <T> awaitAll(futures: List<CompletableFuture<T>>): List<T> =
@@ -178,9 +202,7 @@ class SchedulerService(
         return awaitAll(futures)
     }
 
-    @OptIn(ExperimentalAtomicApi::class)
     private fun releaseChunkTickets(handles: List<ChunkTicketHandle>) {
-
         for (handle in handles) {
             if (!handle.hadTicket) {
                 continue
@@ -350,7 +372,6 @@ class SchedulerService(
                 // Streaming mode: restore chunks as they load
                 val chunkAdapter = nmsAdapter as ChunkByChunkRestore
                 val restoreFutures = mutableListOf<CompletableFuture<Unit>>()
-                val restoreMap = Long2ObjectArrayMap<Mutex>(job.sizeXChunks * job.sizeZChunks)
                 val totalTime = AtomicLong(0)
                 val async = restoreConfig.asyncRestore ?: true
 
@@ -361,6 +382,17 @@ class SchedulerService(
                     // Start async chunk load
                     val chunkFuture = job.world.getChunkAtAsync(targetChunkX, targetChunkZ)
                     val key = ChunkKey(job.world.uid, targetChunkX, targetChunkZ)
+                    val neighbourChunkKeys = arrayOf(
+                        ChunkKey(job.world.uid, targetChunkX, targetChunkZ - 1),
+                        ChunkKey(job.world.uid, targetChunkX, targetChunkZ + 1),
+                        ChunkKey(job.world.uid, targetChunkX - 1, targetChunkZ),
+                        ChunkKey(job.world.uid, targetChunkX + 1, targetChunkZ),
+                        ChunkKey(job.world.uid, targetChunkX - 1, targetChunkZ - 1),
+                        ChunkKey(job.world.uid, targetChunkX - 1, targetChunkZ + 1),
+                        ChunkKey(job.world.uid, targetChunkX + 1, targetChunkZ - 1),
+                        ChunkKey(job.world.uid, targetChunkX + 1, targetChunkZ + 1)
+                    )
+
                     val wasLoaded = job.world.isChunkLoaded(targetChunkX, targetChunkZ)
                     val dispatcher =
                         if (async)
@@ -373,17 +405,7 @@ class SchedulerService(
                             )
 
                     // Setup mutexes from one thread as the map is not thread safe.
-                    val localLock = restoreMap.computeIfAbsent(asLong(targetChunkX, targetChunkZ)) { Mutex() }
-                    val neighbourMutexes = arrayOf(
-                        Triple(targetChunkX, targetChunkZ + 1, restoreMap.computeIfAbsent(asLong(targetChunkX, targetChunkZ + 1)) { Mutex() }),
-                        Triple(targetChunkX, targetChunkZ - 1, restoreMap.computeIfAbsent(asLong(targetChunkX, targetChunkZ - 1)) { Mutex() }),
-                        Triple(targetChunkX + 1, targetChunkZ + 1, restoreMap.computeIfAbsent(asLong(targetChunkX + 1, targetChunkZ + 1)) { Mutex() }),
-                        Triple(targetChunkX + 1, targetChunkZ, restoreMap.computeIfAbsent(asLong(targetChunkX + 1, targetChunkZ)) { Mutex() }),
-                        Triple(targetChunkX + 1, targetChunkZ - 1, restoreMap.computeIfAbsent(asLong(targetChunkX + 1, targetChunkZ - 1)) { Mutex() }),
-                        Triple(targetChunkX - 1, targetChunkZ + 1, restoreMap.computeIfAbsent(asLong(targetChunkX - 1, targetChunkZ + 1)) { Mutex() }),
-                        Triple(targetChunkX - 1, targetChunkZ, restoreMap.computeIfAbsent(asLong(targetChunkX - 1, targetChunkZ)) { Mutex() }),
-                        Triple(targetChunkX - 1, targetChunkZ - 1, restoreMap.computeIfAbsent(asLong(targetChunkX - 1, targetChunkZ - 1)) { Mutex() }),
-                    )
+                    val localLock = accessChunkLock(targetChunkX, targetChunkZ)
 
                     restoreFutures.add(
                         chunkFuture.handle { chunk, throwable ->
@@ -425,27 +447,43 @@ class SchedulerService(
                                     wasLoaded = wasLoaded
                                 )
 
+                                val neighbourMutexes = neighbourChunkKeys.map { (_, x, z) -> accessChunkLock(x, z) }
 
                                 // Lock this and neighbours before doing shit
                                 var locked = false
                                 val spinId = (Math.random() * 1000).roundToInt()
                                 while (!locked) {
                                     run {
-                                        localLock.lock()
-                                        for ((x, z, mutex) in neighbourMutexes) {
+                                        localLock.lock.lock()
+                                        for ((x, z, mutex, refCnt) in neighbourMutexes) {
+                                            refCnt.incrementAndFetch()
                                             if (mutex.isLocked) {
                                                 // Unlock local lock
-                                                localLock.unlock()
+                                                localLock.lock.unlock()
                                                 // Await remote lock availability.
                                                 plugin.slF4JLogger.debug("Task $spinId: Spinning on remote lock for chunk $x, $z")
                                                 mutex.lock()
                                                 mutex.unlock()
                                                 plugin.slF4JLogger.debug("Task $spinId: Spun remote lock for chunk $x, $z")
+                                                // Delay for additional time if someone else is checking to avoid re-checking while they re-check, resulting in a loop.
+                                                val extraDelay = refCnt.decrementAndFetch().let { cnt ->
+                                                    if (cnt > 0) {
+                                                        cnt
+                                                    } else {
+                                                        0
+                                                    }
+                                                }
                                                 // Delay by random amount to avoid lock contention
-                                                delay((Math.random() * 4).roundToLong())
+                                                delay((Math.random() * 3).roundToLong() + extraDelay)
+                                                // Delay for additional again, same reasons, this time is to just deal with randoms being random
+                                                val newDelay = refCnt.load()
+                                                if (newDelay > 0) {
+                                                    delay(newDelay.toLong())
+                                                }
                                                 return@run
                                             }
                                             // Otherwise, lock is not locked, new lock cannot be locked as our local lock is locked, continue.
+                                            refCnt.decrementAndFetch() // Unload reference count for this op
                                         }
 
                                         locked = true
@@ -470,7 +508,7 @@ class SchedulerService(
 
                                     // Unlock pre-await
                                     if (locked) {
-                                        localLock.unlock()
+                                        localLock.lock.unlock()
                                         locked = false
                                         plugin.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ")
                                     }
@@ -491,11 +529,16 @@ class SchedulerService(
                                     releaseChunkTickets(listOf(handle))
                                     future.completeExceptionally(e)
                                 } finally {
+                                    // Release local lock, if locked.
                                     if (locked) {
-                                        localLock.unlock()
+                                        localLock.lock.unlock()
                                         locked = false
                                         plugin.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ (e-case)")
                                     }
+
+                                    // Release lock references
+                                    neighbourMutexes.forEach { releaseChunkLock(it) }
+                                    releaseChunkLock(localLock)
                                 }
                             }
 
@@ -518,7 +561,7 @@ class SchedulerService(
                 val allTime = end - start
                 val totalActiveTime = totalTime.load()
                 val activeTimePer = totalActiveTime / restoreFutures.size
-                plugin.slF4JLogger.info("Restore Timer: ${totalActiveTime}ms active (restore time + packet writing cpu-time aggregated, is usually mostly packet time), ${allTime - activeTimePer}ms total (wall clock, includes active wall clock time, chunk loading, and more).")
+                plugin.slF4JLogger.info("Restore Timer: ${totalActiveTime}ms active (restore time + packet writing cpu-time aggregated), ${allTime - activeTimePer}ms total (wall clock, includes active wall clock time, chunk loading, and more).")
                 plugin.slF4JLogger.info("Note that `streamingRestore` is on in your config, and causes a higher active time, but reduces memory usage and chunk load.")
             } else {
                 // Legacy mode: preload all chunks, then restore all, then release all
