@@ -8,8 +8,8 @@ import bruh.regionrestore.nms.RegionTemplate
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
 import bruh.regionrestore.notification.NotificationService
+import bruh.regionrestore.utils.asLong
 import com.github.shynixn.mccoroutine.folia.*
-import it.unimi.dsi.fastutil.longs.Long2ObjectArrayMap
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.asCompletableFuture
 import kotlinx.coroutines.future.await
@@ -27,10 +27,6 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-
-fun asLong(x: Int, z: Int): Long {
-    return x.toLong() and 4294967295L or ((z.toLong() and 4294967295L) shl 32)
-}
 
 data class RestoreJob(
     val id: UUID,
@@ -175,7 +171,7 @@ class SchedulerService(
                                 return@handle try {
                                     chunk.addPluginChunkTicket(plugin)
                                     ChunkTicketHandle(key, chunk, hadTicket = true, wasLoaded = wasLoaded)
-                                } catch (t: Throwable) {
+                                } catch (_: Throwable) {
                                     // Roll back ref count and continue without a ticket
                                     decrementTicketRef(key)
                                     ChunkTicketHandle(key, chunk, hadTicket = false, wasLoaded = wasLoaded)
@@ -184,7 +180,7 @@ class SchedulerService(
 
                             ChunkTicketHandle(key, chunk, hadTicket = false, wasLoaded = wasLoaded)
                         }
-                    } catch (t: Throwable) {
+                    } catch (_: Throwable) {
                         ChunkTicketHandle(key, null, hadTicket = false, wasLoaded = wasLoaded)
                     }
                 }
