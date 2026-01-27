@@ -10,6 +10,45 @@ Core implementation of the RegionRestore plugin for Paper/Folia servers.
 - **Restore Scheduling**: Timer-based and event-driven restore triggers
 - **Notifications**: Configurable notifications for restore events
 
+## Architecture
+
+### Timer Package
+
+The timer package (`bruh.regionrestore.timer`) handles all restore scheduling and execution:
+
+#### [`SchedulerService`](RegionRestore/PaperMC/src/main/kotlin/timer/SchedulerService.kt:65)
+Main entry point for scheduling and managing restore operations. Coordinates between various managers.
+
+#### [`RestoreJob`](RegionRestore/PaperMC/src/main/kotlin/timer/SchedulerService.kt:29)
+Data class representing a restore job with job state and region bounds.
+
+#### Job Management ([`RestoreJobManager`](RegionRestore/PaperMC/src/main/kotlin/timer/job/RestoreJobManager.kt:23))
+- Manages restore job scheduling with countdowns and repeating restores
+- Tracks active restore count and enforces concurrent restore limits
+- Handles cancellation of countdown and repeating jobs
+
+#### Restore Execution ([`RestoreExecutor`](RegionRestore/PaperMC/src/main/kotlin/timer/restore/RestoreExecutor.kt:23))
+- Executes restore operations using streaming (chunk-by-chunk) or legacy (bulk) mode
+- Manages notification sending for restore events
+- Coordinates with chunk managers for loading and locking
+
+#### Chunk Management
+
+[`ChunkTicketManager`](RegionRestore/PaperMC/src/main/kotlin/timer/chunk/ChunkTicketManager.kt:19)
+- Manages chunk ticket references to prevent chunk unloading during restores
+- Handles delayed unloading based on configuration
+- Provides throttling for chunk loading operations
+
+[`ChunkLockManager`](RegionRestore/PaperMC/src/main/kotlin/timer/chunk/ChunkLockManager.kt:16)
+- Manages chunk locking for concurrent restore operations
+- Uses mutex-based system with spin locking to prevent concurrent modifications
+- Ensures locks are acquired for both the target chunk and its neighbors
+
+[`ChunkPreloader`](RegionRestore/PaperMC/src/main/kotlin/timer/chunk/ChunkPreloader.kt:18)
+- Handles preloading chunks for legacy restore mode
+- Creates ticket handles for tracking loaded chunks
+- Provides throttling for chunk load operations
+
 ## Placeholder Integration
 
 RegionRestore provides placeholder support through both PlaceholderAPI and MiniPlaceholders.
