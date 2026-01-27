@@ -327,7 +327,9 @@ essentiallystateless.admin
 
 ### Performance
 - **Zero persistence** - No disk I/O for player data
-- **Async operations** - Non-blocking command execution
+- **Full coroutine support** - All commands are suspend functions for non-blocking execution
+- **Proper thread dispatching** - Entity operations use entityDispatcher, world operations use regionDispatcher
+- **No runBlocking** - Clean coroutine implementation without blocking the main thread
 - **Efficient caching** - Translation and configuration caching
 - **Minimal memory footprint** - Stateless design reduces memory usage
 

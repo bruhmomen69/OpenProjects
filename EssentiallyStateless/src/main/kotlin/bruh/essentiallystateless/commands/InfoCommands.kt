@@ -25,7 +25,7 @@ class InfoCommands(
 
     @Command("gc", "lag", "mem", "memory", "tps", "uptime", "entities")
     @CommandPermission("essentiallystateless.gc")
-    fun gc(actor: BukkitCommandActor) {
+    suspend fun gc(actor: BukkitCommandActor) {
         val runtime = Runtime.getRuntime()
         val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024
         val maxMemory = runtime.maxMemory() / 1024 / 1024
@@ -46,46 +46,46 @@ class InfoCommands(
             entityCount += world.entityCount
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_HEADER))
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_MEMORY) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_HEADER))
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_MEMORY) {
             unparsed("used", usedMemory.toString())
             unparsed("max", maxMemory.toString())
             unparsed("percent", percentUsed.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_TPS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_TPS) {
             unparsed("tps", tpsFormatted)
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_UPTIME) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_UPTIME) {
             unparsed("uptime", uptime)
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_WORLDS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_WORLDS) {
             unparsed("count", worldCount.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_PLAYERS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_PLAYERS) {
             unparsed("online", onlinePlayers.toString())
             unparsed("max", maxPlayers.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GC_ENTITIES) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GC_ENTITIES) {
             unparsed("count", entityCount.toString())
         })
     }
 
     @Command("list", "who", "online", "playerlist")
     @CommandPermission("essentiallystateless.list")
-    fun list(actor: BukkitCommandActor) {
+    suspend fun list(actor: BukkitCommandActor) {
         val players = Bukkit.getOnlinePlayers()
         val maxPlayers = Bukkit.getMaxPlayers()
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.LIST_HEADER) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.LIST_HEADER) {
             unparsed("count", players.size.toString())
             unparsed("max", maxPlayers.toString())
         })
 
         if (players.isEmpty()) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.LIST_EMPTY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.LIST_EMPTY))
         } else {
             val playerNames = players.joinToString(", ") { it.name }
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.LIST_PLAYERS) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.LIST_PLAYERS) {
                 unparsed("players", playerNames)
             })
         }
@@ -93,10 +93,10 @@ class InfoCommands(
 
     @Command("whois")
     @CommandPermission("essentiallystateless.whois")
-    fun whois(actor: BukkitCommandActor, @SuggestOnlinePlayer targetName: String) {
+    suspend fun whois(actor: BukkitCommandActor, @SuggestOnlinePlayer targetName: String) {
         val target = Bukkit.getPlayer(targetName)
         if (target == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                 unparsed("player", targetName)
             })
             return
@@ -105,55 +105,55 @@ class InfoCommands(
         val ip = target.address?.address?.hostAddress ?: "Unknown"
         val maxHealth = target.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH)?.value ?: 20.0
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_HEADER) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_HEADER) {
             unparsed("player", target.name)
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_UUID) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_UUID) {
             unparsed("uuid", target.uniqueId.toString())
         })
         if (actor.sender().hasPermission("essentiallystateless.whois.ip")) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_IP) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_IP) {
                 unparsed("ip", ip)
             })
         }
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_GAMEMODE) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_GAMEMODE) {
             unparsed("mode", target.gameMode.name.lowercase())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_HEALTH) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_HEALTH) {
             unparsed("health", "%.1f".format(target.health))
             unparsed("max", "%.1f".format(maxHealth))
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_FOOD) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_FOOD) {
             unparsed("food", target.foodLevel.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_LEVEL) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_LEVEL) {
             unparsed("level", target.level.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_LOCATION) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_LOCATION) {
             unparsed("world", target.world.name)
             unparsed("x", target.location.blockX.toString())
             unparsed("y", target.location.blockY.toString())
             unparsed("z", target.location.blockZ.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_FLYING) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_FLYING) {
             unparsed("flying", target.isFlying.toString())
         })
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WHOIS_OP) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.WHOIS_OP) {
             unparsed("op", target.isOp.toString())
         })
     }
 
     @Command("near")
     @CommandPermission("essentiallystateless.near")
-    fun near(actor: BukkitCommandActor, @Optional radius: Int?) {
+    suspend fun near(actor: BukkitCommandActor, @Optional radius: Int?) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
         val searchRadius = radius ?: plugin.config.nearRadius
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.NEAR_HEADER) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.NEAR_HEADER) {
             unparsed("radius", searchRadius.toString())
         })
 
@@ -165,7 +165,7 @@ class InfoCommands(
             val distance = player.location.distance(other.location)
             if (distance <= searchRadius) {
                 found = true
-                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.NEAR_PLAYER) {
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.NEAR_PLAYER) {
                     unparsed("player", other.name)
                     unparsed("distance", "%.1f".format(distance))
                 })
@@ -173,16 +173,16 @@ class InfoCommands(
         }
 
         if (!found) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.NEAR_NONE))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.NEAR_NONE))
         }
     }
 
     @Command("seen")
     @CommandPermission("essentiallystateless.seen")
-    fun seen(actor: BukkitCommandActor, targetName: String) {
+    suspend fun seen(actor: BukkitCommandActor, targetName: String) {
         val online = Bukkit.getPlayer(targetName)
         if (online != null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.SEEN_ONLINE) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.SEEN_ONLINE) {
                 unparsed("player", online.name)
             })
             return
@@ -190,7 +190,7 @@ class InfoCommands(
 
         val offline = Bukkit.getOfflinePlayer(targetName)
         if (!offline.hasPlayedBefore()) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.SEEN_NEVER) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.SEEN_NEVER) {
                 unparsed("player", targetName)
             })
             return
@@ -200,7 +200,7 @@ class InfoCommands(
         val duration = Duration.between(Instant.ofEpochMilli(lastPlayed), Instant.now())
         val timeAgo = formatDuration(duration)
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.SEEN_OFFLINE) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.SEEN_OFFLINE) {
             unparsed("player", offline.name ?: targetName)
             unparsed("time", timeAgo)
         })
@@ -208,11 +208,11 @@ class InfoCommands(
 
     @Command("ping", "pong")
     @CommandPermission("essentiallystateless.ping")
-    fun ping(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer targetName: String?) {
+    suspend fun ping(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer targetName: String?) {
         val target = if (targetName != null) {
             val player = Bukkit.getPlayer(targetName)
             if (player == null) {
-                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                     unparsed("player", targetName)
                 })
                 return
@@ -220,7 +220,7 @@ class InfoCommands(
             player
         } else {
             if (actor.sender() !is Player) {
-                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
                 return
             }
             actor.sender() as Player
@@ -229,11 +229,11 @@ class InfoCommands(
         val ping = target.ping
 
         if (target == actor.sender()) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PING_SELF) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PING_SELF) {
                 unparsed("ping", ping.toString())
             })
         } else {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PING_OTHER) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PING_OTHER) {
                 unparsed("player", target.name)
                 unparsed("ping", ping.toString())
             })
@@ -242,11 +242,11 @@ class InfoCommands(
 
     @Command("getpos", "coords", "position")
     @CommandPermission("essentiallystateless.getpos")
-    fun getpos(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer targetName: String?) {
+    suspend fun getpos(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer targetName: String?) {
         val target = if (targetName != null) {
             val player = Bukkit.getPlayer(targetName)
             if (player == null) {
-                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                     unparsed("player", targetName)
                 })
                 return
@@ -254,7 +254,7 @@ class InfoCommands(
             player
         } else {
             if (actor.sender() !is Player) {
-                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
                 return
             }
             actor.sender() as Player
@@ -263,14 +263,14 @@ class InfoCommands(
         val loc = target.location
 
         if (target == actor.sender()) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GETPOS_SELF) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.GETPOS_SELF) {
                 unparsed("x", "%.2f".format(loc.x))
                 unparsed("y", "%.2f".format(loc.y))
                 unparsed("z", "%.2f".format(loc.z))
                 unparsed("world", loc.world.name)
             })
         } else {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GETPOS_OTHER) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.GETPOS_OTHER) {
                 unparsed("player", target.name)
                 unparsed("x", "%.2f".format(loc.x))
                 unparsed("y", "%.2f".format(loc.y))
@@ -282,9 +282,9 @@ class InfoCommands(
 
     @Command("compass", "direction")
     @CommandPermission("essentiallystateless.compass")
-    fun compass(actor: BukkitCommandActor) {
+    suspend fun compass(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
@@ -302,7 +302,7 @@ class InfoCommands(
             else -> "Unknown"
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.COMPASS_DIRECTION) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.COMPASS_DIRECTION) {
             unparsed("direction", direction)
             unparsed("yaw", "%.1f".format(yaw))
         })
@@ -310,9 +310,9 @@ class InfoCommands(
 
     @Command("depth")
     @CommandPermission("essentiallystateless.depth")
-    fun depth(actor: BukkitCommandActor) {
+    suspend fun depth(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
@@ -326,7 +326,7 @@ class InfoCommands(
             else -> translations.getString(CommandMessages.DEPTH_BELOW_SEA)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.DEPTH_LEVEL) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.DEPTH_LEVEL) {
             unparsed("y", y.toString())
             unparsed("status", status)
         })
@@ -334,14 +334,14 @@ class InfoCommands(
 
     @Command("playtime")
     @CommandPermission("essentiallystateless.playtime")
-    fun playtime(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer targetName: String?) {
+    suspend fun playtime(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer targetName: String?) {
         val target = if (targetName != null) {
             val player = Bukkit.getPlayer(targetName)
             if (player == null) {
                 // Try offline player
                 val offline = Bukkit.getOfflinePlayer(targetName)
                 if (!offline.hasPlayedBefore()) {
-                    actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+                    actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                         unparsed("player", targetName)
                     })
                     return
@@ -352,7 +352,7 @@ class InfoCommands(
             }
         } else {
             if (actor.sender() !is Player) {
-                actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
                 return
             }
             actor.sender() as Player
@@ -368,11 +368,11 @@ class InfoCommands(
         }
 
         if (target == actor.sender()) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYTIME_SELF) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYTIME_SELF) {
                 unparsed("time", timeFormatted)
             })
         } else {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYTIME_OTHER) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYTIME_OTHER) {
                 unparsed("player", name)
                 unparsed("time", timeFormatted)
             })

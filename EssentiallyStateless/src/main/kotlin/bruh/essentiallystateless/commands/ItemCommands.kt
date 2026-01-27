@@ -4,7 +4,6 @@ import bruh.essentiallystateless.EssentiallyStatelessPlugin
 import bruh.essentiallystateless.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
-import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -34,7 +33,7 @@ class ItemCommands(
 
     @Command("give")
     @CommandPermission("essentiallystateless.give")
-    fun give(
+    suspend fun give(
         actor: BukkitCommandActor,
         @SuggestOnlinePlayer targetName: String,
         material: String,
@@ -42,7 +41,7 @@ class ItemCommands(
     ) {
         val target = Bukkit.getPlayer(targetName)
         if (target == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                 unparsed("player", targetName)
             })
             return
@@ -50,7 +49,7 @@ class ItemCommands(
 
         val mat = Material.matchMaterial(material)
         if (mat == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.INVALID_NUMBER) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.INVALID_NUMBER) {
                 unparsed("value", material)
             })
             return
@@ -58,13 +57,11 @@ class ItemCommands(
 
         val item = ItemStack(mat, amount.coerceIn(1, mat.maxStackSize * 36))
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(target)) {
-                target.inventory.addItem(item)
-            }
+        withContext(plugin.entityDispatcher(target)) {
+            target.inventory.addItem(item)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.GIVE_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.GIVE_SUCCESS) {
             unparsed("amount", amount.toString())
             unparsed("item", mat.name.lowercase().replace("_", " "))
             unparsed("player", target.name)
@@ -73,20 +70,20 @@ class ItemCommands(
 
     @Command("item", "i")
     @CommandPermission("essentiallystateless.item")
-    fun item(
+    suspend fun item(
         actor: BukkitCommandActor,
         material: String,
         @Optional @Default("1") amount: Int
     ) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
 
         val mat = Material.matchMaterial(material)
         if (mat == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.INVALID_NUMBER) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.INVALID_NUMBER) {
                 unparsed("value", material)
             })
             return
@@ -94,13 +91,11 @@ class ItemCommands(
 
         val item = ItemStack(mat, amount.coerceIn(1, mat.maxStackSize * 36))
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                player.inventory.addItem(item)
-            }
+        withContext(plugin.entityDispatcher(player)) {
+            player.inventory.addItem(item)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.ITEM_SPAWN) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.ITEM_SPAWN) {
             unparsed("amount", amount.toString())
             unparsed("item", mat.name.lowercase().replace("_", " "))
         })
@@ -108,62 +103,58 @@ class ItemCommands(
 
     @Command("more")
     @CommandPermission("essentiallystateless.more")
-    fun more(actor: BukkitCommandActor, @Optional amount: Int?) {
+    suspend fun more(actor: BukkitCommandActor, @Optional amount: Int?) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
         val item = player.inventory.itemInMainHand
 
         if (item.type == Material.AIR) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.MORE_FAILED))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.MORE_FAILED))
             return
         }
 
         val newAmount = amount ?: item.type.maxStackSize
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                item.amount = newAmount
-            }
+        withContext(plugin.entityDispatcher(player)) {
+            item.amount = newAmount
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.MORE_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.MORE_SUCCESS) {
             unparsed("amount", newAmount.toString())
         })
     }
 
     @Command("repair", "fix")
     @CommandPermission("essentiallystateless.repair")
-    fun repair(actor: BukkitCommandActor, @Optional all: String?) {
+    suspend fun repair(actor: BukkitCommandActor, @Optional all: String?) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                if (all?.equals("all", ignoreCase = true) == true) {
-                    for (item in player.inventory.contents) {
-                        if (item != null) {
-                            repairItem(item)
-                        }
+        withContext(plugin.entityDispatcher(player)) {
+            if (all?.equals("all", ignoreCase = true) == true) {
+                for (item in player.inventory.contents) {
+                    if (item != null) {
+                        repairItem(item)
                     }
-                    player.sendMessage(translations.getComponentSync(CommandMessages.REPAIR_ALL_SUCCESS))
-                } else {
-                    val item = player.inventory.itemInMainHand
-                    if (item.type == Material.AIR) {
-                        player.sendMessage(translations.getComponentSync(CommandMessages.REPAIR_FAILED))
-                        return@withContext
-                    }
-                    if (!repairItem(item)) {
-                        player.sendMessage(translations.getComponentSync(CommandMessages.REPAIR_FAILED))
-                        return@withContext
-                    }
-                    player.sendMessage(translations.getComponentSync(CommandMessages.REPAIR_SUCCESS))
                 }
+                player.sendMessage(translations.getComponent(CommandMessages.REPAIR_ALL_SUCCESS))
+            } else {
+                val item = player.inventory.itemInMainHand
+                if (item.type == Material.AIR) {
+                    player.sendMessage(translations.getComponent(CommandMessages.REPAIR_FAILED))
+                    return@withContext
+                }
+                if (!repairItem(item)) {
+                    player.sendMessage(translations.getComponent(CommandMessages.REPAIR_FAILED))
+                    return@withContext
+                }
+                player.sendMessage(translations.getComponent(CommandMessages.REPAIR_SUCCESS))
             }
         }
     }
@@ -180,37 +171,35 @@ class ItemCommands(
 
     @Command("enchant")
     @CommandPermission("essentiallystateless.enchant")
-    fun enchant(
+    suspend fun enchant(
         actor: BukkitCommandActor,
         enchantmentName: String,
         @Optional @Default("1") level: Int
     ) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
         val item = player.inventory.itemInMainHand
 
         if (item.type == Material.AIR) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.ENCHANT_FAILED))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.ENCHANT_FAILED))
             return
         }
 
         val key = NamespacedKey.minecraft(enchantmentName.lowercase())
         val enchantment = Registry.ENCHANTMENT.get(key)
         if (enchantment == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.ENCHANT_FAILED))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.ENCHANT_FAILED))
             return
         }
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                item.addUnsafeEnchantment(enchantment, level)
-            }
+        withContext(plugin.entityDispatcher(player)) {
+            item.addUnsafeEnchantment(enchantment, level)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.ENCHANT_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.ENCHANT_SUCCESS) {
             unparsed("enchantment", enchantmentName)
             unparsed("level", level.toString())
         })
@@ -218,38 +207,36 @@ class ItemCommands(
 
     @Command("hat", "head")
     @CommandPermission("essentiallystateless.hat")
-    fun hat(actor: BukkitCommandActor) {
+    suspend fun hat(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
         val item = player.inventory.itemInMainHand
 
         if (item.type == Material.AIR) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.HAT_FAILED))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.HAT_FAILED))
             return
         }
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                val helmet = player.inventory.helmet
-                player.inventory.helmet = item.clone().apply { amount = 1 }
-                item.amount -= 1
-                if (helmet != null && helmet.type != Material.AIR) {
-                    player.inventory.addItem(helmet)
-                }
+        withContext(plugin.entityDispatcher(player)) {
+            val helmet = player.inventory.helmet
+            player.inventory.helmet = item.clone().apply { amount = 1 }
+            item.amount -= 1
+            if (helmet != null && helmet.type != Material.AIR) {
+                player.inventory.addItem(helmet)
             }
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.HAT_SUCCESS))
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.HAT_SUCCESS))
     }
 
     @Command("skull", "playerhead")
     @CommandPermission("essentiallystateless.skull")
-    fun skull(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer playerName: String?) {
+    suspend fun skull(actor: BukkitCommandActor, @Optional @SuggestOnlinePlayer playerName: String?) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
@@ -262,87 +249,81 @@ class ItemCommands(
         meta.owningPlayer = offlinePlayer
         skull.itemMeta = meta
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                player.inventory.addItem(skull)
-            }
+        withContext(plugin.entityDispatcher(player)) {
+            player.inventory.addItem(skull)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.SKULL_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.SKULL_SUCCESS) {
             unparsed("player", targetName)
         })
     }
 
     @Command("itemname", "iname", "rename")
     @CommandPermission("essentiallystateless.itemname")
-    fun itemname(actor: BukkitCommandActor, @Optional name: String?) {
+    suspend fun itemname(actor: BukkitCommandActor, @Optional name: String?) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
         val item = player.inventory.itemInMainHand
 
         if (item.type == Material.AIR) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.ITEMNAME_FAILED))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.ITEMNAME_FAILED))
             return
         }
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                val meta = item.itemMeta ?: return@withContext
-                if (name.isNullOrBlank()) {
-                    meta.displayName(null)
-                    item.itemMeta = meta
-                    player.sendMessage(translations.getComponentSync(CommandMessages.ITEMNAME_CLEARED))
-                } else {
-                    meta.displayName(miniMessage.deserialize(name))
-                    item.itemMeta = meta
-                    player.sendMessage(translations.getComponentSync(CommandMessages.ITEMNAME_SUCCESS) {
-                        placeholder("name", name)
-                    })
-                }
+        withContext(plugin.entityDispatcher(player)) {
+            val meta = item.itemMeta ?: return@withContext
+            if (name.isNullOrBlank()) {
+                meta.displayName(null)
+                item.itemMeta = meta
+                player.sendMessage(translations.getComponent(CommandMessages.ITEMNAME_CLEARED))
+            } else {
+                meta.displayName(miniMessage.deserialize(name))
+                item.itemMeta = meta
+                player.sendMessage(translations.getComponent(CommandMessages.ITEMNAME_SUCCESS) {
+                    placeholder("name", name)
+                })
             }
         }
     }
 
     @Command("itemlore", "lore")
     @CommandPermission("essentiallystateless.itemlore")
-    fun itemlore(actor: BukkitCommandActor, @Optional lore: String?) {
+    suspend fun itemlore(actor: BukkitCommandActor, @Optional lore: String?) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
         val item = player.inventory.itemInMainHand
 
         if (item.type == Material.AIR) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.ITEMLORE_FAILED))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.ITEMLORE_FAILED))
             return
         }
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                val meta = item.itemMeta ?: return@withContext
-                if (lore.isNullOrBlank()) {
-                    meta.lore(null)
-                    item.itemMeta = meta
-                    player.sendMessage(translations.getComponentSync(CommandMessages.ITEMLORE_CLEARED))
-                } else {
-                    val loreLines = lore.split("\\n", "|").map { miniMessage.deserialize(it) }
-                    meta.lore(loreLines)
-                    item.itemMeta = meta
-                    player.sendMessage(translations.getComponentSync(CommandMessages.ITEMLORE_SUCCESS))
-                }
+        withContext(plugin.entityDispatcher(player)) {
+            val meta = item.itemMeta ?: return@withContext
+            if (lore.isNullOrBlank()) {
+                meta.lore(null)
+                item.itemMeta = meta
+                player.sendMessage(translations.getComponent(CommandMessages.ITEMLORE_CLEARED))
+            } else {
+                val loreLines = lore.split("\\n", "|").map { miniMessage.deserialize(it) }
+                meta.lore(loreLines)
+                item.itemMeta = meta
+                player.sendMessage(translations.getComponent(CommandMessages.ITEMLORE_SUCCESS))
             }
         }
     }
 
     @Command("condense", "compact")
     @CommandPermission("essentiallystateless.condense")
-    fun condense(actor: BukkitCommandActor) {
+    suspend fun condense(actor: BukkitCommandActor) {
         if (actor.sender() !is Player) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_ONLY))
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
             return
         }
         val player = actor.sender() as Player
@@ -375,56 +356,54 @@ class ItemCommands(
             Material.PACKED_ICE to Material.BLUE_ICE
         )
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(player)) {
-                var totalBlocks = 0
-                val inventory = player.inventory
+        withContext(plugin.entityDispatcher(player)) {
+            var totalBlocks = 0
+            val inventory = player.inventory
 
-                for ((material, block) in condenseMap) {
-                    val itemsNeeded = if (material == Material.GLOWSTONE_DUST || material == Material.CLAY_BALL) 4 else 9
+            for ((material, block) in condenseMap) {
+                val itemsNeeded = if (material == Material.GLOWSTONE_DUST || material == Material.CLAY_BALL) 4 else 9
+                
+                while (true) {
+                    var totalCount = 0
+                    val slots = mutableListOf<Int>()
                     
-                    while (true) {
-                        var totalCount = 0
-                        val slots = mutableListOf<Int>()
-                        
-                        for (i in 0 until inventory.size) {
-                            val item = inventory.getItem(i)
-                            if (item?.type == material) {
-                                totalCount += item.amount
-                                slots.add(i)
-                            }
+                    for (i in 0 until inventory.size) {
+                        val item = inventory.getItem(i)
+                        if (item?.type == material) {
+                            totalCount += item.amount
+                            slots.add(i)
                         }
-                        
-                        if (totalCount < itemsNeeded) break
-                        
-                        val blocksToCreate = totalCount / itemsNeeded
-                        val remaining = totalCount % itemsNeeded
-                        
-                        // Clear all slots with this material
-                        for (slot in slots) {
-                            inventory.setItem(slot, null)
-                        }
-                        
-                        // Add blocks
-                        inventory.addItem(ItemStack(block, blocksToCreate))
-                        totalBlocks += blocksToCreate
-                        
-                        // Add remaining items
-                        if (remaining > 0) {
-                            inventory.addItem(ItemStack(material, remaining))
-                        }
-                        
-                        break
                     }
+                    
+                    if (totalCount < itemsNeeded) break
+                    
+                    val blocksToCreate = totalCount / itemsNeeded
+                    val remaining = totalCount % itemsNeeded
+                    
+                    // Clear all slots with this material
+                    for (slot in slots) {
+                        inventory.setItem(slot, null)
+                    }
+                    
+                    // Add blocks
+                    inventory.addItem(ItemStack(block, blocksToCreate))
+                    totalBlocks += blocksToCreate
+                    
+                    // Add remaining items
+                    if (remaining > 0) {
+                        inventory.addItem(ItemStack(material, remaining))
+                    }
+                    
+                    break
                 }
+            }
 
-                if (totalBlocks > 0) {
-                    player.sendMessage(translations.getComponentSync(CommandMessages.CONDENSE_SUCCESS) {
-                        unparsed("count", totalBlocks.toString())
-                    })
-                } else {
-                    player.sendMessage(translations.getComponentSync(CommandMessages.CONDENSE_NONE))
-                }
+            if (totalBlocks > 0) {
+                player.sendMessage(translations.getComponent(CommandMessages.CONDENSE_SUCCESS) {
+                    unparsed("count", totalBlocks.toString())
+                })
+            } else {
+                player.sendMessage(translations.getComponent(CommandMessages.CONDENSE_NONE))
             }
         }
     }

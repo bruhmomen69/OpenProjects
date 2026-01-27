@@ -4,7 +4,6 @@ import bruh.essentiallystateless.EssentiallyStatelessPlugin
 import bruh.essentiallystateless.config.EssentiallyStatelessConfigLoader
 import bruh.essentiallystateless.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
-import com.github.shynixn.mccoroutine.folia.launch
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
@@ -22,22 +21,20 @@ class EssentiallyStatelessMainCommand(
 
     @Subcommand("reload")
     @CommandPermission("essentiallystateless.reload")
-    fun reload(actor: BukkitCommandActor) {
-        plugin.launch {
-            // Reload config
-            val newConfig = configLoader.reload()
-            
-            // Update plugin's config reference using reflection since it's private set
-            val configField = plugin::class.java.getDeclaredField("config")
-            configField.isAccessible = true
-            configField.set(plugin, newConfig)
-            
-            // Reload translations
-            translations.switchLanguage(newConfig.language)
-            translations.reload()
-            
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.CONFIG_RELOADED))
-        }
+    suspend fun reload(actor: BukkitCommandActor) {
+        // Reload config
+        val newConfig = configLoader.reload()
+        
+        // Update plugin's config reference using reflection since it's private set
+        val configField = plugin::class.java.getDeclaredField("config")
+        configField.isAccessible = true
+        configField.set(plugin, newConfig)
+        
+        // Reload translations
+        translations.switchLanguage(newConfig.language)
+        translations.reload()
+        
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.CONFIG_RELOADED))
     }
 
     @Subcommand("version")

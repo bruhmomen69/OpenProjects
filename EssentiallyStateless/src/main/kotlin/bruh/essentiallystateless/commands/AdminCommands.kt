@@ -4,13 +4,14 @@ import bruh.essentiallystateless.EssentiallyStatelessPlugin
 import bruh.essentiallystateless.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
-import com.github.shynixn.mccoroutine.folia.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Command
-import revxrsal.commands.annotation.Default
 import revxrsal.commands.annotation.Optional
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import revxrsal.commands.bukkit.annotation.CommandPermission
@@ -26,14 +27,14 @@ class AdminCommands(
 
     @Command("kick")
     @CommandPermission("essentiallystateless.kick")
-    fun kick(
+    suspend fun kick(
         actor: BukkitCommandActor,
         @SuggestOnlinePlayer targetName: String,
         @Optional reason: String?
     ) {
         val target = Bukkit.getPlayer(targetName)
         if (target == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                 unparsed("player", targetName)
             })
             return
@@ -41,13 +42,11 @@ class AdminCommands(
 
         val kickReason = reason ?: translations.getString(CommandMessages.KICK_DEFAULT_REASON)
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(target)) {
-                target.kick(miniMessage.deserialize(kickReason))
-            }
+        withContext(plugin.entityDispatcher(target)) {
+            target.kick(miniMessage.deserialize(kickReason))
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.KICK_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.KICK_SUCCESS) {
             unparsed("player", target.name)
             unparsed("reason", kickReason)
         })
@@ -55,29 +54,28 @@ class AdminCommands(
 
     @Command("kickall")
     @CommandPermission("essentiallystateless.kickall")
-    fun kickall(actor: BukkitCommandActor, @Optional reason: String?) {
+    suspend fun kickall(actor: BukkitCommandActor, @Optional reason: String?) {
         val kickReason = reason ?: translations.getString(CommandMessages.KICK_DEFAULT_REASON)
-        var count = 0
+        val playersToKick = Bukkit.getOnlinePlayers()
+            .filter { it != actor.sender() }
 
-        for (player in Bukkit.getOnlinePlayers()) {
-            if (player != actor.sender()) {
-                plugin.launch {
-                    withContext(plugin.entityDispatcher(player)) {
-                        player.kick(miniMessage.deserialize(kickReason))
-                    }
+        // Kick all players concurrently using coroutineScope
+        coroutineScope {
+            playersToKick.map { player ->
+                async(plugin.entityDispatcher(player)) {
+                    player.kick(miniMessage.deserialize(kickReason))
                 }
-                count++
-            }
+            }.awaitAll()
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.KICKALL_SUCCESS) {
-            unparsed("count", count.toString())
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.KICKALL_SUCCESS) {
+            unparsed("count", playersToKick.size.toString())
         })
     }
 
     @Command("ban")
     @CommandPermission("essentiallystateless.ban")
-    fun ban(
+    suspend fun ban(
         actor: BukkitCommandActor,
         targetName: String,
         @Optional reason: String?
@@ -90,14 +88,12 @@ class AdminCommands(
         // Kick if online
         val onlinePlayer = Bukkit.getPlayer(targetName)
         if (onlinePlayer != null) {
-            plugin.launch {
-                withContext(plugin.entityDispatcher(onlinePlayer)) {
-                    onlinePlayer.kick(miniMessage.deserialize(banReason))
-                }
+            withContext(plugin.entityDispatcher(onlinePlayer)) {
+                onlinePlayer.kick(miniMessage.deserialize(banReason))
             }
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.BAN_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.BAN_SUCCESS) {
             unparsed("player", targetName)
             unparsed("reason", banReason)
         })
@@ -105,11 +101,11 @@ class AdminCommands(
 
     @Command("unban", "pardon")
     @CommandPermission("essentiallystateless.unban")
-    fun unban(actor: BukkitCommandActor, targetName: String) {
+    suspend fun unban(actor: BukkitCommandActor, targetName: String) {
         val offlinePlayer = Bukkit.getOfflinePlayer(targetName)
 
         if (!offlinePlayer.isBanned) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.UNBAN_FAILED) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.UNBAN_FAILED) {
                 unparsed("player", targetName)
             })
             return
@@ -117,14 +113,14 @@ class AdminCommands(
 
         Bukkit.getServer().bannedPlayers.remove(offlinePlayer)
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.UNBAN_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.UNBAN_SUCCESS) {
             unparsed("player", targetName)
         })
     }
 
     @Command("banip")
     @CommandPermission("essentiallystateless.banip")
-    fun banip(
+    suspend fun banip(
         actor: BukkitCommandActor,
         ip: String,
         @Optional reason: String?
@@ -141,7 +137,7 @@ class AdminCommands(
 
         Bukkit.getServer().banIP(ipToBan)
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.BANIP_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.BANIP_SUCCESS) {
             unparsed("ip", ipToBan)
             unparsed("reason", banReason)
         })
@@ -149,11 +145,11 @@ class AdminCommands(
 
     @Command("unbanip", "pardonip")
     @CommandPermission("essentiallystateless.unbanip")
-    fun unbanip(actor: BukkitCommandActor, ip: String) {
+    suspend fun unbanip(actor: BukkitCommandActor, ip: String) {
         val ipBans = Bukkit.getServer().ipBans
         
         if (!ipBans.contains(ip)) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.UNBANIP_FAILED) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.UNBANIP_FAILED) {
                 unparsed("ip", ip)
             })
             return
@@ -161,21 +157,21 @@ class AdminCommands(
 
         Bukkit.getServer().unbanIP(ip)
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.UNBANIP_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.UNBANIP_SUCCESS) {
             unparsed("ip", ip)
         })
     }
 
     @Command("sudo")
     @CommandPermission("essentiallystateless.sudo")
-    fun sudo(
+    suspend fun sudo(
         actor: BukkitCommandActor,
         @SuggestOnlinePlayer targetName: String,
         command: String
     ) {
         val target = Bukkit.getPlayer(targetName)
         if (target == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.PLAYER_NOT_FOUND) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.PLAYER_NOT_FOUND) {
                 unparsed("player", targetName)
             })
             return
@@ -183,13 +179,11 @@ class AdminCommands(
 
         val commandToRun = if (command.startsWith("/")) command.substring(1) else command
 
-        plugin.launch {
-            withContext(plugin.entityDispatcher(target)) {
-                target.performCommand(commandToRun)
-            }
+        withContext(plugin.entityDispatcher(target)) {
+            target.performCommand(commandToRun)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.SUDO_SUCCESS) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.SUDO_SUCCESS) {
             unparsed("player", target.name)
             unparsed("command", commandToRun)
         })
@@ -197,26 +191,26 @@ class AdminCommands(
 
     @Command("broadcast", "bc", "bcast")
     @CommandPermission("essentiallystateless.broadcast")
-    fun broadcast(actor: BukkitCommandActor, message: String) {
+    suspend fun broadcast(actor: BukkitCommandActor, message: String) {
         val format = plugin.config.broadcastFormat
         val formattedMessage = format.replace("<message>", message)
         val component = miniMessage.deserialize(formattedMessage)
 
         Bukkit.broadcast(component)
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.BROADCAST_SENT))
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.BROADCAST_SENT))
     }
 
     @Command("broadcastworld")
     @CommandPermission("essentiallystateless.broadcast")
-    fun broadcastworld(
+    suspend fun broadcastworld(
         actor: BukkitCommandActor,
         @SuggestWorld worldName: String,
         message: String
     ) {
         val world = Bukkit.getWorld(worldName)
         if (world == null) {
-            actor.sender().sendMessage(translations.getComponentSync(CommandMessages.WORLD_NOT_FOUND) {
+            actor.sender().sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
                 unparsed("world", worldName)
             })
             return
@@ -232,7 +226,7 @@ class AdminCommands(
             player.sendMessage(component)
         }
 
-        actor.sender().sendMessage(translations.getComponentSync(CommandMessages.BROADCAST_WORLD_SENT) {
+        actor.sender().sendMessage(translations.getComponent(CommandMessages.BROADCAST_WORLD_SENT) {
             unparsed("world", world.name)
         })
     }
