@@ -93,6 +93,18 @@ class TimeWeatherCommands(
     ) {
         val world = resolveWorld(actor, worldName) ?: return
 
+        val weatherName = when (weatherType.lowercase()) {
+            "clear", "sun", "sunny" -> translations.getString(CommandMessages.WEATHER_CLEAR)
+            "rain", "rainy" -> translations.getString(CommandMessages.WEATHER_RAIN)
+            "storm", "thunder", "thunderstorm" -> translations.getString(CommandMessages.WEATHER_STORM)
+            else -> {
+                actor.sender().sendMessage(translations.getComponent(CommandMessages.INVALID_NUMBER) {
+                    unparsed("value", weatherType)
+                })
+                return
+            }
+        }
+
         withContext(plugin.regionDispatcher(world.spawnLocation)) {
             when (weatherType.lowercase()) {
                 "clear", "sun", "sunny" -> {
@@ -107,20 +119,7 @@ class TimeWeatherCommands(
                     world.setStorm(true)
                     world.isThundering = true
                 }
-                else -> {
-                    actor.sender().sendMessage(translations.getComponent(CommandMessages.INVALID_NUMBER) {
-                        unparsed("value", weatherType)
-                    })
-                    return@withContext
-                }
             }
-        }
-
-        val weatherName = when (weatherType.lowercase()) {
-            "clear", "sun", "sunny" -> translations.getString(CommandMessages.WEATHER_CLEAR)
-            "rain", "rainy" -> translations.getString(CommandMessages.WEATHER_RAIN)
-            "storm", "thunder", "thunderstorm" -> translations.getString(CommandMessages.WEATHER_STORM)
-            else -> weatherType
         }
 
         actor.sender().sendMessage(translations.getComponent(CommandMessages.WEATHER_SET) {

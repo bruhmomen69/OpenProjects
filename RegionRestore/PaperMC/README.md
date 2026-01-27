@@ -10,6 +10,22 @@ Core implementation of the RegionRestore plugin for Paper/Folia servers.
 - **Restore Scheduling**: Timer-based and event-driven restore triggers
 - **Notifications**: Configurable notifications for restore events
 
+## Architecture
+
+### Timer Package (`timer/`)
+
+The restore scheduling system has been refactored into a clean, modular architecture:
+
+- **[`RestoreJob`](src/main/kotlin/timer/RestoreJob.kt)**: Data class representing a restore operation
+- **[`SchedulerService`](src/main/kotlin/timer/SchedulerService.kt)**: Main coordinator for scheduling restores (countdown, repeating, immediate)
+- **[`ChunkTicketManager`](src/main/kotlin/timer/ChunkTicketManager.kt)**: Manages chunk loading and plugin chunk tickets
+- **[`ChunkLockManager`](src/main/kotlin/timer/ChunkLockManager.kt)**: Handles chunk-level locking to prevent concurrent modifications
+- **[`RestoreExecutionContext`](src/main/kotlin/timer/RestoreExecutionContext.kt)**: Shared context for all restore operations
+- **[`StreamingRestoreExecutor`](src/main/kotlin/timer/StreamingRestoreExecutor.kt)**: Executes restores in streaming mode (lower memory, chunks restored as they load)
+- **[`LegacyRestoreExecutor`](src/main/kotlin/timer/LegacyRestoreExecutor.kt)**: Executes restores in legacy mode (preload all chunks, then restore)
+
+This separation allows each component to have a single responsibility and makes the codebase more maintainable and testable.
+
 ## Placeholder Integration
 
 RegionRestore provides placeholder support through both PlaceholderAPI and MiniPlaceholders.
