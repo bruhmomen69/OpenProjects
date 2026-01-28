@@ -4,7 +4,6 @@ import bruh.essentiallystateless.commands.*
 import bruh.essentiallystateless.config.EssentiallyStatelessConfig
 import bruh.essentiallystateless.config.EssentiallyStatelessConfigLoader
 import bruh.essentiallystateless.translations.CommandMessages
-import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import bruh.zchat.utils.translations.translationApi
 import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
@@ -24,8 +23,6 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
         private set
     lateinit var configLoader: EssentiallyStatelessConfigLoader
         private set
-    lateinit var menuAPI: MenuAPI
-        private set
     lateinit var translations: TranslationAPI
         private set
 
@@ -43,8 +40,6 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
         translations.switchLanguage(config.language)
         translations.load()
         slF4JLogger.info("Translation system initialized")
-
-        menuAPI = MenuAPI(this)
 
         setupCommands()
 
@@ -96,7 +91,7 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
         lamp.register(TimeWeatherCommands(this, translations))
         lamp.register(PlayerCommands(this, translations))
         lamp.register(TeleportCommands(this, translations))
-        lamp.register(InventoryCommands(this, translations, menuAPI))
+        lamp.register(InventoryCommands(this, translations))
         lamp.register(ItemCommands(this, translations))
         lamp.register(WorldCommands(this, translations))
         lamp.register(AdminCommands(this, translations))
