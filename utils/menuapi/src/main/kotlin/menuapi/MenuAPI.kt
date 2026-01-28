@@ -1,6 +1,5 @@
 package bruh.zchat.utils.menuapi
 
-import bruh.zchat.utils.menuapi.configurable.ConfigurableMenuAPI
 import org.bukkit.Bukkit
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -17,7 +16,6 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.Closeable
-import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -48,34 +46,9 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
     private val openMenus: MutableMap<UUID, MenuHolder<*>> = ConcurrentHashMap()
     private val scheduledTasks: MutableList<BukkitTask> = mutableListOf()
     
-    private var _configurable: ConfigurableMenuAPI? = null
-
-    /** NamespacedKey for marking menu items */
-    val menuItemKey: NamespacedKey = NamespacedKey(plugin, "menu_item")
 
     init {
         Bukkit.getPluginManager().registerEvents(listener, plugin)
-    }
-    
-    // ========================================================================
-    // Configurable Menu API
-    // ========================================================================
-    
-    /**
-     * Gets the ConfigurableMenuAPI instance, creating it if needed.
-     * Uses the default "menus" subdirectory of the plugin's data folder.
-     */
-    fun configurable(): ConfigurableMenuAPI {
-        return _configurable ?: ConfigurableMenuAPI(plugin).also { _configurable = it }
-    }
-    
-    /**
-     * Gets the ConfigurableMenuAPI instance with a custom menus directory.
-     * 
-     * @param menusDirectory The directory for menu config files
-     */
-    fun configurable(menusDirectory: Path): ConfigurableMenuAPI {
-        return _configurable ?: ConfigurableMenuAPI(plugin, menusDirectory).also { _configurable = it }
     }
 
     // ========================================================================
@@ -361,10 +334,6 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
     // ========================================================================
 
     override fun close() {
-        // Close configurable menu API if initialized
-        _configurable?.close()
-        _configurable = null
-        
         // Unregister listener
         HandlerList.unregisterAll(listener)
 
