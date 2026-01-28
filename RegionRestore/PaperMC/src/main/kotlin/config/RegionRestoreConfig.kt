@@ -12,7 +12,8 @@ data class RegionRestoreConfig(
     val templates: TemplatesConfig = TemplatesConfig(),
     val notifications: NotificationsConfig = NotificationsConfig(),
     val restore: RestoreConfig = RestoreConfig(),
-    val massCloner: MassClonerConfig = MassClonerConfig()
+    val massCloner: MassClonerConfig = MassClonerConfig(),
+    val entityKiller: EntityKillerConfig = EntityKillerConfig()
 )
 
 @ConfigSerializable
@@ -87,6 +88,22 @@ data class MassClonerConfig(
     val allowOverwrite: Boolean = false,
     val vacateDelaySeconds: Int = 5,
     val worlds: List<MassClonerWorldConfig> = emptyList()
+)
+
+/**
+ * Configuration for entity killing before restore.
+ * By default, entities are blacklisted (not killed) with PLAYER already blacklisted.
+ * When enabled, all entities EXCEPT blacklisted types will be killed.
+ * When using whitelist mode, only listed entity types will be killed.
+ */
+@ConfigSerializable
+data class EntityKillerConfig(
+    @Comment("Enable entity killing before restore. Default: false (disabled)")
+    val enabled: Boolean = false,
+    @Comment("If true, the entityTypes list acts as a whitelist (only these entities are killed).\nIf false, the list acts as a blacklist (all entities except these are killed). Default: false (blacklist)")
+    val whitelistMode: Boolean = false,
+    @Comment("List of entity type names to whitelist or blacklist.\nIn blacklist mode (default), these entities will NOT be killed.\nIn whitelist mode, ONLY these entities will be killed.")
+    val entityTypes: List<String> = listOf("PLAYER")
 )
 
 @ConfigSerializable

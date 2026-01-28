@@ -2,6 +2,7 @@ package bruh.regionrestore.timer
 
 import bruh.regionrestore.config.NotificationsConfig
 import bruh.regionrestore.config.RestoreConfig
+import bruh.regionrestore.config.EntityKillerConfig
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
@@ -26,6 +27,7 @@ class SchedulerService(
     notificationService: bruh.regionrestore.notification.NotificationService,
     private val restoreConfig: RestoreConfig,
     private val notificationsConfig: NotificationsConfig,
+    private val entityKillerConfig: EntityKillerConfig,
     nmsAdapter: PaperNmsAdapter
 ) {
     // Core managers
@@ -46,6 +48,9 @@ class SchedulerService(
     // Executors for different restore modes
     private val streamingExecutor = StreamingRestoreExecutor(context)
     private val legacyExecutor = LegacyRestoreExecutor(context)
+
+    // Entity killer service
+    private val entityKiller = EntityKiller(entityKillerConfig, plugin)
 
     // Job management
     private val countdownJobs = context.countdownJobs
@@ -182,6 +187,15 @@ class SchedulerService(
             // Send started notification
             val startedConfig = NotificationConfig.fromEventConfig(notificationsConfig.restoreStarted)
             context.sendNotification(startedConfig, audienceScope, job)
+
+            // Kill entities in the region before restore
+            entityKiller.killEntitiesInRegion(
+                job.world,
+                job.minBlockX,
+                job.maxBlockX,
+                job.minBlockZ,
+                job.maxBlockZ
+            )
 
             val start = System.currentTimeMillis()
 

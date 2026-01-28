@@ -9,6 +9,7 @@ Core implementation of the RegionRestore plugin for Paper/Folia servers.
 - **Occupancy Tracking**: Track player presence in region instances
 - **Restore Scheduling**: Timer-based and event-driven restore triggers
 - **Notifications**: Configurable notifications for restore events
+- **Entity Killer**: Kill entities within a region before restore (whitelist/blacklist mode)
 
 ## Architecture
 
@@ -91,3 +92,77 @@ Format: `<regionrestore_<placeholder>>`
 
 - **PlaceholderAPI**: For `%regionrestore_*%` placeholders
 - **MiniPlaceholders**: For `<regionrestore_*>` placeholders in MiniMessage
+
+## Entity Killer
+
+The Entity Killer feature allows you to kill entities within a region before a template is restored. This is useful for clearing mobs, items, or other entities that shouldn't persist across restores.
+
+### Configuration
+
+```yaml
+entityKiller:
+  enabled: false  # Enable entity killing (default: false)
+  whitelistMode: false  # If true, only kill listed entity types; if false, kill all except listed types
+  entityTypes:
+    - PLAYER  # In blacklist mode (default), these entities are NOT killed
+```
+
+### Modes
+
+| Mode | `whitelistMode` | Behavior |
+|------|-----------------|----------|
+| Blacklist | `false` (default) | All entities EXCEPT those listed in `entityTypes` are killed |
+| Whitelist | `true` | Only entities listed in `entityTypes` are killed |
+
+### Default Configuration
+
+By default, entity killing is **disabled**. When enabled with the default blacklist mode:
+
+- Players are protected (not killed) - they will be teleported out via the vacancy system
+- All other entity types (mobs, items, etc.) will be killed
+
+### Entity Type Names
+
+Use standard Minecraft entity type names in the configuration:
+
+| Category | Entity Types |
+|----------|-------------|
+| Hostile | ZOMBIE, SKELETON, CREEPER, SPIDER, etc. |
+| Passive | COW, PIG, CHICKEN, SHEEP, HORSE, etc. |
+| Projectiles | ARROW, FIREBALL, SPECTRAL_ARROW, TRIDENT |
+| Items | DROPPED_ITEM |
+| Vehicles | MINECART, BOAT |
+| Players | PLAYER |
+
+### Example Configurations
+
+**Clear all mobs except players:**
+```yaml
+entityKiller:
+  enabled: true
+  whitelistMode: false
+  entityTypes:
+    - PLAYER
+```
+
+**Only clear dropped items:**
+```yaml
+entityKiller:
+  enabled: true
+  whitelistMode: true
+  entityTypes:
+    - DROPPED_ITEM
+```
+
+**Clear all hostile mobs:**
+```yaml
+entityKiller:
+  enabled: true
+  whitelistMode: true
+  entityTypes:
+    - ZOMBIE
+    - SKELETON
+    - CREEPER
+    - SPIDER
+    - PHANTOM
+```
