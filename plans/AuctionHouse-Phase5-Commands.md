@@ -8,17 +8,17 @@ This phase creates all command classes using the Lamp command framework.
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/commands/AuctionHouseCommands.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.commands
+package bruh.auctionhouse.commands
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
-import bruh.zchat.auctionhouse.config.AuctionHouseConfig
-import bruh.zchat.auctionhouse.gui.AuctionCreateMenu
-import bruh.zchat.auctionhouse.gui.AuctionHouseMenu
-import bruh.zchat.auctionhouse.gui.ExpiredItemsMenu
-import bruh.zchat.auctionhouse.gui.MyAuctionsMenu
-import bruh.zchat.auctionhouse.model.AuctionType
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.gui.AuctionCreateMenu
+import bruh.auctionhouse.gui.AuctionHouseMenu
+import bruh.auctionhouse.gui.ExpiredItemsMenu
+import bruh.auctionhouse.gui.MyAuctionsMenu
+import bruh.auctionhouse.model.AuctionType
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import kotlinx.coroutines.launch
@@ -154,9 +154,9 @@ class AuctionHouseCommands(
             val result = auctionService.cancelAuction(player, uuid)
             player.sendMessage(
                 when (result) {
-                    is bruh.zchat.auctionhouse.service.ServiceResult.Success -> 
+                    is bruh.auctionhouse.service.ServiceResult.Success ->
                         translationAPI.getComponentSync(AuctionMessages.AUCTION_CANCELLED)
-                    is bruh.zchat.auctionhouse.service.ServiceResult.Failure -> 
+                    is bruh.auctionhouse.service.ServiceResult.Failure ->
                         result.message
                 }
             )
@@ -192,13 +192,13 @@ class AuctionHouseCommands(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/commands/OrderCommands.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.commands
+package bruh.auctionhouse.commands
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
-import bruh.zchat.auctionhouse.config.AuctionHouseConfig
-import bruh.zchat.auctionhouse.model.OrderType
-import bruh.zchat.auctionhouse.service.OrderService
-import bruh.zchat.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.model.OrderType
+import bruh.auctionhouse.service.OrderService
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import kotlinx.coroutines.launch
@@ -299,9 +299,9 @@ class OrderCommands(
             val result = orderService.cancelOrder(player, uuid)
             player.sendMessage(
                 when (result) {
-                    is bruh.zchat.auctionhouse.service.ServiceResult.Success ->
+                    is bruh.auctionhouse.service.ServiceResult.Success ->
                         translationAPI.getComponentSync(OrderMessages.ORDER_CANCELLED)
-                    is bruh.zchat.auctionhouse.service.ServiceResult.Failure ->
+                    is bruh.auctionhouse.service.ServiceResult.Failure ->
                         result.message
                 }
             )
@@ -338,11 +338,11 @@ class OrderCommands(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/commands/AuctionAdminCommands.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.commands
+package bruh.auctionhouse.commands
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import kotlinx.coroutines.launch
 import org.bukkit.entity.Player
@@ -441,9 +441,9 @@ lamp.register(AuctionAdminCommands(this, auctionService, translationAPI))
 
 Add to the imports:
 ```kotlin
-import bruh.zchat.auctionhouse.commands.*
-import bruh.zchat.auctionhouse.database.*
-import bruh.zchat.auctionhouse.service.*
+import bruh.auctionhouse.commands.*
+import bruh.auctionhouse.database.*
+import bruh.auctionhouse.service.*
 import bruh.zchat.utils.database.createDatabase
 import bruh.zchat.utils.menuapi.MenuAPI
 ```

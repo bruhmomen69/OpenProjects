@@ -23,7 +23,7 @@ plugins {
     alias(libs.plugins.kotlinPluginSerialization)
 }
 
-group = "bruh.zchat.auctionhouse"
+group = "bruh.auctionhouse"
 version = "1.0.0"
 
 repositories {
@@ -67,7 +67,7 @@ dependencies {
 tasks.named<ShadowJar>("shadowJar") {
     mergeServiceFiles()
     
-    relocate("com.github.shynixn", "bruh.zchat.auctionhouse.dependencies.com.github.shynixn")
+    relocate("com.github.shynixn", "bruh.auctionhouse.dependencies.com.github.shynixn")
     
     exclude("META-INF/*.SF")
     exclude("META-INF/*.DSA")
@@ -137,7 +137,7 @@ See `config.conf` for all configuration options.
 ```yaml
 name: AuctionHouse
 version: ${version}
-main: bruh.zchat.auctionhouse.AuctionHousePlugin
+main: bruh.auctionhouse.AuctionHousePlugin
 api-version: '1.21'
 load: POSTWORLD
 folia-supported: true
@@ -153,7 +153,7 @@ dependencies:
 ```yaml
 name: AuctionHouse
 version: ${version}
-main: bruh.zchat.auctionhouse.AuctionHousePlugin
+main: bruh.auctionhouse.AuctionHousePlugin
 api-version: '1.21'
 depend: [Vault]
 ```
@@ -164,7 +164,7 @@ depend: [Vault]
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/config/AuctionHouseConfig.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.config
+package bruh.auctionhouse.config
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
@@ -336,7 +336,7 @@ data class SoundConfig(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/config/AuctionHouseConfigLoader.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.config
+package bruh.auctionhouse.config
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -398,7 +398,7 @@ class AuctionHouseConfigLoader(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/translations/AuctionMessages.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.translations
+package bruh.auctionhouse.translations
 
 import bruh.zchat.utils.translations.MessageKey
 
@@ -457,7 +457,7 @@ enum class AuctionMessages(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/translations/OrderMessages.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.translations
+package bruh.auctionhouse.translations
 
 import bruh.zchat.utils.translations.MessageKey
 
@@ -491,7 +491,7 @@ enum class OrderMessages(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/translations/GuiMessages.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.translations
+package bruh.auctionhouse.translations
 
 import bruh.zchat.utils.translations.MessageKey
 
@@ -573,7 +573,7 @@ enum class GuiMessages(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/economy/EconomyProvider.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.economy
+package bruh.auctionhouse.economy
 
 import net.kyori.adventure.text.Component
 import java.util.UUID
@@ -590,7 +590,7 @@ interface EconomyProvider {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/economy/VaultEconomyProvider.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.economy
+package bruh.auctionhouse.economy
 
 import net.kyori.adventure.text.Component
 import net.milkbowl.vault.economy.Economy
@@ -661,15 +661,15 @@ class VaultEconomyProvider(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/AuctionHousePlugin.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse
+package bruh.auctionhouse
 
-import bruh.zchat.auctionhouse.config.AuctionHouseConfig
-import bruh.zchat.auctionhouse.config.AuctionHouseConfigLoader
-import bruh.zchat.auctionhouse.economy.EconomyProvider
-import bruh.zchat.auctionhouse.economy.VaultEconomyProvider
-import bruh.zchat.auctionhouse.translations.AuctionMessages
-import bruh.zchat.auctionhouse.translations.GuiMessages
-import bruh.zchat.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.config.AuctionHouseConfigLoader
+import bruh.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.economy.VaultEconomyProvider
+import bruh.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin

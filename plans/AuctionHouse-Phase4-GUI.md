@@ -8,9 +8,9 @@ This phase creates all the menu classes using the `menuapi` utilities.
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/MenuUtils.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
@@ -77,14 +77,14 @@ object MenuUtils {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/AuctionHouseMenu.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.model.Auction
-import bruh.zchat.auctionhouse.model.AuctionFilter
-import bruh.zchat.auctionhouse.model.AuctionSort
-import bruh.zchat.auctionhouse.model.AuctionType
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.model.Auction
+import bruh.auctionhouse.model.AuctionFilter
+import bruh.auctionhouse.model.AuctionSort
+import bruh.auctionhouse.model.AuctionType
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -276,12 +276,12 @@ class AuctionHouseMenu(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/AuctionDetailsMenu.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.model.Auction
-import bruh.zchat.auctionhouse.model.AuctionType
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.model.Auction
+import bruh.auctionhouse.model.AuctionType
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -418,10 +418,10 @@ class AuctionDetailsMenu(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/AuctionCreateForm.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.model.AuctionType
-import bruh.zchat.auctionhouse.service.AuctionService
+import bruh.auctionhouse.model.AuctionType
+import bruh.auctionhouse.service.AuctionService
 import bruh.zchat.utils.menuapi.BooleanInput
 import bruh.zchat.utils.menuapi.EnumInput
 import bruh.zchat.utils.menuapi.FormField
@@ -487,11 +487,11 @@ class AuctionCreateForm(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/AuctionCreateMenu.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.model.AuctionType
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.model.AuctionType
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -709,12 +709,12 @@ class AuctionCreateMenu(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/MyAuctionsMenu.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.model.Auction
-import bruh.zchat.auctionhouse.model.AuctionStatus
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.model.Auction
+import bruh.auctionhouse.model.AuctionStatus
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -794,12 +794,12 @@ class MyAuctionsMenu(
                     runBlocking {
                         val result = auctionService.cancelAuction(player, auction.id)
                         when (result) {
-                            is bruh.zchat.auctionhouse.service.ServiceResult.Success -> {
+                            is bruh.auctionhouse.service.ServiceResult.Success -> {
                                 player.sendMessage(translationAPI.getComponentSync(
-                                    bruh.zchat.auctionhouse.translations.AuctionMessages.AUCTION_CANCELLED
+                                    bruh.auctionhouse.translations.AuctionMessages.AUCTION_CANCELLED
                                 ))
                             }
-                            is bruh.zchat.auctionhouse.service.ServiceResult.Failure -> {
+                            is bruh.auctionhouse.service.ServiceResult.Failure -> {
                                 player.sendMessage(result.message)
                             }
                         }
@@ -822,10 +822,10 @@ For a more structured navigation system, consider using MenuTree:
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/gui/AuctionHouseNavigator.kt` (Create - Optional)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
-import bruh.zchat.auctionhouse.service.AuctionService
-import bruh.zchat.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.MenuTreeResult
 import bruh.zchat.utils.menuapi.menuTree
@@ -854,8 +854,8 @@ class AuctionHouseNavigator(
                 dynamicItems { player ->
                     // Load and create auction items dynamically
                     val auctions = auctionService.getActiveAuctions(
-                        bruh.zchat.auctionhouse.model.AuctionFilter(),
-                        bruh.zchat.auctionhouse.model.AuctionSort.ENDING_SOON,
+                        bruh.auctionhouse.model.AuctionFilter(),
+                        bruh.auctionhouse.model.AuctionSort.ENDING_SOON,
                         0, 28
                     )
                     

@@ -8,9 +8,9 @@ This phase adds final touches: PlaceholderAPI support, expiration service, notif
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/service/ExpirationService.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.service
+package bruh.auctionhouse.service
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.AuctionHousePlugin
 import kotlinx.coroutines.launch
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
@@ -61,13 +61,13 @@ class ExpirationService(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/hooks/PlaceholderAPIHook.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.hooks
+package bruh.auctionhouse.hooks
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
-import bruh.zchat.auctionhouse.database.AuctionRepository
-import bruh.zchat.auctionhouse.database.OrderRepository
-import bruh.zchat.auctionhouse.model.AuctionStatus
-import bruh.zchat.auctionhouse.model.OrderStatus
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.OrderRepository
+import bruh.auctionhouse.model.AuctionStatus
+import bruh.auctionhouse.model.OrderStatus
 import kotlinx.coroutines.runBlocking
 import me.clip.placeholderapi.expansion.PlaceholderExpansion
 import org.bukkit.entity.Player
@@ -113,19 +113,19 @@ class PlaceholderAPIHook(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/AuctionHousePlugin.kt` (Final Version)
 ```kotlin
-package bruh.zchat.auctionhouse
+package bruh.auctionhouse
 
-import bruh.zchat.auctionhouse.commands.*
-import bruh.zchat.auctionhouse.config.AuctionHouseConfig
-import bruh.zchat.auctionhouse.config.AuctionHouseConfigLoader
-import bruh.zchat.auctionhouse.database.*
-import bruh.zchat.auctionhouse.economy.EconomyProvider
-import bruh.zchat.auctionhouse.economy.VaultEconomyProvider
-import bruh.zchat.auctionhouse.hooks.PlaceholderAPIHook
-import bruh.zchat.auctionhouse.service.*
-import bruh.zchat.auctionhouse.translations.AuctionMessages
-import bruh.zchat.auctionhouse.translations.GuiMessages
-import bruh.zchat.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.commands.*
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.config.AuctionHouseConfigLoader
+import bruh.auctionhouse.database.*
+import bruh.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.economy.VaultEconomyProvider
+import bruh.auctionhouse.hooks.PlaceholderAPIHook
+import bruh.auctionhouse.service.*
+import bruh.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.DatabaseDialect
 import bruh.zchat.utils.database.createDatabase

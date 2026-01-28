@@ -12,7 +12,7 @@ AuctionHouse/
 ├── build.gradle.kts              # Module build configuration
 ├── README.md                     # Module documentation
 ├── src/main/kotlin/
-│   └── bruh/zchat/auctionhouse/
+│   └── bruh/auctionhouse/
 │       ├── AuctionHousePlugin.kt           # Main plugin class
 │       ├── config/
 │       │   ├── AuctionHouseConfig.kt       # Configuration classes
@@ -115,7 +115,7 @@ dependencies {
 ```yaml
 name: AuctionHouse
 version: ${version}
-main: bruh.zchat.auctionhouse.AuctionHousePlugin
+main: bruh.auctionhouse.AuctionHousePlugin
 api-version: 1.21
 load: POSTWORLD
 folia-supported: true
@@ -136,7 +136,7 @@ Uses `@ConfigSerializable` data classes with `@Comment` annotations, loaded via 
 
 ### AuctionHouseConfig.kt
 ```kotlin
-package bruh.zchat.auctionhouse.config
+package bruh.auctionhouse.config
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
@@ -308,7 +308,7 @@ data class SoundConfig(
 
 ### AuctionHouseConfigLoader.kt (Following EssentiallyStateless Pattern)
 ```kotlin
-package bruh.zchat.auctionhouse.config
+package bruh.auctionhouse.config
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -366,7 +366,7 @@ Uses `utils/translations` with `MessageKey` interface. The TranslationAPI auto-g
 
 ### AuctionMessages.kt
 ```kotlin
-package bruh.zchat.auctionhouse.translations
+package bruh.auctionhouse.translations
 
 import bruh.zchat.utils.translations.MessageKey
 
@@ -425,7 +425,7 @@ enum class AuctionMessages(
 
 ### OrderMessages.kt
 ```kotlin
-package bruh.zchat.auctionhouse.translations
+package bruh.auctionhouse.translations
 
 import bruh.zchat.utils.translations.MessageKey
 
@@ -459,7 +459,7 @@ enum class OrderMessages(
 
 ### GuiMessages.kt
 ```kotlin
-package bruh.zchat.auctionhouse.translations
+package bruh.auctionhouse.translations
 
 import bruh.zchat.utils.translations.MessageKey
 
@@ -708,7 +708,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 ### Schema Migration (Following ZealousChat Pattern)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
 import bruh.zchat.utils.database.migration.DatabaseSchema
 import bruh.zchat.utils.database.sql
@@ -805,7 +805,7 @@ object ItemSerialization {
 
 ### Main Auction Browser (Using PaginatedMenu)
 ```kotlin
-package bruh.zchat.auctionhouse.gui
+package bruh.auctionhouse.gui
 
 import bruh.zchat.utils.menuapi.PaginatedMenu
 import bruh.zchat.utils.menuapi.VItem
@@ -889,9 +889,9 @@ class AuctionHouseMenu(
 ## Command Structure (Using Lamp)
 
 ```kotlin
-package bruh.zchat.auctionhouse.commands
+package bruh.auctionhouse.commands
 
-import bruh.zchat.auctionhouse.service.AuctionService
+import bruh.auctionhouse.service.AuctionService
 import bruh.zchat.utils.translations.TranslationAPI
 import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Command
@@ -965,7 +965,7 @@ class AuctionHouseCommands(
 ## Economy Integration
 
 ```kotlin
-package bruh.zchat.auctionhouse.economy
+package bruh.auctionhouse.economy
 
 import net.kyori.adventure.text.Component
 import net.milkbowl.vault.economy.Economy

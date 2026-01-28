@@ -8,10 +8,10 @@ This phase creates the business logic services: AuctionService, OrderService, Ex
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/service/ServiceResults.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.service
+package bruh.auctionhouse.service
 
-import bruh.zchat.auctionhouse.model.Auction
-import bruh.zchat.auctionhouse.model.Order
+import bruh.auctionhouse.model.Auction
+import bruh.auctionhouse.model.Order
 import net.kyori.adventure.text.Component
 
 sealed class ServiceResult<out T> {
@@ -67,14 +67,14 @@ data class PagedResult<T>(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/service/AuctionService.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.service
+package bruh.auctionhouse.service
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
-import bruh.zchat.auctionhouse.config.AuctionHouseConfig
-import bruh.zchat.auctionhouse.database.*
-import bruh.zchat.auctionhouse.economy.EconomyProvider
-import bruh.zchat.auctionhouse.model.*
-import bruh.zchat.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.*
+import bruh.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.model.*
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -535,7 +535,7 @@ class AuctionService(
         }
     }
     
-    private fun calculateFee(amount: Double, feeConfig: bruh.zchat.auctionhouse.config.FeeConfig): Double {
+    private fun calculateFee(amount: Double, feeConfig: bruh.auctionhouse.config.FeeConfig): Double {
         val fee = when (feeConfig.type) {
             "PERCENTAGE" -> amount * (feeConfig.amount / 100)
             "FLAT" -> feeConfig.amount
@@ -553,14 +553,14 @@ class AuctionService(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/service/OrderService.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.service
+package bruh.auctionhouse.service
 
-import bruh.zchat.auctionhouse.AuctionHousePlugin
-import bruh.zchat.auctionhouse.config.AuctionHouseConfig
-import bruh.zchat.auctionhouse.database.*
-import bruh.zchat.auctionhouse.economy.EconomyProvider
-import bruh.zchat.auctionhouse.model.*
-import bruh.zchat.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.*
+import bruh.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.model.*
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -1036,7 +1036,7 @@ class OrderService(
         }
     }
     
-    private fun calculateFee(amount: Double, feeConfig: bruh.zchat.auctionhouse.config.FeeConfig): Double {
+    private fun calculateFee(amount: Double, feeConfig: bruh.auctionhouse.config.FeeConfig): Double {
         val fee = when (feeConfig.type) {
             "PERCENTAGE" -> amount * (feeConfig.amount / 100)
             "FLAT" -> feeConfig.amount

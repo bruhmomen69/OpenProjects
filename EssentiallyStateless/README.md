@@ -166,113 +166,208 @@ The plugin generates a comprehensive configuration file at `plugins/EssentiallyS
 
 All commands use the permission format: `essentiallystateless.<command>`
 
-### Permission Groups
+### Default Permission Values
 
-#### Basic Users
+Permissions are configured with sensible defaults out of the box.
+
+<details>
+<summary><b>Available to All Players (default: true)</b></summary>
+
+These commands work for everyone by default:
+
+```
+essentiallystateless.list          # List online players
+essentiallystateless.ping          # Check ping
+essentiallystateless.getpos        # Get coordinates
+essentiallystateless.compass       # Show facing direction
+essentiallystateless.depth         # Show depth
+essentiallystateless.playtime      # Check playtime
+essentiallystateless.seen          # Check when player was last online
+essentiallystateless.near          # Find nearby players
+essentiallystateless.me            # Emote actions
+essentiallystateless.ptime         # Personal time
+essentiallystateless.pweather      # Personal weather
+essentiallystateless.ext           # Extinguish yourself
+essentiallystateless.hat           # Wear items as hat
+essentiallystateless.condense      # Condense items to blocks
+essentiallystateless.enderchest    # Open your ender chest
+essentiallystateless.disposal      # Open trash inventory
+```
+</details>
+
+<details>
+<summary><b>Game Mode Commands (default: op)</b></summary>
 
 ```
 essentiallystateless.gamemode
-essentiallystateless.time
-essentiallystateless.weather
-essentiallystateless.heal
-essentiallystateless.feed
-essentiallystateless.fly
-essentiallystateless.speed
-essentiallystateless.god
-essentiallystateless.ext
-essentiallystateless.rest
+essentiallystateless.gamemode.others
+```
+</details>
+
+<details>
+<summary><b>Player State Commands (default: op)</b></summary>
+
+```
+essentiallystateless.heal / heal.others
+essentiallystateless.feed / feed.others
+essentiallystateless.fly / fly.others
+essentiallystateless.speed / speed.others
+essentiallystateless.god / god.others
+essentiallystateless.rest / rest.others
 essentiallystateless.exp
 essentiallystateless.kill
 essentiallystateless.burn
+```
+</details>
+
+<details>
+<summary><b>Time & Weather Commands (default: op)</b></summary>
+
+```
+essentiallystateless.time
+essentiallystateless.weather
+```
+</details>
+
+<details>
+<summary><b>Teleportation Commands (default: op)</b></summary>
+
+```
 essentiallystateless.tp
+essentiallystateless.tphere
+essentiallystateless.tpall
+essentiallystateless.tppos
 essentiallystateless.top
 essentiallystateless.bottom
 essentiallystateless.jump
 essentiallystateless.world
+```
+</details>
+
+<details>
+<summary><b>Inventory Commands (default: op)</b></summary>
+
+```
 essentiallystateless.anvil
 essentiallystateless.workbench
-essentiallystateless.enderchest
-essentiallystateless.disposal
-essentiallystateless.clearinventory
+essentiallystateless.grindstone
+essentiallystateless.cartography
+essentiallystateless.loom
+essentiallystateless.smithing
+essentiallystateless.stonecutter
+essentiallystateless.enderchest.others
+essentiallystateless.invsee
+essentiallystateless.clearinventory / clearinventory.others
+```
+</details>
+
+<details>
+<summary><b>Item Commands (default: op)</b></summary>
+
+```
+essentiallystateless.give
 essentiallystateless.item
 essentiallystateless.more
 essentiallystateless.repair
-essentiallystateless.hat
+essentiallystateless.enchant
 essentiallystateless.skull
 essentiallystateless.itemname
 essentiallystateless.itemlore
-essentiallystateless.condense
+```
+</details>
+
+<details>
+<summary><b>World Manipulation Commands (default: op)</b></summary>
+
+```
 essentiallystateless.lightning
+essentiallystateless.remove
+essentiallystateless.spawnmob
 essentiallystateless.tree
-essentiallystateless.bigtree
 essentiallystateless.break
-essentiallystateless.me
+essentiallystateless.spawner
+```
+</details>
+
+<details>
+<summary><b>Administration Commands (default: op)</b></summary>
+
+```
+essentiallystateless.kick
+essentiallystateless.kickall
+essentiallystateless.ban / unban
+essentiallystateless.banip / unbanip
+essentiallystateless.sudo
+essentiallystateless.broadcast
+essentiallystateless.gc
+essentiallystateless.whois
+essentiallystateless.reload
+```
+</details>
+
+<details>
+<summary><b>Fun Commands (default: op)</b></summary>
+
+```
 essentiallystateless.fireball
 essentiallystateless.book
 essentiallystateless.editsign
 essentiallystateless.potion
 essentiallystateless.firework
-essentiallystateless.gc
-essentiallystateless.list
-essentiallystateless.whois
-essentiallystateless.near
-essentiallystateless.seen
-essentiallystateless.ping
-essentiallystateless.getpos
-essentiallystateless.compass
-essentiallystateless.depth
-essentiallystateless.playtime
 ```
+</details>
 
-#### Staff Permissions
+<details>
+<summary><b>Admin Permission (default: op)</b></summary>
 
 ```
-essentiallystateless.gamemode.others
-essentiallystateless.heal.others
-essentiallystateless.feed.others
-essentiallystateless.fly.others
-essentiallystateless.speed.others
-essentiallystateless.god.others
-essentiallystateless.enderchest.others
-essentiallystateless.clearinventory.others
-essentiallystateless.give
-essentiallystateless.enchant
-essentiallystateless.spawnmob
-essentiallystateless.spawner
-essentiallystateless.remove
-essentiallystateless.kick
-essentiallystateless.kickall
-essentiallystateless.ban
-essentiallystateless.unban
-essentiallystateless.banip
-essentiallystateless.unbanip
-essentiallystateless.sudo
-essentiallystateless.broadcast
-essentiallystateless.broadcastworld
-essentiallystateless.reload
+essentiallystateless.admin    # Grants ALL permissions
 ```
+</details>
 
-#### Admin Permission
-
-```
-essentiallystateless.admin
-```
-
-### LuckPerms Setup Example
+<details>
+<summary><b>LuckPerms Setup Examples</b></summary>
 
 ```bash
 # Give admin access to all commands
 /lp group admin permission set essentiallystateless.admin true
 
-# Give basic commands to default players
-/lp group default permission set essentiallystateless.gamemode true
-/lp group default permission set essentiallystateless.heal true
-/lp group default permission set essentiallystateless.fly true
+# Grant basic essentials to default players (already available by default)
+# These are already default: true, so no setup needed for:
+# - list, ping, getpos, compass, depth, playtime, seen, near, me
+# - ptime, pweather, ext, hat, condense, enderchest, disposal
 
-# Give staff access to others commands
+# Give moderator access to help players
+/lp group moderator permission set essentiallystateless.heal true
 /lp group moderator permission set essentiallystateless.heal.others true
-/lp group moderator permission set essentiallystateless.fly.others true
+/lp group moderator permission set essentiallystateless.tp true
+/lp group moderator permission set essentiallystateless.kick true
+
+# Give builder access to creative tools
+/lp group builder permission set essentiallystateless.gamemode true
+/lp group builder permission set essentiallystateless.time true
+/lp group builder permission set essentiallystateless.speed true
+/lp group builder permission set essentiallystateless.fly true
 ```
+</details>
+
+<details>
+<summary><b>Customizing Defaults</b></summary>
+
+To change default permissions, edit your permissions plugin configuration or use commands:
+
+```bash
+# Example: Allow all players to heal themselves
+/lp group default permission set essentiallystateless.heal true
+
+# Example: Remove disposal access from default players
+/lp group default permission set essentiallystateless.disposal false
+```
+
+**Note:** The `.others` suffix permissions control whether a player can use the command on other players. For example:
+- `essentiallystateless.heal` - Can heal yourself
+- `essentiallystateless.heal.others` - Can heal other players (in addition to yourself)
+</details>
 
 ## Usage Examples
 

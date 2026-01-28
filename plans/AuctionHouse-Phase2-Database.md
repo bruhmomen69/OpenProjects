@@ -8,7 +8,7 @@ This phase creates the database schema, data models, and repository layer for au
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/AuctionType.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 enum class AuctionType {
     AUCTION,    // Bidding only
@@ -19,7 +19,7 @@ enum class AuctionType {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/AuctionStatus.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 enum class AuctionStatus {
     ACTIVE,     // Currently running
@@ -31,7 +31,7 @@ enum class AuctionStatus {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/Auction.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 import org.bukkit.inventory.ItemStack
 import java.time.Instant
@@ -72,7 +72,7 @@ data class Auction(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/Bid.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 import java.time.Instant
 import java.util.UUID
@@ -90,7 +90,7 @@ data class Bid(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/OrderType.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 enum class OrderType {
     BUY_ORDER,   // Requesting to buy items
@@ -100,7 +100,7 @@ enum class OrderType {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/OrderStatus.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 enum class OrderStatus {
     PENDING,    // Waiting to be filled
@@ -113,7 +113,7 @@ enum class OrderStatus {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/Order.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
@@ -154,7 +154,7 @@ data class Order(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/OrderFill.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 import java.time.Instant
 import java.util.UUID
@@ -173,7 +173,7 @@ data class OrderFill(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/ExpiredItem.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 import org.bukkit.inventory.ItemStack
 import java.time.Instant
@@ -200,7 +200,7 @@ data class ExpiredItem(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/Transaction.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 import java.time.Instant
 import java.util.UUID
@@ -234,7 +234,7 @@ data class Transaction(
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/model/ItemFilter.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.model
+package bruh.auctionhouse.model
 
 data class AuctionFilter(
     val searchQuery: String? = null,
@@ -275,7 +275,7 @@ enum class OrderSort {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/AuctionHouseSchema.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
 import bruh.zchat.utils.database.migration.DatabaseSchema
 import bruh.zchat.utils.database.sql
@@ -576,9 +576,9 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/AuctionRepository.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
-import bruh.zchat.auctionhouse.model.*
+import bruh.auctionhouse.model.*
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import org.bukkit.inventory.ItemStack
@@ -838,9 +838,9 @@ class AuctionRepository(private val database: Database) {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/BidRepository.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
-import bruh.zchat.auctionhouse.model.Bid
+import bruh.auctionhouse.model.Bid
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import java.util.UUID
@@ -932,9 +932,9 @@ class BidRepository(private val database: Database) {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/OrderRepository.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
-import bruh.zchat.auctionhouse.model.*
+import bruh.auctionhouse.model.*
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import org.bukkit.Material
@@ -1163,9 +1163,9 @@ class OrderRepository(private val database: Database) {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/OrderFillRepository.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
-import bruh.zchat.auctionhouse.model.OrderFill
+import bruh.auctionhouse.model.OrderFill
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import java.util.UUID
@@ -1216,10 +1216,10 @@ class OrderFillRepository(private val database: Database) {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/ExpiredItemRepository.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
-import bruh.zchat.auctionhouse.model.ExpiredItem
-import bruh.zchat.auctionhouse.model.ExpiredItemType
+import bruh.auctionhouse.model.ExpiredItem
+import bruh.auctionhouse.model.ExpiredItemType
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import org.bukkit.inventory.ItemStack
@@ -1318,10 +1318,10 @@ class ExpiredItemRepository(private val database: Database) {
 
 ### File: `AuctionHouse/src/main/kotlin/bruh/zchat/auctionhouse/database/TransactionRepository.kt` (Create)
 ```kotlin
-package bruh.zchat.auctionhouse.database
+package bruh.auctionhouse.database
 
-import bruh.zchat.auctionhouse.model.Transaction
-import bruh.zchat.auctionhouse.model.TransactionType
+import bruh.auctionhouse.model.Transaction
+import bruh.auctionhouse.model.TransactionType
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import java.util.UUID
