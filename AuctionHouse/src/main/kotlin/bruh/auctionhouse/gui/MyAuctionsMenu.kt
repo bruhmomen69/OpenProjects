@@ -1,6 +1,7 @@
 package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
@@ -27,6 +28,7 @@ class MyAuctionsMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
+    private val economy: EconomyProvider,
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
@@ -60,7 +62,7 @@ class MyAuctionsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }

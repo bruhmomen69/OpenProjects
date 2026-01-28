@@ -29,6 +29,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
      * If group exists for the source, adds quantity to it.
      * If group doesn't exist, creates new consolidated entry.
      *
+     * @param quantity The total quantity to add to the group
      * @return The consolidated item (created or updated)
      */
     suspend fun addItemToGroup(
@@ -37,14 +38,15 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
         itemType: ExpiredItemType,
         sourceId: UUID,
         itemStack: ItemStack,
-        reason: String
+        reason: String,
+        quantity: Int
     ): ConsolidatedExpiredItem = withContext(Dispatchers.IO) {
         // First, try to find an existing consolidated group for this source
         val existing = getBySourceId(sourceId)
 
         if (existing != null) {
             // Update existing group
-            val newQuantity = existing.totalQuantity + itemStack.amount
+            val newQuantity = existing.totalQuantity + quantity
             val now = Instant.now()
 
             database.execute(
@@ -72,7 +74,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 sourceId = sourceId,
                 itemMaterial = itemStack.type,
                 itemDisplayName = itemStack.itemMeta?.displayName?.toString(),
-                totalQuantity = itemStack.amount,
+                totalQuantity = quantity,
                 claimedQuantity = 0,
                 itemStack = itemStack.clone().apply { amount = 1 }, // Store as single item template
                 reason = reason,

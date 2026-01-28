@@ -181,7 +181,7 @@ class ExpiredItemRepository(private val database: Database) {
                 val remainderItem = item.copy(
                     id = UUID.randomUUID(),
                     itemStack = item.itemStack.clone().apply { amount = originalAmount - claimedAmount },
-                    consolidatedGroupId = null // Not part of the consolidated group anymore
+                    consolidatedGroupId = item.consolidatedGroupId
                 )
                 create(remainderItem)
 

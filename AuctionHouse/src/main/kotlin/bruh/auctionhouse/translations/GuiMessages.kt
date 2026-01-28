@@ -16,6 +16,7 @@ enum class GuiMessages(
     ORDERS_TITLE("orders_title", "Order Browser"),
     CREATE_AUCTION_TITLE("create_auction_title", "Create Auction"),
     CREATE_ORDER_TITLE("create_order_title", "Create Order"),
+    MATERIAL_PICKER_TITLE("material_picker_title", "Select Material"),
     EXPIRED_ITEMS_TITLE("expired_items_title", "Expired Items"),
     
     // Navigation

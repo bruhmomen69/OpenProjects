@@ -1,6 +1,7 @@
 package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.model.OrderFilter
@@ -29,6 +30,7 @@ class OrderBrowserMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
+    private val economy: EconomyProvider,
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
@@ -142,7 +144,7 @@ class OrderBrowserMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                val menu = OrderFulfillMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player, order)
+                val menu = OrderFulfillMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player, order)
                 val opened = menu.open()
                 if (opened) ClickResult.CLOSE else ClickResult.ALLOW
             }
@@ -195,7 +197,7 @@ class OrderBrowserMenu(
     private fun createBackButton(): VItem {
         return MenuUtils.backButton(translationAPI).apply {
             onClick { _, _ ->
-                AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+                AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }

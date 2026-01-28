@@ -2,6 +2,7 @@ package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
@@ -28,6 +29,7 @@ class ClaimQuantityMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
+    private val economy: EconomyProvider,
     private val player: Player,
     private val consolidatedItem: ConsolidatedExpiredItem,
     private val initialQuantity: Int
@@ -189,7 +191,7 @@ class ClaimQuantityMenu(
                     if (result.success) {
                         ConsolidatedExpiredItemsMenu(
                             menuAPI, consolidatedService, auctionService, orderService, config,
-                            translationAPI, plugin, player
+                            translationAPI, plugin, economy, player
                         ).open()
                     }
                 }
@@ -209,7 +211,7 @@ class ClaimQuantityMenu(
                 // Return to consolidated expired items menu
                 ConsolidatedExpiredItemsMenu(
                     menuAPI, consolidatedService, auctionService, orderService, config,
-                    translationAPI, plugin, player
+                    translationAPI, plugin, economy, player
                 ).open()
                 ClickResult.CLOSE
             }

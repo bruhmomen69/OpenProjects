@@ -1,6 +1,7 @@
 package bruh.auctionhouse.commands
 
 import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.gui.AuctionCreateMenu
 import bruh.auctionhouse.gui.AuctionHouseMenu
@@ -35,7 +36,8 @@ class AuctionHouseCommands(
     private val orderService: OrderService,
     private val consolidatedExpiredItemService: ConsolidatedExpiredItemService,
     private val translationAPI: TranslationAPI,
-    private val menuAPI: MenuAPI
+    private val menuAPI: MenuAPI,
+    private val economy: EconomyProvider
 ) {
 
     /**
@@ -47,7 +49,7 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+        AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
     }
 
     /**
@@ -181,7 +183,7 @@ class AuctionHouseCommands(
         }
         ConsolidatedExpiredItemsMenu(
             menuAPI, consolidatedExpiredItemService, auctionService, orderService, config,
-            translationAPI, plugin, player
+            translationAPI, plugin, economy, player
         ).open()
     }
 
@@ -191,7 +193,7 @@ class AuctionHouseCommands(
     @Subcommand("myauctions")
     @CommandPermission("auctionhouse.myauctions")
     fun myAuctions(player: Player) {
-        MyAuctionsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+        MyAuctionsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
     }
 
     /**

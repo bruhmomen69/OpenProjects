@@ -2,6 +2,7 @@ package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.service.AuctionService
@@ -31,6 +32,7 @@ class OrderFulfillMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
+    private val economy: EconomyProvider,
     private val player: Player,
     private val order: Order
 ) {
@@ -136,7 +138,7 @@ class OrderFulfillMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    OrderBrowserMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+                    OrderBrowserMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }

@@ -2,6 +2,7 @@ package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionFilter
 import bruh.auctionhouse.model.AuctionSort
@@ -28,6 +29,7 @@ class AuctionHouseMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
+    private val economy: EconomyProvider,
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
@@ -76,6 +78,7 @@ class AuctionHouseMenu(
             staticItems[46] = createFilterButton()
             staticItems[47] = createSortButton()
             staticItems[48] = createSearchButton()
+            staticItems[49] = createCreateOrderButton()
             staticItems[50] = createMyAuctionsButton()
             staticItems[51] = createCreateAuctionButton()
             staticItems[52] = createOrdersButton()
@@ -98,7 +101,7 @@ class AuctionHouseMenu(
         when (auction.auctionType) {
             AuctionType.AUCTION -> {
                 loreList.add(translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_BID) {
-                    unparsed("price", MenuUtils.formatPrice(auction.startPrice, plugin.economy))
+                    unparsed("price", MenuUtils.formatPrice(auction.startPrice, economy))
                 })
             }
             AuctionType.BIN -> {
@@ -108,11 +111,11 @@ class AuctionHouseMenu(
             }
             AuctionType.BOTH -> {
                 loreList.add(translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_BID) {
-                    unparsed("price", MenuUtils.formatPrice(auction.startPrice, plugin.economy))
+                    unparsed("price", MenuUtils.formatPrice(auction.startPrice, economy))
                 })
                 auction.buyNowPrice?.let { binPrice ->
                     loreList.add(translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_BIN) {
-                        unparsed("price", MenuUtils.formatPrice(binPrice, plugin.economy))
+                        unparsed("price", MenuUtils.formatPrice(binPrice, economy))
                     })
                 }
             }
@@ -142,7 +145,7 @@ class AuctionHouseMenu(
 
             onClick { _, _ ->
                 // Handle click - open auction details
-                AuctionDetailsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player, auction).open()
+                AuctionDetailsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player, auction).open()
                 ClickResult.CLOSE
             }
         }
@@ -207,7 +210,7 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                MyAuctionsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+                MyAuctionsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }
@@ -231,7 +234,21 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderBrowserMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+                OrderBrowserMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
+                ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun createCreateOrderButton(): VItem {
+        return VItem(XMaterial.DIAMOND) {
+            name = translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_ORDER)
+            hideAllFlags()
+
+            onClick { _, _ ->
+                OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).open {
+                    open(currentPage)
+                }
                 ClickResult.CLOSE
             }
         }

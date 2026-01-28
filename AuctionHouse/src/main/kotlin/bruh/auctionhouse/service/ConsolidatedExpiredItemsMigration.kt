@@ -10,7 +10,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
+import org.slf4j.Logger
 import java.util.UUID
+import bruh.auctionhouse.util.toBigInteger
+import bruh.auctionhouse.util.toUuid
 import kotlin.math.min
 
 /**
@@ -20,7 +23,8 @@ import kotlin.math.min
 class ConsolidatedExpiredItemsMigration(
     private val database: Database,
     private val expiredItemRepository: ExpiredItemRepository,
-    private val consolidatedRepository: ConsolidatedExpiredItemRepository
+    private val consolidatedRepository: ConsolidatedExpiredItemRepository,
+    private val logger: Logger
 ) {
     private val migrationFlagKey = "consolidated_expired_items_migration_completed"
 
@@ -123,11 +127,11 @@ class ConsolidatedExpiredItemsMigration(
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)
                 },
-                consolidated.id.toString(),
-                consolidated.ownerUuid.toString(),
+                consolidated.id.toBigInteger(),
+                consolidated.ownerUuid.toBigInteger(),
                 consolidated.ownerName,
                 consolidated.itemType.name,
-                consolidated.sourceId.toString(),
+                consolidated.sourceId.toBigInteger(),
                 consolidated.itemMaterial.name,
                 consolidated.itemDisplayName,
                 consolidated.totalQuantity,
@@ -145,8 +149,8 @@ class ConsolidatedExpiredItemsMigration(
             items.forEach { item ->
                 database.execute(
                     sql("UPDATE expired_items SET consolidated_group_id = ? WHERE id = ?"),
-                    consolidated.id.toString(),
-                    item.id.toString()
+                    consolidated.id.toBigInteger(),
+                    item.id.toBigInteger()
                 )
                 migratedCount++
             }
@@ -155,9 +159,9 @@ class ConsolidatedExpiredItemsMigration(
         markMigrationCompleted()
 
         // Log migration results
-        println("[AuctionHouse] Consolidated expired items migration completed:")
-        println("  - Migrated $migratedCount expired items")
-        println("  - Created $createdGroups consolidated groups")
+        logger.info("[AuctionHouse] Consolidated expired items migration completed:")
+        logger.info("  - Migrated $migratedCount expired items")
+        logger.info("  - Created $createdGroups consolidated groups")
     }
 
     /**
@@ -179,12 +183,12 @@ class ConsolidatedExpiredItemsMigration(
 
     private fun mapFromResultSet(rs: java.sql.ResultSet): MigrationItem {
         return MigrationItem(
-            id = UUID.fromString(rs.getString("id")),
-            ownerUuid = UUID.fromString(rs.getString("owner_uuid")),
+            id = rs.getObject("id", java.math.BigInteger::class.java).toUuid(),
+            ownerUuid = rs.getObject("owner_uuid", java.math.BigInteger::class.java).toUuid(),
             ownerName = rs.getString("owner_name"),
             itemType = ExpiredItemType.valueOf(rs.getString("item_type")),
-            sourceId = UUID.fromString(rs.getString("source_id")),
-            consolidatedGroupId = rs.getString("consolidated_group_id")?.let { UUID.fromString(it) },
+            sourceId = rs.getObject("source_id", java.math.BigInteger::class.java).toUuid(),
+            consolidatedGroupId = rs.getObject("consolidated_group_id", java.math.BigInteger::class.java)?.toUuid(),
             itemStack = org.bukkit.inventory.ItemStack.deserializeBytes(rs.getBytes("item_stack")),
             amount = org.bukkit.inventory.ItemStack.deserializeBytes(rs.getBytes("item_stack")).amount,
             reason = rs.getString("reason"),

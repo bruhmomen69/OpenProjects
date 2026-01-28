@@ -1,6 +1,7 @@
 package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.service.AuctionService
@@ -29,6 +30,7 @@ class ConsolidatedExpiredItemsMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
+    private val economy: EconomyProvider,
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
@@ -41,7 +43,7 @@ class ConsolidatedExpiredItemsMenu(
         if (consolidatedItems.isEmpty()) {
             player.sendMessage(mm.deserialize("<gray>You have no expired items to claim."))
             // Open the main auction house menu instead
-            AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+            AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
             return
         }
 
@@ -69,7 +71,7 @@ class ConsolidatedExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -122,6 +124,7 @@ class ConsolidatedExpiredItemsMenu(
             config = config,
             translationAPI = translationAPI,
             plugin = plugin,
+            economy = economy,
             player = player,
             consolidatedItem = item,
             initialQuantity = initialQuantity

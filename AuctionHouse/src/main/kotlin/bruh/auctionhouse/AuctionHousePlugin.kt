@@ -149,7 +149,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
         // Step 5.5: Run data migration if needed
         val migration = ConsolidatedExpiredItemsMigration(
-            database, expiredItemRepository, consolidatedExpiredItemRepository
+            database, expiredItemRepository, consolidatedExpiredItemRepository, slF4JLogger
         )
         migration.migrate()
         slF4JLogger.info("Data migration check completed")
@@ -188,7 +188,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
         // Step 9: Register commands
         val lamp = BukkitLamp.builder(this).build()
-        lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI))
+        lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI, economy))
         lamp.register(OrderCommands(this, config, orderService, translations, menuAPI))
         lamp.register(AuctionAdminCommands(this, auctionService, translations))
         slF4JLogger.info("Commands registered")

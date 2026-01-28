@@ -52,7 +52,8 @@ class ExpiredItemManager(
             itemType = itemType,
             sourceId = sourceId,
             itemStack = templateItem,
-            reason = reason
+            reason = reason,
+            quantity = totalQuantity
         )
 
         // Store individual items for inventory management

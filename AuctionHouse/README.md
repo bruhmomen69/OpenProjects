@@ -90,6 +90,7 @@ The test server will:
 - Changed Lamp from `compileOnly` to `implementation` for proper shading
 - Added `MockEconomyProvider` fallback for testing without economy plugins (now behind safety gate)
 - Fixed `utils:configapi` to properly export Configurate dependencies
+- Fixed partial claim splitting to keep remainder items linked to their consolidated group (no orphaned expired items)
 
 ### Mock Economy Safety Gate
 
