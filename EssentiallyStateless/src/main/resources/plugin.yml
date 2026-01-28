@@ -94,3 +94,292 @@ permissions:
       essentiallystateless.potion: true
       essentiallystateless.firework: true
       essentiallystateless.reload: true
+
+  # ============================================
+  # Game Mode Commands
+  # ============================================
+  essentiallystateless.gamemode:
+    description: Change your own game mode
+    default: op
+  essentiallystateless.gamemode.others:
+    description: Change other players' game mode
+    default: op
+
+  # ============================================
+  # Time & Weather Commands
+  # ============================================
+  essentiallystateless.time:
+    description: Set or query world time
+    default: op
+  essentiallystateless.weather:
+    description: Set world weather
+    default: op
+  essentiallystateless.ptime:
+    description: Set personal time
+    default: true
+  essentiallystateless.pweather:
+    description: Set personal weather
+    default: true
+
+  # ============================================
+  # Player State Commands
+  # ============================================
+  essentiallystateless.heal:
+    description: Heal yourself
+    default: op
+  essentiallystateless.heal.others:
+    description: Heal other players
+    default: op
+  essentiallystateless.feed:
+    description: Feed yourself
+    default: op
+  essentiallystateless.feed.others:
+    description: Feed other players
+    default: op
+  essentiallystateless.fly:
+    description: Toggle fly mode for yourself
+    default: op
+  essentiallystateless.fly.others:
+    description: Toggle fly mode for other players
+    default: op
+  essentiallystateless.speed:
+    description: Change your own speed
+    default: op
+  essentiallystateless.speed.others:
+    description: Change other players' speed
+    default: op
+  essentiallystateless.god:
+    description: Toggle god mode for yourself
+    default: op
+  essentiallystateless.god.others:
+    description: Toggle god mode for other players
+    default: op
+  essentiallystateless.ext:
+    description: Extinguish yourself or others
+    default: true
+  essentiallystateless.rest:
+    description: Reset rest statistic for yourself or others
+    default: op
+  essentiallystateless.exp:
+    description: View or modify experience
+    default: op
+  essentiallystateless.kill:
+    description: Kill yourself or other players
+    default: op
+  essentiallystateless.burn:
+    description: Burn yourself or other players
+    default: op
+
+  # ============================================
+  # Teleport Commands
+  # ============================================
+  essentiallystateless.tp:
+    description: Teleport to a player or teleport others
+    default: op
+  essentiallystateless.tphere:
+    description: Teleport a player to you
+    default: op
+  essentiallystateless.tpall:
+    description: Teleport all players to a location
+    default: op
+  essentiallystateless.tppos:
+    description: Teleport to specific coordinates
+    default: op
+  essentiallystateless.top:
+    description: Teleport to the highest block
+    default: op
+  essentiallystateless.bottom:
+    description: Teleport to the lowest safe block
+    default: op
+  essentiallystateless.jump:
+    description: Jump to the block you're looking at
+    default: op
+  essentiallystateless.world:
+    description: Teleport to another world
+    default: op
+
+  # ============================================
+  # Inventory & Virtual Container Commands
+  # ============================================
+  essentiallystateless.anvil:
+    description: Open a virtual anvil
+    default: op
+  essentiallystateless.workbench:
+    description: Open a virtual workbench
+    default: op
+  essentiallystateless.grindstone:
+    description: Open a virtual grindstone
+    default: op
+  essentiallystateless.cartography:
+    description: Open a virtual cartography table
+    default: op
+  essentiallystateless.loom:
+    description: Open a virtual loom
+    default: op
+  essentiallystateless.smithing:
+    description: Open a virtual smithing table
+    default: op
+  essentiallystateless.stonecutter:
+    description: Open a virtual stonecutter
+    default: op
+  essentiallystateless.enderchest:
+    description: Open your ender chest
+    default: true
+  essentiallystateless.enderchest.others:
+    description: Open another player's ender chest
+    default: op
+  essentiallystateless.disposal:
+    description: Open a disposal/trash inventory
+    default: true
+  essentiallystateless.invsee:
+    description: View another player's inventory
+    default: op
+  essentiallystateless.clearinventory:
+    description: Clear your own inventory
+    default: op
+  essentiallystateless.clearinventory.others:
+    description: Clear another player's inventory
+    default: op
+
+  # ============================================
+  # Item Commands
+  # ============================================
+  essentiallystateless.give:
+    description: Give items to players
+    default: op
+  essentiallystateless.item:
+    description: Spawn items for yourself
+    default: op
+  essentiallystateless.more:
+    description: Increase item stack size
+    default: op
+  essentiallystateless.repair:
+    description: Repair items
+    default: op
+  essentiallystateless.enchant:
+    description: Enchant items
+    default: op
+  essentiallystateless.hat:
+    description: Wear item on your head
+    default: true
+  essentiallystateless.skull:
+    description: Get player skulls
+    default: op
+  essentiallystateless.itemname:
+    description: Rename items
+    default: op
+  essentiallystateless.itemlore:
+    description: Edit item lore
+    default: op
+  essentiallystateless.condense:
+    description: Condense items into blocks
+    default: true
+
+  # ============================================
+  # World Commands
+  # ============================================
+  essentiallystateless.lightning:
+    description: Strike lightning
+    default: op
+  essentiallystateless.remove:
+    description: Remove entities in radius
+    default: op
+  essentiallystateless.spawnmob:
+    description: Spawn mobs
+    default: op
+  essentiallystateless.tree:
+    description: Spawn trees
+    default: op
+  essentiallystateless.break:
+    description: Break blocks you're looking at
+    default: op
+  essentiallystateless.spawner:
+    description: Change spawner type
+    default: op
+
+  # ============================================
+  # Admin Commands
+  # ============================================
+  essentiallystateless.kick:
+    description: Kick players
+    default: op
+  essentiallystateless.kickall:
+    description: Kick all players
+    default: op
+  essentiallystateless.ban:
+    description: Ban players
+    default: op
+  essentiallystateless.unban:
+    description: Unban players
+    default: op
+  essentiallystateless.banip:
+    description: Ban IP addresses
+    default: op
+  essentiallystateless.unbanip:
+    description: Unban IP addresses
+    default: op
+  essentiallystateless.sudo:
+    description: Run commands as other players
+    default: op
+  essentiallystateless.broadcast:
+    description: Broadcast messages
+    default: op
+  essentiallystateless.gc:
+    description: View server performance info
+    default: op
+  essentiallystateless.reload:
+    description: Reload the plugin configuration
+    default: op
+
+  # ============================================
+  # Info Commands (mostly available to all)
+  # ============================================
+  essentiallystateless.list:
+    description: List online players
+    default: true
+  essentiallystateless.whois:
+    description: View detailed player information
+    default: op
+  essentiallystateless.near:
+    description: Find nearby players
+    default: true
+  essentiallystateless.seen:
+    description: Check when a player was last online
+    default: true
+  essentiallystateless.ping:
+    description: Check your or another player's ping
+    default: true
+  essentiallystateless.getpos:
+    description: Get your or another player's position
+    default: true
+  essentiallystateless.compass:
+    description: Get your facing direction
+    default: true
+  essentiallystateless.depth:
+    description: Get your depth relative to sea level
+    default: true
+  essentiallystateless.playtime:
+    description: Check your or another player's playtime
+    default: true
+
+  # ============================================
+  # Fun Commands
+  # ============================================
+  essentiallystateless.me:
+    description: Send action messages
+    default: true
+  essentiallystateless.fireball:
+    description: Launch a fireball
+    default: op
+  essentiallystateless.book:
+    description: Make written books editable
+    default: op
+  essentiallystateless.editsign:
+    description: Edit signs
+    default: op
+  essentiallystateless.potion:
+    description: Modify potions
+    default: op
+  essentiallystateless.firework:
+    description: Modify fireworks
+    default: op

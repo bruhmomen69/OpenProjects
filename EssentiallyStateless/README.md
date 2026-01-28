@@ -146,7 +146,6 @@ within Minecraft's native systems - all state is stored in player data and world
 3. **Start** the server - configuration will be generated automatically
 4. **Configure** by editing `plugins/EssentiallyStateless/config.conf`
 5. **Reload** with `/essentiallystateless reload`
-6.
 
 ## Configuration
 
