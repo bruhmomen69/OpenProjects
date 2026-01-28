@@ -41,5 +41,7 @@ include(":RegionRestore:nms:PaperMC-1_21_9")
 include(":RegionRestore:nms:PaperMC-1_21_10")
 include(":RegionRestore:nms:PaperMC-1_21_11")
 include(":RegionRestore:plugin")
+// AuctionHouse
+include(":AuctionHouse")
 
 rootProject.name = "OpenProjects"

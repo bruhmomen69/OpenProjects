@@ -1,0 +1,12 @@
+name: AuctionHouse
+version: ${version}
+main: bruh.auctionhouse.AuctionHousePlugin
+api-version: '1.21'
+load: POSTWORLD
+folia-supported: true
+dependencies:
+  server:
+    Vault:
+      load: BEFORE
+      required: true
+      join-classpath: true

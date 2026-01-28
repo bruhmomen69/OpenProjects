@@ -1,0 +1,684 @@
+package bruh.auctionhouse.service
+
+import bruh.auctionhouse.AuctionHousePlugin
+import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.config.FeeConfig
+import bruh.auctionhouse.database.ExpiredItemRepository
+import bruh.auctionhouse.database.OrderFillRepository
+import bruh.auctionhouse.database.OrderRepository
+import bruh.auctionhouse.database.TransactionRepository
+import bruh.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.model.ExpiredItem
+import bruh.auctionhouse.model.ExpiredItemType
+import bruh.auctionhouse.model.Order
+import bruh.auctionhouse.model.OrderFill
+import bruh.auctionhouse.model.OrderFilter
+import bruh.auctionhouse.model.OrderSort
+import bruh.auctionhouse.model.OrderStatus
+import bruh.auctionhouse.model.OrderType
+import bruh.auctionhouse.model.Transaction
+import bruh.auctionhouse.model.TransactionType
+import bruh.auctionhouse.translations.OrderMessages
+import bruh.zchat.utils.translations.TranslationAPI
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import net.kyori.adventure.text.minimessage.MiniMessage
+import org.bukkit.Material
+import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
+import java.math.BigDecimal
+import java.time.Duration
+import java.time.Instant
+import java.util.UUID
+
+/**
+ * Service layer for order business logic.
+ * Handles creation, fulfillment, and management of buy/sell orders.
+ */
+class OrderService(
+    private val plugin: AuctionHousePlugin,
+    private val config: AuctionHouseConfig,
+    private val orderRepository: OrderRepository,
+    private val orderFillRepository: OrderFillRepository,
+    private val expiredItemRepository: ExpiredItemRepository,
+    private val transactionRepository: TransactionRepository,
+    private val economy: EconomyProvider,
+    private val translationAPI: TranslationAPI,
+    private val serverId: String
+) {
+    private val mm = MiniMessage.miniMessage()
+    private val logger = plugin.slF4JLogger
+
+    /**
+     * Creates a new buy order.
+     *
+     * @param creator The player creating the order
+     * @param material The material being requested
+     * @param displayName Optional display name filter for matching items
+     * @param quantity The quantity requested
+     * @param pricePerUnit The price per unit
+     * @param allowPartial Whether partial fills are allowed
+     * @param minFillQuantity Minimum quantity for partial fills
+     * @param duration How long the order will be active
+     * @return The result of the creation attempt
+     */
+    suspend fun createBuyOrder(
+        creator: Player,
+        material: Material,
+        displayName: String?,
+        quantity: Int,
+        pricePerUnit: Double,
+        allowPartial: Boolean,
+        minFillQuantity: Int?,
+        duration: Duration
+    ): CreateOrderResult = withContext(Dispatchers.IO) {
+        if (!config.orders.enabled) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED)
+            )
+        }
+
+        // Validate quantity
+        if (quantity < config.orders.minQuantity || quantity > config.orders.maxQuantity) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_QUANTITY) {
+                    unparsed("min", config.orders.minQuantity.toString())
+                    unparsed("max", config.orders.maxQuantity.toString())
+                }
+            )
+        }
+
+        // Validate price
+        if (pricePerUnit < config.orders.minPricePerUnit || pricePerUnit > config.orders.maxPricePerUnit) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(config.orders.minPricePerUnit)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
+            )
+        }
+
+        // Check concurrent orders
+        val activeCount = orderRepository.countPlayerOrders(creator.uniqueId, OrderStatus.PENDING)
+        if (activeCount >= config.orders.maxConcurrentOrders) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_MAX_REACHED) {
+                    unparsed("max", config.orders.maxConcurrentOrders.toString())
+                }
+            )
+        }
+
+        // Calculate total cost
+        val totalCost = quantity * pricePerUnit
+        val listingFee = calculateFee(totalCost, config.orders.listingFee)
+        val totalRequired = totalCost + listingFee
+
+        // Check balance
+        if (!economy.has(creator, BigDecimal.valueOf(totalRequired))) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(totalRequired))} to create this order.")
+            )
+        }
+
+        // Charge fees
+        economy.withdraw(creator, BigDecimal.valueOf(totalRequired))
+
+        // Create order
+        val order = Order(
+            id = UUID.randomUUID(),
+            creatorUuid = creator.uniqueId,
+            creatorName = creator.name,
+            orderType = OrderType.BUY_ORDER,
+            itemMaterial = material,
+            itemDisplayName = displayName,
+            itemLoreHash = null,
+            itemNbtHash = null,
+            itemStack = null,
+            quantityRequested = quantity,
+            quantityFilled = 0,
+            pricePerUnit = pricePerUnit,
+            totalPrice = totalCost,
+            status = OrderStatus.PENDING,
+            createdAt = Instant.now(),
+            expiresAt = Instant.now().plus(duration),
+            allowPartial = allowPartial,
+            minFillQuantity = minFillQuantity
+        )
+
+        orderRepository.create(order)
+
+        CreateOrderResult(
+            true, order, listingFee,
+            translationAPI.getComponentSync(OrderMessages.ORDER_CREATED)
+        )
+    }
+
+    /**
+     * Creates a new sell order.
+     *
+     * @param creator The player creating the order
+     * @param item The item being sold
+     * @param pricePerUnit The price per unit
+     * @param duration How long the order will be active
+     * @return The result of the creation attempt
+     */
+    suspend fun createSellOrder(
+        creator: Player,
+        item: ItemStack,
+        pricePerUnit: Double,
+        duration: Duration
+    ): CreateOrderResult = withContext(Dispatchers.IO) {
+        if (!config.orders.enabled) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED)
+            )
+        }
+
+        val quantity = item.amount
+
+        // Validate price
+        if (pricePerUnit < config.orders.minPricePerUnit || pricePerUnit > config.orders.maxPricePerUnit) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(config.orders.minPricePerUnit)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
+            )
+        }
+
+        // Check concurrent orders
+        val activeCount = orderRepository.countPlayerOrders(creator.uniqueId, OrderStatus.PENDING)
+        if (activeCount >= config.orders.maxConcurrentOrders) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_MAX_REACHED) {
+                    unparsed("max", config.orders.maxConcurrentOrders.toString())
+                }
+            )
+        }
+
+        val listingFee = calculateFee(quantity * pricePerUnit, config.orders.listingFee)
+
+        // Charge listing fee
+        if (listingFee > 0 && !economy.has(creator, BigDecimal.valueOf(listingFee))) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(listingFee))} to list this order.")
+            )
+        }
+
+        if (listingFee > 0) {
+            economy.withdraw(creator, BigDecimal.valueOf(listingFee))
+        }
+
+        // Remove items from inventory
+        withContext(Dispatchers.Main) {
+            creator.inventory.removeItem(item)
+        }
+
+        // Create order
+        val order = Order(
+            id = UUID.randomUUID(),
+            creatorUuid = creator.uniqueId,
+            creatorName = creator.name,
+            orderType = OrderType.SELL_ORDER,
+            itemMaterial = item.type,
+            itemDisplayName = run {
+                val meta = item.itemMeta
+                if (meta != null && meta.hasDisplayName()) {
+                    meta.displayName()?.let { mm.serialize(it) }
+                } else {
+                    null
+                }
+            },
+            itemLoreHash = null,
+            itemNbtHash = null,
+            itemStack = item.clone(),
+            quantityRequested = quantity,
+            quantityFilled = 0,
+            pricePerUnit = pricePerUnit,
+            totalPrice = quantity * pricePerUnit,
+            status = OrderStatus.PENDING,
+            createdAt = Instant.now(),
+            expiresAt = Instant.now().plus(duration),
+            allowPartial = false,
+            minFillQuantity = null
+        )
+
+        orderRepository.create(order)
+
+        CreateOrderResult(
+            true, order, listingFee,
+            translationAPI.getComponentSync(OrderMessages.ORDER_CREATED)
+        )
+    }
+
+    /**
+     * Fulfills an order by providing items (for buy orders) or buying items (for sell orders).
+     *
+     * @param filler The player fulfilling the order
+     * @param orderId The ID of the order
+     * @param items The items being provided
+     * @return The result of the fulfillment attempt
+     */
+    suspend fun fulfillOrder(
+        filler: Player,
+        orderId: UUID,
+        items: List<ItemStack>
+    ): FulfillResult = withContext(Dispatchers.IO) {
+        val order = orderRepository.getById(orderId)
+            ?: return@withContext FulfillResult(
+                false, 0, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_NOT_FOUND)
+            )
+
+        if (!order.isActive()) {
+            return@withContext FulfillResult(
+                false, 0, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_ALREADY_FILLED)
+            )
+        }
+
+        if (order.creatorUuid == filler.uniqueId) {
+            return@withContext FulfillResult(
+                false, 0, 0.0,
+                mm.deserialize("<red>You cannot fulfill your own order.")
+            )
+        }
+
+        // Validate items match order requirements
+        val totalQuantity = items.sumOf { it.amount }
+        val remaining = order.remainingQuantity()
+
+        if (totalQuantity > remaining) {
+            return@withContext FulfillResult(
+                false, 0, 0.0,
+                mm.deserialize("<red>You provided too many items. Maximum needed: $remaining")
+            )
+        }
+
+        if (!order.allowPartial && totalQuantity < remaining) {
+            return@withContext FulfillResult(
+                false, 0, 0.0,
+                mm.deserialize("<red>This order requires the full quantity ($remaining) at once.")
+            )
+        }
+
+        order.minFillQuantity?.let { min ->
+            if (totalQuantity < min) {
+                return@withContext FulfillResult(
+                    false, 0, 0.0,
+                    translationAPI.getComponentSync(OrderMessages.ORDER_MIN_FILL_NOT_MET) {
+                        unparsed("min", min.toString())
+                    }
+                )
+            }
+        }
+
+        // Calculate earnings
+        val fillPrice = totalQuantity * order.pricePerUnit
+        val fillFee = calculateFee(fillPrice, config.orders.fillFee)
+        val earnings = fillPrice - fillFee
+
+        // For buy orders: creator pays filler
+        // For sell orders: filler pays creator
+        when (order.orderType) {
+            OrderType.BUY_ORDER -> {
+                // Check creator still has funds
+                if (!economy.has(
+                        plugin.server.getOfflinePlayer(order.creatorUuid),
+                        BigDecimal.valueOf(fillPrice)
+                    )
+                ) {
+                    return@withContext FulfillResult(
+                        false, 0, 0.0,
+                        mm.deserialize("<red>The order creator no longer has sufficient funds.")
+                    )
+                }
+
+                // Transfer funds
+                val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                economy.withdraw(creator, BigDecimal.valueOf(fillPrice))
+                economy.deposit(filler, BigDecimal.valueOf(earnings))
+
+                // Give items to creator
+                withContext(Dispatchers.Main) {
+                    plugin.server.getPlayer(order.creatorUuid)?.let { creatorPlayer ->
+                        items.forEach { item ->
+                            if (creatorPlayer.inventory.firstEmpty() == -1) {
+                                creatorPlayer.world.dropItemNaturally(creatorPlayer.location, item)
+                            } else {
+                                creatorPlayer.inventory.addItem(item)
+                            }
+                        }
+                    } ?: run {
+                        // Creator offline - store items as expired
+                        items.forEach { item ->
+                            expiredItemRepository.create(
+                                ExpiredItem(
+                                    id = UUID.randomUUID(),
+                                    ownerUuid = order.creatorUuid,
+                                    ownerName = order.creatorName,
+                                    itemType = ExpiredItemType.ORDER_ITEM,
+                                    sourceId = orderId,
+                                    itemStack = item,
+                                    reason = "ORDER_FILL",
+                                    expiredAt = Instant.now()
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            OrderType.SELL_ORDER -> {
+                // Filler buys items from creator
+                if (!economy.has(filler, BigDecimal.valueOf(fillPrice))) {
+                    return@withContext FulfillResult(
+                        false, 0, 0.0,
+                        mm.deserialize("<red>You don't have enough money to fulfill this order.")
+                    )
+                }
+
+                val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                economy.withdraw(filler, BigDecimal.valueOf(fillPrice))
+                economy.deposit(creator, BigDecimal.valueOf(earnings))
+
+                // Give items to filler
+                withContext(Dispatchers.Main) {
+                    items.forEach { item ->
+                        if (filler.inventory.firstEmpty() == -1) {
+                            filler.world.dropItemNaturally(filler.location, item)
+                        } else {
+                            filler.inventory.addItem(item)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remove items from filler (for buy orders)
+        if (order.orderType == OrderType.BUY_ORDER) {
+            withContext(Dispatchers.Main) {
+                items.forEach { item ->
+                    filler.inventory.removeItemAnySlot(item)
+                }
+            }
+        }
+
+        // Create fill record
+        val fill = OrderFill(
+            orderId = orderId,
+            fillerUuid = filler.uniqueId,
+            fillerName = filler.name,
+            quantity = totalQuantity,
+            pricePerUnit = order.pricePerUnit,
+            totalPrice = fillPrice,
+            filledAt = Instant.now()
+        )
+        orderFillRepository.create(fill)
+
+        // Update order status
+        val newFilledQuantity = order.quantityFilled + totalQuantity
+        val newStatus = when {
+            newFilledQuantity >= order.quantityRequested -> OrderStatus.FILLED
+            else -> OrderStatus.PARTIAL
+        }
+        orderRepository.updateFillStatus(orderId, newFilledQuantity, newStatus)
+
+        // Log transaction
+        transactionRepository.create(
+            Transaction(
+                transactionType = TransactionType.ORDER_FILL,
+                fromUuid = if (order.orderType == OrderType.BUY_ORDER) order.creatorUuid else filler.uniqueId,
+                fromName = if (order.orderType == OrderType.BUY_ORDER) order.creatorName else filler.name,
+                toUuid = if (order.orderType == OrderType.BUY_ORDER) filler.uniqueId else order.creatorUuid,
+                toName = if (order.orderType == OrderType.BUY_ORDER) filler.name else order.creatorName,
+                amount = earnings,
+                taxAmount = fillFee,
+                itemMaterial = order.itemMaterial.name,
+                itemQuantity = totalQuantity,
+                referenceId = orderId,
+                timestamp = Instant.now(),
+                serverId = serverId
+            )
+        )
+
+        // Notify order creator
+        plugin.server.getPlayer(order.creatorUuid)?.let { creator ->
+            if (newStatus == OrderStatus.FILLED) {
+                creator.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_FILLED))
+            } else {
+                creator.sendMessage(
+                    translationAPI.getComponentSync(OrderMessages.ORDER_PARTIAL_FILL) {
+                        unparsed("filled", newFilledQuantity.toString())
+                        unparsed("total", order.quantityRequested.toString())
+                    }
+                )
+            }
+        }
+
+        FulfillResult(
+            true, totalQuantity, earnings,
+            translationAPI.getComponentSync(OrderMessages.ORDER_FULFILLED) {
+                unparsed("amount", economy.format(BigDecimal.valueOf(earnings)))
+            }
+        )
+    }
+
+    /**
+     * Cancels an order.
+     *
+     * @param player The player attempting to cancel (must be owner or admin)
+     * @param orderId The ID of the order to cancel
+     * @return The result of the cancellation attempt
+     */
+    suspend fun cancelOrder(player: Player, orderId: UUID): ServiceResult<Order> = withContext(Dispatchers.IO) {
+        val order = orderRepository.getById(orderId)
+            ?: return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_NOT_FOUND)
+            )
+
+        if (order.creatorUuid != player.uniqueId && !player.hasPermission("auctionhouse.admin.cancel")) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_NOT_OWNER)
+            )
+        }
+
+        if (!order.isActive()) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_ALREADY_FILLED)
+            )
+        }
+
+        orderRepository.updateStatus(orderId, OrderStatus.CANCELLED)
+
+        // Return items or refund based on order type
+        when (order.orderType) {
+            OrderType.SELL_ORDER -> {
+                // Return items to seller
+                order.itemStack?.let { itemStack ->
+                    expiredItemRepository.create(
+                        ExpiredItem(
+                            id = UUID.randomUUID(),
+                            ownerUuid = order.creatorUuid,
+                            ownerName = order.creatorName,
+                            itemType = ExpiredItemType.ORDER_ITEM,
+                            sourceId = orderId,
+                            itemStack = itemStack,
+                            reason = "CANCELLED",
+                            expiredAt = Instant.now()
+                        )
+                    )
+                }
+            }
+
+            OrderType.BUY_ORDER -> {
+                // Refund remaining money
+                val remainingValue = order.remainingValue()
+                if (remainingValue > 0) {
+                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                    economy.deposit(creator, BigDecimal.valueOf(remainingValue))
+                    transactionRepository.create(
+                        Transaction(
+                            transactionType = TransactionType.ORDER_REFUND,
+                            fromUuid = null,
+                            fromName = null,
+                            toUuid = order.creatorUuid,
+                            toName = order.creatorName,
+                            amount = remainingValue,
+                            taxAmount = 0.0,
+                            itemMaterial = null,
+                            itemQuantity = null,
+                            referenceId = orderId,
+                            timestamp = Instant.now(),
+                            serverId = serverId
+                        )
+                    )
+                }
+            }
+        }
+
+        ServiceResult.Success(order)
+    }
+
+    /**
+     * Gets active orders with filtering, sorting, and pagination.
+     *
+     * @param filter Filter criteria
+     * @param sort Sort order
+     * @param page Page number (0-indexed)
+     * @param pageSize Number of items per page
+     * @return Paged result of orders
+     */
+    suspend fun getActiveOrders(
+        filter: OrderFilter,
+        sort: OrderSort,
+        page: Int,
+        pageSize: Int
+    ): PagedResult<Order> = withContext(Dispatchers.IO) {
+        val orders = orderRepository.getActiveOrders(filter, sort, page, pageSize)
+        // Note: We need a total count query for accurate pagination
+        // For now, we'll estimate based on the results
+        val hasMore = orders.size == pageSize
+        val estimatedTotal = if (hasMore) {
+            (page + 2) * pageSize // At least one more page
+        } else {
+            page * pageSize + orders.size
+        }
+        val totalPages = (estimatedTotal + pageSize - 1) / pageSize
+
+        PagedResult(orders, page, totalPages.coerceAtLeast(1), estimatedTotal)
+    }
+
+    /**
+     * Gets orders for a specific player.
+     *
+     * @param playerId The player's UUID
+     * @param status Optional status filter
+     * @return List of orders
+     */
+    suspend fun getPlayerOrders(playerId: UUID, status: OrderStatus?): List<Order> =
+        orderRepository.getPlayerOrders(playerId, status)
+
+    /**
+     * Gets an order by ID.
+     *
+     * @param orderId The order UUID
+     * @return The order, or null if not found
+     */
+    suspend fun getOrder(orderId: UUID): Order? =
+        orderRepository.getById(orderId)
+
+    /**
+     * Processes expired orders.
+     * Handles refunds and item returns for expired orders.
+     */
+    suspend fun processExpiredOrders() = withContext(Dispatchers.IO) {
+        val expiredOrders = orderRepository.getExpiredOrders()
+
+        for (order in expiredOrders) {
+            try {
+                processExpiredOrder(order)
+            } catch (e: Exception) {
+                logger.error("Error processing expired order ${order.id}", e)
+            }
+        }
+    }
+
+    private suspend fun processExpiredOrder(order: Order) {
+        orderRepository.updateStatus(order.id, OrderStatus.EXPIRED)
+
+        // Return items or refund
+        when (order.orderType) {
+            OrderType.SELL_ORDER -> {
+                order.itemStack?.let { itemStack ->
+                    expiredItemRepository.create(
+                        ExpiredItem(
+                            id = UUID.randomUUID(),
+                            ownerUuid = order.creatorUuid,
+                            ownerName = order.creatorName,
+                            itemType = ExpiredItemType.ORDER_ITEM,
+                            sourceId = order.id,
+                            itemStack = itemStack,
+                            reason = "EXPIRED",
+                            expiredAt = Instant.now()
+                        )
+                    )
+                }
+            }
+
+            OrderType.BUY_ORDER -> {
+                val remainingValue = order.remainingValue()
+                if (remainingValue > 0) {
+                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                    economy.deposit(creator, BigDecimal.valueOf(remainingValue))
+                    transactionRepository.create(
+                        Transaction(
+                            transactionType = TransactionType.ORDER_REFUND,
+                            fromUuid = null,
+                            fromName = null,
+                            toUuid = order.creatorUuid,
+                            toName = order.creatorName,
+                            amount = remainingValue,
+                            taxAmount = 0.0,
+                            itemMaterial = null,
+                            itemQuantity = null,
+                            referenceId = order.id,
+                            timestamp = Instant.now(),
+                            serverId = serverId
+                        )
+                    )
+                }
+            }
+        }
+
+        // Notify creator
+        plugin.server.getPlayer(order.creatorUuid)?.let { creator ->
+            creator.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_EXPIRED))
+        }
+    }
+
+    /**
+     * Calculates a fee based on the amount and fee configuration.
+     *
+     * @param amount The base amount
+     * @param feeConfig The fee configuration
+     * @return The calculated fee
+     */
+    private fun calculateFee(amount: Double, feeConfig: FeeConfig): Double {
+        val fee = when (feeConfig.type.uppercase()) {
+            "PERCENTAGE" -> amount * (feeConfig.amount / 100)
+            "FLAT" -> feeConfig.amount
+            else -> 0.0
+        }
+        return fee.coerceIn(feeConfig.minFee, feeConfig.maxFee)
+    }
+}
