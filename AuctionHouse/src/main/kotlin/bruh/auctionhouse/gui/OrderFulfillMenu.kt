@@ -215,7 +215,7 @@ class OrderFulfillMenu(
                         "Enter Quantity",
                         quantity,
                         minQuantity,
-                        order.remainingQuantity()
+                        minOf(order.remainingQuantity(), inventoryCount)
                     )
                     when (result) {
                         is AnvilInputResult.Success -> quantity = result.value
@@ -250,7 +250,7 @@ class OrderFulfillMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                if (quantity < order.remainingQuantity()) {
+                if (quantity < minOf(order.remainingQuantity(), inventoryCount)) {
                     quantity++
                 }
                 open()

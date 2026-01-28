@@ -40,6 +40,7 @@ class AuctionService(
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
     private val expiredItemRepository: ExpiredItemRepository,
+    private val expiredItemManager: ExpiredItemManager,
     private val transactionRepository: TransactionRepository,
     private val economy: EconomyProvider,
     private val translationAPI: TranslationAPI,
@@ -385,14 +386,16 @@ class AuctionService(
             )
         )
 
-        // Give item to buyer
-        withContext(Dispatchers.Main) {
-            if (buyer.inventory.firstEmpty() == -1) {
-                buyer.world.dropItemNaturally(buyer.location, auction.itemStack)
-            } else {
-                buyer.inventory.addItem(auction.itemStack)
-            }
-        }
+        // Give item to buyer (store in expired items if inventory full)
+        giveItemOrStoreExpired(
+            buyer,
+            buyer.uniqueId,
+            buyer.name,
+            auction.itemStack,
+            auction.id,
+            ExpiredItemType.AUCTION_ITEM,
+            "BIN_PURCHASE"
+        )
 
         // Notify seller
         plugin.server.getPlayer(auction.sellerUuid)?.let { sellerPlayer ->
@@ -462,17 +465,13 @@ class AuctionService(
         }
 
         // Return item to seller
-        expiredItemRepository.create(
-            ExpiredItem(
-                id = UUID.randomUUID(),
-                ownerUuid = auction.sellerUuid,
-                ownerName = auction.sellerName,
-                itemType = ExpiredItemType.AUCTION_ITEM,
-                sourceId = auctionId,
-                itemStack = auction.itemStack,
-                reason = "CANCELLED",
-                expiredAt = Instant.now()
-            )
+        expiredItemManager.storeExpiredItem(
+            ownerUuid = auction.sellerUuid,
+            ownerName = auction.sellerName,
+            itemType = ExpiredItemType.AUCTION_ITEM,
+            sourceId = auctionId,
+            item = auction.itemStack,
+            reason = "CANCELLED"
         )
 
         // Mark as cancelled
@@ -586,13 +585,15 @@ class AuctionService(
 
             // Give item to winner
             plugin.server.getPlayer(highestBid.bidderUuid)?.let { player ->
-                withContext(Dispatchers.Main) {
-                    if (player.inventory.firstEmpty() == -1) {
-                        player.world.dropItemNaturally(player.location, auction.itemStack)
-                    } else {
-                        player.inventory.addItem(auction.itemStack)
-                    }
-                }
+                val itemGiven = giveItemOrStoreExpired(
+                    player,
+                    highestBid.bidderUuid,
+                    highestBid.bidderName,
+                    auction.itemStack,
+                    auction.id,
+                    ExpiredItemType.AUCTION_ITEM,
+                    "AUCTION_WON"
+                )
                 player.sendMessage(
                     translationAPI.getComponentSync(AuctionMessages.AUCTION_WON) {
                         unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
@@ -601,17 +602,13 @@ class AuctionService(
                 )
             } ?: run {
                 // Player offline - store in expired items
-                expiredItemRepository.create(
-                    ExpiredItem(
-                        id = UUID.randomUUID(),
-                        ownerUuid = highestBid.bidderUuid,
-                        ownerName = highestBid.bidderName,
-                        itemType = ExpiredItemType.AUCTION_ITEM,
-                        sourceId = auction.id,
-                        itemStack = auction.itemStack,
-                        reason = "WON_AUCTION",
-                        expiredAt = Instant.now()
-                    )
+                expiredItemManager.storeExpiredItem(
+                    ownerUuid = highestBid.bidderUuid,
+                    ownerName = highestBid.bidderName,
+                    itemType = ExpiredItemType.AUCTION_ITEM,
+                    sourceId = auction.id,
+                    item = auction.itemStack,
+                    reason = "WON_AUCTION"
                 )
             }
 
@@ -629,17 +626,13 @@ class AuctionService(
             auctionRepository.updateStatus(auction.id, AuctionStatus.EXPIRED)
 
             // Return item to seller
-            expiredItemRepository.create(
-                ExpiredItem(
-                    id = UUID.randomUUID(),
-                    ownerUuid = auction.sellerUuid,
-                    ownerName = auction.sellerName,
-                    itemType = ExpiredItemType.AUCTION_ITEM,
-                    sourceId = auction.id,
-                    itemStack = auction.itemStack,
-                    reason = "EXPIRED",
-                    expiredAt = Instant.now()
-                )
+            expiredItemManager.storeExpiredItem(
+                ownerUuid = auction.sellerUuid,
+                ownerName = auction.sellerName,
+                itemType = ExpiredItemType.AUCTION_ITEM,
+                sourceId = auction.id,
+                item = auction.itemStack,
+                reason = "EXPIRED"
             )
 
             // Notify seller
@@ -674,5 +667,51 @@ class AuctionService(
         }
 
         return fee.coerceIn(feeConfig.minFee, feeConfig.maxFee)
+    }
+
+    /**
+     * Attempts to give an item to a player. If their inventory is full or partially full,
+     * stores the excess in the expired items system instead of dropping on the ground.
+     *
+     * @param player The player to give the item to
+     * @param ownerUuid The UUID of the item owner (for expired item storage)
+     * @param ownerName The name of the item owner (for expired item storage)
+     * @param itemStack The item to give
+     * @param sourceId The source auction/order ID
+     * @param itemType The type of expired item
+     * @param reason The reason for storage if needed
+     * @return True if the full item was given, false if partially or fully stored as expired
+     */
+    private suspend fun giveItemOrStoreExpired(
+        player: org.bukkit.entity.Player,
+        ownerUuid: UUID,
+        ownerName: String,
+        itemStack: ItemStack,
+        sourceId: UUID,
+        itemType: ExpiredItemType,
+        reason: String
+    ): Boolean = withContext(Dispatchers.Main) {
+        val remaining = player.inventory.addItem(itemStack.clone())
+
+        if (remaining.isEmpty()) {
+            return@withContext true // Full success
+        }
+
+        // Store overflow in expired items instead of dropping
+        val totalRemaining = remaining.values.sumOf { it.amount }
+        expiredItemManager.storeExpiredItems(
+            ownerUuid = ownerUuid,
+            ownerName = ownerName,
+            itemType = itemType,
+            sourceId = sourceId,
+            items = remaining.values.toList(),
+            reason = "$reason (INVENTORY_FULL)"
+        )
+
+        player.sendMessage(
+            mm.deserialize("<yellow>Your inventory was full. $totalRemaining item(s) have been stored in your expired items menu.")
+        )
+
+        false // Partial or no success - stored in expired items
     }
 }

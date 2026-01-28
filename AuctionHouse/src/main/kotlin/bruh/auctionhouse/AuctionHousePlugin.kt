@@ -8,6 +8,7 @@ import bruh.auctionhouse.config.AuctionHouseConfigLoader
 import bruh.auctionhouse.database.AuctionHouseSchema
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.ConsolidatedExpiredItemRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.database.OrderFillRepository
 import bruh.auctionhouse.database.OrderRepository
@@ -16,6 +17,9 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.economy.VaultEconomyProvider
 import bruh.auctionhouse.hooks.PlaceholderAPIHook
 import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.service.ConsolidatedExpiredItemService
+import bruh.auctionhouse.service.ConsolidatedExpiredItemsMigration
+import bruh.auctionhouse.service.ExpiredItemManager
 import bruh.auctionhouse.service.ExpirationService
 import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.AuctionMessages
@@ -72,6 +76,8 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
     private lateinit var orderRepository: OrderRepository
     private lateinit var orderFillRepository: OrderFillRepository
     private lateinit var expiredItemRepository: ExpiredItemRepository
+    private lateinit var consolidatedExpiredItemRepository: ConsolidatedExpiredItemRepository
+    private lateinit var consolidatedExpiredItemService: ConsolidatedExpiredItemService
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var expirationService: ExpirationService
 
@@ -137,20 +143,36 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         orderRepository = OrderRepository(database)
         orderFillRepository = OrderFillRepository(database)
         expiredItemRepository = ExpiredItemRepository(database)
+        consolidatedExpiredItemRepository = ConsolidatedExpiredItemRepository(database)
         transactionRepository = TransactionRepository(database)
         slF4JLogger.info("Repositories created")
+
+        // Step 5.5: Run data migration if needed
+        val migration = ConsolidatedExpiredItemsMigration(
+            database, expiredItemRepository, consolidatedExpiredItemRepository
+        )
+        migration.migrate()
+        slF4JLogger.info("Data migration check completed")
 
         // Step 6: Create services
         val serverId = server.name
 
+        val expiredItemManager = ExpiredItemManager(
+            expiredItemRepository, consolidatedExpiredItemRepository
+        )
+
+        consolidatedExpiredItemService = ConsolidatedExpiredItemService(
+            consolidatedExpiredItemRepository, expiredItemRepository
+        )
+
         auctionService = AuctionService(
             this, config, auctionRepository, bidRepository, expiredItemRepository,
-            transactionRepository, economy, translations, serverId
+            expiredItemManager, transactionRepository, economy, translations, serverId
         )
 
         orderService = OrderService(
             this, config, orderRepository, orderFillRepository, expiredItemRepository,
-            transactionRepository, economy, translations, serverId
+            expiredItemManager, transactionRepository, economy, translations, serverId
         )
 
         slF4JLogger.info("Services created")
@@ -166,7 +188,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
         // Step 9: Register commands
         val lamp = BukkitLamp.builder(this).build()
-        lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, translations, menuAPI))
+        lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI))
         lamp.register(OrderCommands(this, config, orderService, translations, menuAPI))
         lamp.register(AuctionAdminCommands(this, auctionService, translations))
         slF4JLogger.info("Commands registered")
@@ -177,7 +199,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
                 this,
                 auctionRepository,
                 orderRepository,
-                expiredItemRepository
+                consolidatedExpiredItemService
             ).register()
             slF4JLogger.info("PlaceholderAPI integration enabled")
         } else {

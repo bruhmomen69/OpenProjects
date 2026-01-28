@@ -4,9 +4,11 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.gui.AuctionCreateMenu
 import bruh.auctionhouse.gui.AuctionHouseMenu
+import bruh.auctionhouse.gui.ConsolidatedExpiredItemsMenu
 import bruh.auctionhouse.gui.MyAuctionsMenu
 import bruh.auctionhouse.model.AuctionType
 import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.service.ConsolidatedExpiredItemService
 import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -31,6 +33,7 @@ class AuctionHouseCommands(
     private val config: AuctionHouseConfig,
     private val auctionService: AuctionService,
     private val orderService: OrderService,
+    private val consolidatedExpiredItemService: ConsolidatedExpiredItemService,
     private val translationAPI: TranslationAPI,
     private val menuAPI: MenuAPI
 ) {
@@ -172,7 +175,14 @@ class AuctionHouseCommands(
     @Subcommand("expired")
     @CommandPermission("auctionhouse.expired")
     fun expired(player: Player) {
-        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.PLAYER_ONLY))
+        if (!plugin.isReady) {
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
+            return
+        }
+        ConsolidatedExpiredItemsMenu(
+            menuAPI, consolidatedExpiredItemService, auctionService, orderService, config,
+            translationAPI, plugin, player
+        ).open()
     }
 
     /**

@@ -2,10 +2,10 @@ package bruh.auctionhouse.hooks
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.database.AuctionRepository
-import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.model.AuctionStatus
 import bruh.auctionhouse.model.OrderStatus
+import bruh.auctionhouse.service.ConsolidatedExpiredItemService
 import kotlinx.coroutines.runBlocking
 import me.clip.placeholderapi.expansion.PlaceholderExpansion
 import org.bukkit.entity.Player
@@ -18,7 +18,7 @@ class PlaceholderAPIHook(
     private val plugin: AuctionHousePlugin,
     private val auctionRepository: AuctionRepository,
     private val orderRepository: OrderRepository,
-    private val expiredItemRepository: ExpiredItemRepository
+    private val consolidatedExpiredItemService: ConsolidatedExpiredItemService
 ) : PlaceholderExpansion() {
 
     override fun getIdentifier(): String = "auctionhouse"
@@ -69,7 +69,7 @@ class PlaceholderAPIHook(
             "expired_items" -> {
                 player?.let {
                     runBlocking {
-                        expiredItemRepository.countPlayerExpiredItems(it.uniqueId).toString()
+                        consolidatedExpiredItemService.countPlayerConsolidatedItems(it.uniqueId).toString()
                     }
                 } ?: "0"
             }
@@ -77,3 +77,4 @@ class PlaceholderAPIHook(
         }
     }
 }
+

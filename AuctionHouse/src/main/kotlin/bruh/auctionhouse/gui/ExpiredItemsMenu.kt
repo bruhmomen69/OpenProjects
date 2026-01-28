@@ -14,7 +14,11 @@ import com.cryptomorin.xseries.XMaterial
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
+import org.bukkit.Material
 import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
+import java.time.Instant
+import java.util.UUID
 
 /**
  * Menu for retrieving expired/cancelled items.
@@ -81,6 +85,9 @@ class ExpiredItemsMenu(
         val loreList = mutableListOf<Component>()
         loreList.add(mm.deserialize("<gray>Reason: <white>${expiredItem.reason}"))
         loreList.add(mm.deserialize("<gray>Expired: <white>${formatExpiredTime(expiredItem.expiredAt)}"))
+        if (expiredItem.itemStack.amount > 1) {
+            loreList.add(mm.deserialize("<gray>Quantity: <white>${expiredItem.itemStack.amount}"))
+        }
         loreList.add(Component.empty())
         loreList.add(mm.deserialize("<green>Click to retrieve item"))
 
@@ -92,10 +99,8 @@ class ExpiredItemsMenu(
 
             onClick { _, _ ->
                 runBlocking {
-                    // Give item to player
+                    // Give item to player with partial retrieval support
                     giveItemToPlayer(expiredItem)
-                    // Mark as claimed
-                    expiredItemRepository.markAsClaimed(expiredItem.id)
                 }
                 // Refresh menu
                 open()
@@ -104,17 +109,92 @@ class ExpiredItemsMenu(
         }
     }
 
-    private fun giveItemToPlayer(expiredItem: ExpiredItem) {
-        val remaining = player.inventory.addItem(expiredItem.itemStack)
-        if (remaining.isNotEmpty()) {
-            // Inventory full, drop at player location
-            remaining.values.forEach { item ->
-                player.world.dropItemNaturally(player.location, item)
-            }
-            player.sendMessage(mm.deserialize("<yellow>Your inventory was full. Some items were dropped at your location."))
-        } else {
-            player.sendMessage(mm.deserialize("<green>Item retrieved successfully!"))
+    private suspend fun giveItemToPlayer(expiredItem: ExpiredItem) {
+        val itemStack = expiredItem.itemStack
+        val maxStackSize = itemStack.maxStackSize
+        val totalAmount = itemStack.amount
+
+        // Calculate how much inventory space is available for this item type
+        val availableSpace = calculateAvailableSpace(itemStack)
+
+        if (availableSpace <= 0) {
+            // No space at all - keep in expired items
+            player.sendMessage(mm.deserialize("<red>Your inventory is full! Clear some space and try again."))
+            return
         }
+
+        if (availableSpace >= totalAmount) {
+            // Full retrieval - give all items and mark as claimed
+            val remaining = player.inventory.addItem(itemStack.clone())
+            if (remaining.isEmpty()) {
+                expiredItemRepository.markAsClaimed(expiredItem.id)
+                player.sendMessage(mm.deserialize("<green>Item retrieved successfully!"))
+            } else {
+                // This shouldn't happen if we calculated correctly, but handle it anyway
+                val remainingAmount = remaining.values.sumOf { it.amount }
+                storeOverflowAsNewExpiredItem(expiredItem, remainingAmount)
+                expiredItemRepository.markAsClaimed(expiredItem.id)
+                player.sendMessage(mm.deserialize("<yellow>Partial retrieval! Some items couldn't fit and remain in expired items."))
+            }
+        } else {
+            // Partial retrieval - give what fits, store remainder as new expired item
+            val toGive = itemStack.clone()
+            toGive.amount = availableSpace
+
+            val remainder = itemStack.clone()
+            remainder.amount = totalAmount - availableSpace
+
+            player.inventory.addItem(toGive)
+
+            // Store overflow as a new expired item entry
+            storeOverflowAsNewExpiredItem(expiredItem, remainder.amount)
+
+            // Mark original as claimed
+            expiredItemRepository.markAsClaimed(expiredItem.id)
+
+            player.sendMessage(mm.deserialize("<yellow>Partial retrieval! Retrieved $availableSpace/${totalAmount} items. The rest remain in expired items."))
+        }
+    }
+
+    private fun calculateAvailableSpace(itemStack: ItemStack): Int {
+        val maxStackSize = itemStack.maxStackSize
+        val type = itemStack.type
+        val meta = itemStack.itemMeta
+        var available = 0
+
+        // Check existing slots with same item type that aren't full
+        for (item in player.inventory.contents) {
+            if (item == null || item.type.isAir) {
+                // Empty slot - can hold a full stack
+                available += maxStackSize
+            } else if (item.type == type && item.isSimilar(itemStack)) {
+                // Same item type with same metadata - can stack
+                val spaceInStack = maxStackSize - item.amount
+                if (spaceInStack > 0) {
+                    available += spaceInStack
+                }
+            }
+        }
+
+        return available
+    }
+
+    private suspend fun storeOverflowAsNewExpiredItem(original: ExpiredItem, remainingAmount: Int) {
+        val overflowItem = original.itemStack.clone()
+        overflowItem.amount = remainingAmount
+
+        expiredItemRepository.create(
+            ExpiredItem(
+                id = UUID.randomUUID(),
+                ownerUuid = original.ownerUuid,
+                ownerName = original.ownerName,
+                itemType = original.itemType,
+                sourceId = original.sourceId,
+                itemStack = overflowItem,
+                reason = "${original.reason} (PARTIAL)",
+                expiredAt = Instant.now()
+            )
+        )
     }
 
     private fun formatExpiredTime(instant: java.time.Instant): String {

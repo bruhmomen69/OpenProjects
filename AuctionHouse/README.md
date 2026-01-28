@@ -20,7 +20,7 @@ A GUI-based Auction House plugin with dual-mode auctions (Auction + BIN) and an 
 - **Vault Integration**: Full economy support with configurable fees
 - **Flexible Configuration**: Extensive customization for admins
 - **Anti-Snipe Protection**: Automatic auction extension when bids are placed near end time
-- **Expired Item Retrieval**: Players can retrieve expired items
+- **Expired Item Retrieval**: Players can retrieve expired items with partial retrieval support (overflow stays in expired items, never dropped)
 - **Translation System**: Multi-language support using properties files
 
 ## Commands
@@ -76,6 +76,11 @@ The test server will:
 - Load the AuctionHouse plugin
 
 ### Recent Changes
+
+- **Item Retrieval Safety Improvements**:
+  - **Partial Retrieval Support**: The Expired Items Menu now supports partial retrieval. If your inventory is partially full, you'll receive what fits and the rest remains in expired items for later retrieval.
+  - **No More Dropped Items**: Items from won auctions, BIN purchases, and order fills are now stored in the Expired Items system instead of being dropped on the ground when inventory is full.
+  - **Buy Order Config Option**: New config `orders.buyOrdersAlwaysToExpiredItems` (default: false) - When enabled, items from fulfilled buy orders always go to the Expired Items menu instead of directly to inventory.
 
 - **CRITICAL SAFETY**: Mock economy now requires BOTH environment variable `AUCTIONHOUSE_DEV_MODE=true` AND config `economy.useMockEconomy=true` to prevent accidental production usage
 - Fixed potential NPE issues in item display name handling in AuctionService and OrderService

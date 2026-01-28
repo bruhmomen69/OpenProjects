@@ -11,7 +11,7 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
     
     override val migrations = listOf(
         migration(1, "Initial schema") {
-            
+
             // auctions table
             execute(sql {
                 mysql("""
@@ -290,6 +290,116 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                         timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         server_id TEXT
                     )
+                """)
+            })
+        },
+        migration(2, "Add consolidated expired items") {
+            // Create plugin_metadata table for tracking migrations and flags
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS plugin_metadata (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value VARCHAR(255) NOT NULL
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS plugin_metadata (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value VARCHAR(255) NOT NULL
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS plugin_metadata (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                """)
+            })
+
+            // Create consolidated_expired_items table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS consolidated_expired_items (
+                        id DECIMAL(39,0) PRIMARY KEY,
+                        owner_uuid DECIMAL(39,0) NOT NULL,
+                        owner_name VARCHAR(32) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id DECIMAL(39,0) NOT NULL,
+                        item_material VARCHAR(50) NOT NULL,
+                        item_display_name TEXT,
+                        total_quantity INT NOT NULL DEFAULT 0,
+                        claimed_quantity INT NOT NULL DEFAULT 0,
+                        item_stack BLOB NOT NULL,
+                        reason VARCHAR(100) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL,
+                        last_updated_at TIMESTAMP NOT NULL,
+                        is_fully_claimed BOOLEAN DEFAULT FALSE,
+                        INDEX idx_owner_uuid (owner_uuid),
+                        INDEX idx_source_id (source_id),
+                        INDEX idx_fully_claimed (is_fully_claimed)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS consolidated_expired_items (
+                        id NUMERIC(39,0) PRIMARY KEY,
+                        owner_uuid NUMERIC(39,0) NOT NULL,
+                        owner_name VARCHAR(32) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id NUMERIC(39,0) NOT NULL,
+                        item_material VARCHAR(50) NOT NULL,
+                        item_display_name TEXT,
+                        total_quantity INT NOT NULL DEFAULT 0,
+                        claimed_quantity INT NOT NULL DEFAULT 0,
+                        item_stack BYTEA NOT NULL,
+                        reason VARCHAR(100) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL,
+                        last_updated_at TIMESTAMP NOT NULL,
+                        is_fully_claimed BOOLEAN DEFAULT FALSE
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS consolidated_expired_items (
+                        id BLOB(16) PRIMARY KEY,
+                        owner_uuid BLOB(16) NOT NULL,
+                        owner_name TEXT NOT NULL,
+                        item_type TEXT NOT NULL,
+                        source_id BLOB(16) NOT NULL,
+                        item_material TEXT NOT NULL,
+                        item_display_name TEXT,
+                        total_quantity INTEGER NOT NULL DEFAULT 0,
+                        claimed_quantity INTEGER NOT NULL DEFAULT 0,
+                        item_stack BLOB NOT NULL,
+                        reason TEXT NOT NULL,
+                        expired_at TIMESTAMP NOT NULL,
+                        last_updated_at TIMESTAMP NOT NULL,
+                        is_fully_claimed INTEGER DEFAULT 0
+                    )
+                """)
+            })
+
+            // Add consolidated_group_id column to expired_items table
+            execute(sql {
+                mysql("""
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id DECIMAL(39,0) NULL
+                """)
+                postgres("""
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id NUMERIC(39,0) NULL
+                """)
+                sqlite("""
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id BLOB(16)
+                """)
+            })
+
+            // Create index for the new column (not supported in SQLite for ALTER TABLE)
+            execute(sql {
+                mysql("""
+                    CREATE INDEX idx_consolidated_group ON expired_items(consolidated_group_id)
+                """)
+                postgres("""
+                    CREATE INDEX idx_consolidated_group ON expired_items(consolidated_group_id)
+                """)
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_consolidated_group ON expired_items(consolidated_group_id)
                 """)
             })
         }

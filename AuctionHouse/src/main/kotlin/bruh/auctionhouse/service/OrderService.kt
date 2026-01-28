@@ -41,6 +41,7 @@ class OrderService(
     private val orderRepository: OrderRepository,
     private val orderFillRepository: OrderFillRepository,
     private val expiredItemRepository: ExpiredItemRepository,
+    private val expiredItemManager: ExpiredItemManager,
     private val transactionRepository: TransactionRepository,
     private val economy: EconomyProvider,
     private val translationAPI: TranslationAPI,
@@ -348,33 +349,43 @@ class OrderService(
                 economy.withdraw(creator, BigDecimal.valueOf(fillPrice))
                 economy.deposit(filler, BigDecimal.valueOf(earnings))
 
-                // Give items to creator
-                withContext(Dispatchers.Main) {
-                    plugin.server.getPlayer(order.creatorUuid)?.let { creatorPlayer ->
-                        items.forEach { item ->
-                            if (creatorPlayer.inventory.firstEmpty() == -1) {
-                                creatorPlayer.world.dropItemNaturally(creatorPlayer.location, item)
-                            } else {
-                                creatorPlayer.inventory.addItem(item)
-                            }
-                        }
-                    } ?: run {
-                        // Creator offline - store items as expired
-                        items.forEach { item ->
-                            expiredItemRepository.create(
-                                ExpiredItem(
-                                    id = UUID.randomUUID(),
-                                    ownerUuid = order.creatorUuid,
-                                    ownerName = order.creatorName,
-                                    itemType = ExpiredItemType.ORDER_ITEM,
-                                    sourceId = orderId,
-                                    itemStack = item,
-                                    reason = "ORDER_FILL",
-                                    expiredAt = Instant.now()
-                                )
-                            )
-                        }
+                // Give items to creator (or store in expired items)
+                plugin.server.getPlayer(order.creatorUuid)?.let { creatorPlayer ->
+                    if (config.orders.buyOrdersAlwaysToExpiredItems) {
+                        // Config option: always store in expired items
+                        expiredItemManager.storeExpiredItems(
+                            ownerUuid = order.creatorUuid,
+                            ownerName = order.creatorName,
+                            itemType = ExpiredItemType.ORDER_ITEM,
+                            sourceId = orderId,
+                            items = items,
+                            reason = "ORDER_FILL"
+                        )
+                        creatorPlayer.sendMessage(
+                            mm.deserialize("<green>Your buy order was filled! Items are available in your expired items menu.")
+                        )
+                    } else {
+                        // Try to give items, store overflow in expired items
+                        giveItemsOrStoreExpired(
+                            creatorPlayer,
+                            order.creatorUuid,
+                            order.creatorName,
+                            items,
+                            orderId,
+                            ExpiredItemType.ORDER_ITEM,
+                            "ORDER_FILL"
+                        )
                     }
+                } ?: run {
+                    // Creator offline - store items as expired
+                    expiredItemManager.storeExpiredItems(
+                        ownerUuid = order.creatorUuid,
+                        ownerName = order.creatorName,
+                        itemType = ExpiredItemType.ORDER_ITEM,
+                        sourceId = orderId,
+                        items = items,
+                        reason = "ORDER_FILL"
+                    )
                 }
             }
 
@@ -391,16 +402,16 @@ class OrderService(
                 economy.withdraw(filler, BigDecimal.valueOf(fillPrice))
                 economy.deposit(creator, BigDecimal.valueOf(earnings))
 
-                // Give items to filler
-                withContext(Dispatchers.Main) {
-                    items.forEach { item ->
-                        if (filler.inventory.firstEmpty() == -1) {
-                            filler.world.dropItemNaturally(filler.location, item)
-                        } else {
-                            filler.inventory.addItem(item)
-                        }
-                    }
-                }
+                // Give items to filler (store overflow in expired items instead of dropping)
+                giveItemsOrStoreExpired(
+                    filler,
+                    filler.uniqueId,
+                    filler.name,
+                    items,
+                    orderId,
+                    ExpiredItemType.ORDER_ITEM,
+                    "ORDER_FILL"
+                )
             }
         }
 
@@ -505,17 +516,13 @@ class OrderService(
             OrderType.SELL_ORDER -> {
                 // Return items to seller
                 order.itemStack?.let { itemStack ->
-                    expiredItemRepository.create(
-                        ExpiredItem(
-                            id = UUID.randomUUID(),
-                            ownerUuid = order.creatorUuid,
-                            ownerName = order.creatorName,
-                            itemType = ExpiredItemType.ORDER_ITEM,
-                            sourceId = orderId,
-                            itemStack = itemStack,
-                            reason = "CANCELLED",
-                            expiredAt = Instant.now()
-                        )
+                    expiredItemManager.storeExpiredItem(
+                        ownerUuid = order.creatorUuid,
+                        ownerName = order.creatorName,
+                        itemType = ExpiredItemType.ORDER_ITEM,
+                        sourceId = orderId,
+                        item = itemStack,
+                        reason = "CANCELLED"
                     )
                 }
             }
@@ -620,17 +627,13 @@ class OrderService(
         when (order.orderType) {
             OrderType.SELL_ORDER -> {
                 order.itemStack?.let { itemStack ->
-                    expiredItemRepository.create(
-                        ExpiredItem(
-                            id = UUID.randomUUID(),
-                            ownerUuid = order.creatorUuid,
-                            ownerName = order.creatorName,
-                            itemType = ExpiredItemType.ORDER_ITEM,
-                            sourceId = order.id,
-                            itemStack = itemStack,
-                            reason = "EXPIRED",
-                            expiredAt = Instant.now()
-                        )
+                    expiredItemManager.storeExpiredItem(
+                        ownerUuid = order.creatorUuid,
+                        ownerName = order.creatorName,
+                        itemType = ExpiredItemType.ORDER_ITEM,
+                        sourceId = order.id,
+                        item = itemStack,
+                        reason = "EXPIRED"
                     )
                 }
             }
@@ -680,5 +683,59 @@ class OrderService(
             else -> 0.0
         }
         return fee.coerceIn(feeConfig.minFee, feeConfig.maxFee)
+    }
+
+    /**
+     * Attempts to give items to a player. If their inventory is full or partially full,
+     * stores the excess in the expired items system instead of dropping on the ground.
+     *
+     * @param player The player to give the items to
+     * @param ownerUuid The UUID of the item owner (for expired item storage)
+     * @param ownerName The name of the item owner (for expired item storage)
+     * @param items The list of items to give
+     * @param sourceId The source order ID
+     * @param itemType The type of expired item
+     * @param reason The reason for storage if needed
+     */
+    private suspend fun giveItemsOrStoreExpired(
+        player: org.bukkit.entity.Player,
+        ownerUuid: UUID,
+        ownerName: String,
+        items: List<ItemStack>,
+        sourceId: UUID,
+        itemType: ExpiredItemType,
+        reason: String
+    ) = withContext(Dispatchers.Main) {
+        var totalStored = 0
+
+        // Collect all overflow items
+        val overflowItems = mutableListOf<ItemStack>()
+        items.forEach { item ->
+            val remaining = player.inventory.addItem(item.clone())
+
+            if (remaining.isNotEmpty()) {
+                // Collect overflow items
+                overflowItems.addAll(remaining.values)
+                totalStored += remaining.values.sumOf { it.amount }
+            }
+        }
+
+        // Store all overflow items at once
+        if (overflowItems.isNotEmpty()) {
+            expiredItemManager.storeExpiredItems(
+                ownerUuid = ownerUuid,
+                ownerName = ownerName,
+                itemType = itemType,
+                sourceId = sourceId,
+                items = overflowItems,
+                reason = "$reason (INVENTORY_FULL)"
+            )
+        }
+
+        if (totalStored > 0) {
+            player.sendMessage(
+                mm.deserialize("<yellow>Your inventory was full. $totalStored item(s) have been stored in your expired items menu.")
+            )
+        }
     }
 }

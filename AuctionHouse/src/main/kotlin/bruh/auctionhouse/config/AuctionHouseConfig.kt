@@ -90,20 +90,25 @@ data class OrderSettings(
     val durationOptions: List<Int> = listOf(24, 48, 72, 168),
     val defaultDuration: Int = 72,
     val maxDuration: Int = 336,
-    
+
     val minQuantity: Int = 1,
     val maxQuantity: Int = 10000,
     val minPricePerUnit: Double = 0.01,
     val maxPricePerUnit: Double = 10000000.0,
-    
+
     val listingFee: FeeConfig = FeeConfig("FLAT", 100.0, 100.0, 100.0),
     val fillFee: FeeConfig = FeeConfig("PERCENTAGE", 2.5, 0.0, 100000.0),
-    
+
     val partialFills: PartialFillConfig = PartialFillConfig(),
     val maxConcurrentOrders: Int = 5,
     val expiredStorageDays: Int = 30,
-    
-    val matching: OrderMatchingConfig = OrderMatchingConfig()
+
+    val matching: OrderMatchingConfig = OrderMatchingConfig(),
+
+    @Comment("When enabled, items from fulfilled buy orders will always go to the Expired Items menu\n" +
+        "instead of being placed directly in the player's inventory. This prevents item loss\n" +
+        "when the player's inventory is full. Default: false")
+    val buyOrdersAlwaysToExpiredItems: Boolean = false
 )
 
 @ConfigSerializable
