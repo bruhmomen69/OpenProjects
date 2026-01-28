@@ -14,7 +14,7 @@ dependencies {
     compileOnly(libs.kotlinxCoroutinesCore)
     
     // Kotlin reflect for FormInput
-    api(libs.kotlinReflect)
+    compileOnly(libs.kotlinReflect)
     
     // XSeries and AnvilGUI
     api(libs.xseries)

@@ -403,26 +403,6 @@ To change default permissions, edit your permissions plugin configuration or use
 /whois PlayerName - View detailed player information
 ```
 
-## Technical Details
-
-### Architecture
-
-- **Stateless Design** - No external data storage
-- **MCCoroutine Integration** - Folia-compatible async operations
-- **Lamp Command Framework** - Modern command handling with suggestions
-- **Configurate HOCON** - Modern configuration format
-- **TranslationAPI** - Multi-language support with caching
-- **MenuAPI** - GUI support for future features
-
-### Performance
-
-- **Zero persistence** - No disk I/O for player data
-- **Full coroutine support** - All commands are suspend functions for non-blocking execution
-- **Proper thread dispatching** - Entity operations use entityDispatcher, world operations use regionDispatcher
-- **No runBlocking** - Clean coroutine implementation without blocking the main thread
-- **Efficient caching** - Translation and configuration caching
-- **Minimal memory footprint** - Stateless design reduces memory usage
-
 ### Compatibility
 
 - **PaperMC 1.21+** - Full Paper API compatibility

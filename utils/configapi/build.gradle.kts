@@ -7,5 +7,6 @@ dependencies {
     compileOnly(libs.kotlinxCoroutinesCore)
     
     // Configurate
-    api(libs.bundles.configurateHocon)
+    api(libs.configurateHocon)
+    compileOnly(libs.configurateExtraKotlin)
 }
