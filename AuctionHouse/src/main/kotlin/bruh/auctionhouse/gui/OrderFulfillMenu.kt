@@ -7,6 +7,7 @@ import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -34,9 +35,68 @@ class OrderFulfillMenu(
     private val order: Order
 ) {
     private val mm = MiniMessage.miniMessage()
-    private var quantity = order.remainingQuantity()
+    private val inventoryCount = countMatchingItems()
+    private val remainingQuantity = order.remainingQuantity()
+    private var quantity: Int
 
-    fun open() {
+    init {
+        // Calculate default quantity based on partial fill settings
+        quantity = if (order.allowPartial) {
+            // For partial fills: default to min(inventory count, remaining quantity)
+            minOf(inventoryCount, remainingQuantity)
+        } else {
+            // For non-partial: must fill the full remaining amount
+            remainingQuantity
+        }
+    }
+
+    /**
+     * Opens the fulfillment menu. Returns false if player doesn't have enough items.
+     */
+    fun open(): Boolean {
+        // Check if player has any matching items
+        if (inventoryCount == 0) {
+            player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
+                unparsed("required", remainingQuantity.toString())
+                unparsed("have", "0")
+                unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
+            })
+            return false
+        }
+
+        // For non-partial fills, check if player has enough items
+        if (!order.allowPartial && inventoryCount < remainingQuantity) {
+            player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
+                unparsed("required", remainingQuantity.toString())
+                unparsed("have", inventoryCount.toString())
+                unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
+            })
+            return false
+        }
+
+        // For partial fills with min fill quantity, check if player has at least the minimum
+        order.minFillQuantity?.let { minFill ->
+            if (inventoryCount < minFill) {
+                player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_MIN_FILL_NOT_MET) {
+                    unparsed("min", minFill.toString())
+                    unparsed("have", inventoryCount.toString())
+                    unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
+                })
+                return false
+            }
+        }
+
+        // If partial fills not allowed, skip directly to confirmation (no quantity selection)
+        if (!order.allowPartial) {
+            // Just show confirm dialog with full amount required
+            openConfirmOnlyMenu()
+        } else {
+            openFullMenu()
+        }
+        return true
+    }
+
+    private fun openFullMenu() {
         val menu = menuAPI.simple {
             rows = 5
             title = translationAPI.getComponentSync(GuiMessages.ORDERS_TITLE)
@@ -46,8 +106,8 @@ class OrderFulfillMenu(
             // Order item display
             item(13, createOrderDisplayItem())
 
-            // Quantity selector (if partial fills allowed)
-            if (order.allowPartial && order.remainingQuantity() > 1) {
+            // Quantity selector (only show if partial fills allowed and there's more than 1 to fill)
+            if (order.allowPartial && remainingQuantity > 1 && inventoryCount > 1) {
                 item(29, createQuantityDecreaseButton())
                 item(30, createQuantityDisplayItem())
                 item(31, createQuantityIncreaseButton())
@@ -55,6 +115,23 @@ class OrderFulfillMenu(
 
             // Confirm button
             item(33, createConfirmButton())
+        }
+
+        menuAPI.open(menu, player)
+    }
+
+    private fun openConfirmOnlyMenu() {
+        val menu = menuAPI.simple {
+            rows = 3
+            title = translationAPI.getComponentSync(GuiMessages.ORDERS_TITLE)
+
+            background = MenuUtils.backgroundItem()
+
+            // Order item display in center
+            item(13, createOrderDisplayItem())
+
+            // Confirm button (right side)
+            item(15, createConfirmButton())
 
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
@@ -63,7 +140,7 @@ class OrderFulfillMenu(
                     ClickResult.CLOSE
                 }
             }
-            item(36, backItem)
+            item(18, backItem)
 
             // Close button
             val closeItem = MenuUtils.closeButton(translationAPI).apply {
@@ -71,7 +148,7 @@ class OrderFulfillMenu(
                     ClickResult.CLOSE
                 }
             }
-            item(44, closeItem)
+            item(26, closeItem)
         }
 
         menuAPI.open(menu, player)
@@ -209,7 +286,19 @@ class OrderFulfillMenu(
                 runBlocking {
                     val items = findItemsInInventory()
                     if (items.isEmpty() && order.orderType == OrderType.BUY_ORDER) {
-                        player.sendMessage(mm.deserialize("<red>You don't have any ${order.itemMaterial.name.replace("_", " ").lowercase()} in your inventory!"))
+                        player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
+                            unparsed("required", quantity.toString())
+                            unparsed("have", "0")
+                            unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
+                        })
+                    } else if (items.sumOf { it.amount } < quantity) {
+                        // Handle case where user selected more than they currently have
+                        val foundAmount = items.sumOf { it.amount }
+                        player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
+                            unparsed("required", quantity.toString())
+                            unparsed("have", foundAmount.toString())
+                            unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
+                        })
                     } else {
                         val result = orderService.fulfillOrder(player, order.id, items)
                         player.sendMessage(result.message)
@@ -243,5 +332,24 @@ class OrderFulfillMenu(
         }
 
         return items
+    }
+
+    /**
+     * Counts how many matching items the player has in their inventory.
+     */
+    private fun countMatchingItems(): Int {
+        return player.inventory.contents.filterNotNull().sumOf { item ->
+            if (item.type == order.itemMaterial) {
+                // Check display name match if specified
+                val itemDisplayName = item.itemMeta?.displayName()?.let { mm.serialize(it) }
+                if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
+                    0
+                } else {
+                    item.amount
+                }
+            } else {
+                0
+            }
+        }
     }
 }

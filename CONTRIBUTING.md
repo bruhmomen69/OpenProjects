@@ -3,6 +3,8 @@
 - You are in a monorepo with core utils, and the `ZealousChat` and `RegionRestore` plugins.
 - The `ZealousChat` plugin is a chat plugin that uses MiniMessage for chat formatting.
 - The `RegionRestore` plugin is a region restore plugin that uses MiniMessage for chat formatting.
+- The `EssentiallyStateless` plugin is a essentials plugin that does not store user state.
+- The `AuctionHouse` plugin is an Auctions and Orders plugin.
 - RegionRestore uses a multi module structure, with `api`, `PaperMC` and `plugin` (packaging) modules, along with NMS modules.
 
 # Working

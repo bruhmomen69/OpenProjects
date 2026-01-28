@@ -142,8 +142,9 @@ class OrderBrowserMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderFulfillMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player, order).open()
-                ClickResult.CLOSE
+                val menu = OrderFulfillMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, player, order)
+                val opened = menu.open()
+                if (opened) ClickResult.CLOSE else ClickResult.ALLOW
             }
         }
     }

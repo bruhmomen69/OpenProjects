@@ -22,8 +22,8 @@ enum class OrderMessages(
     ORDER_FILLED("order_filled", "<green>Your order has been completely filled!"),
     ORDER_PARTIAL_FILL("order_partial_fill", "<yellow>Your order was partially filled ({filled}/{total})."),
     ORDER_FULFILLED("order_fulfilled", "<green>You fulfilled an order and received <gold>{amount}</gold>!"),
-    ORDER_NOT_ENOUGH_ITEMS("order_not_enough_items", "<red>You don't have enough items to fulfill this order."),
-    ORDER_MIN_FILL_NOT_MET("order_min_fill_not_met", "<red>You must fulfill at least {min} items."),
+    ORDER_NOT_ENOUGH_ITEMS("order_not_enough_items", "<red>You don't have enough <white>{material}</white> to fulfill this order. <gray>Required: <white>{required}</white>, You have: <white>{have}</white>"),
+    ORDER_MIN_FILL_NOT_MET("order_min_fill_not_met", "<red>This order requires at least <white>{min}</white> {material}. <gray>You only have: <white>{have}</white>"),
     ORDER_WRONG_ITEM("order_wrong_item", "<red>The items don't match the order requirements."),
     
     // Order status

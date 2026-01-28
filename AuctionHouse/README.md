@@ -5,7 +5,11 @@ A GUI-based Auction House plugin with dual-mode auctions (Auction + BIN) and an 
 ## Features
 
 - **Auction System**: Create auctions with bidding, Buy-It-Now (BIN), or both
-- **Order System**: Request specific items in bulk quantities
+- **Order System**: Request specific items in bulk quantities with smart fulfillment
+  - Automatic inventory checking before fulfillment
+  - Smart default quantity (uses your inventory amount for partial fills)
+  - Streamlined UI (skips quantity selection for non-partial orders)
+  - User-friendly error messages for insufficient items
 - **GUI Layer**: Full interactive menu system using MenuAPI
   - Auction browser with pagination, filters, and sorting
   - Individual auction view with bid/BIN buttons
