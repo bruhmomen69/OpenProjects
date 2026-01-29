@@ -77,6 +77,8 @@ The test server will:
 
 ### Recent Changes
 
+- **Search Feature**: The search button in `/ah` menu is now functional! Click it to search for auctions by item name or material type.
+- **GUI Security Fix**: Fixed search button in `/ah` menu allowing players to move items out of the GUI. The button now correctly returns `ClickResult.DENY` to prevent item manipulation.
 - **Item Retrieval Safety Improvements**:
   - **Partial Retrieval Support**: The Expired Items Menu now supports partial retrieval. If your inventory is partially full, you'll receive what fits and the rest remains in expired items for later retrieval.
   - **No More Dropped Items**: Items from won auctions, BIN purchases, and order fills are now stored in the Expired Items system instead of being dropped on the ground when inventory is full.

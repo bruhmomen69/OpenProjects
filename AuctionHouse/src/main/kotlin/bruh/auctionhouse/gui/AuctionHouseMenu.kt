@@ -9,9 +9,11 @@ import bruh.auctionhouse.model.AuctionSort
 import bruh.auctionhouse.model.AuctionType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.GuiMessages
+import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
+import bruh.zchat.utils.menuapi.promptText
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import kotlinx.coroutines.runBlocking
@@ -195,11 +197,36 @@ class AuctionHouseMenu(
     private fun createSearchButton(): VItem {
         return VItem(XMaterial.OAK_SIGN) {
             name = translationAPI.getComponentSync(GuiMessages.BUTTON_SEARCH)
+            lore = mutableListOf(
+                mm.deserialize("<gray>Click to search for items"),
+                Component.empty(),
+                if (currentFilter.searchQuery.isNullOrBlank()) {
+                    mm.deserialize("<gray>Current: <white>None")
+                } else {
+                    mm.deserialize("<gray>Current: <white>${currentFilter.searchQuery}")
+                }
+            )
             hideAllFlags()
 
             onClick { _, _ ->
-                // TODO: Implement search functionality
-                ClickResult.ALLOW
+                runBlocking {
+                    val result = menuAPI.promptText(
+                        player,
+                        "Search Auctions",
+                        currentFilter.searchQuery ?: ""
+                    )
+                    when (result) {
+                        is AnvilInputResult.Success -> {
+                            currentFilter = currentFilter.copy(
+                                searchQuery = result.value.takeIf { it.isNotBlank() }
+                            )
+                            currentPage = 0
+                            open(currentPage)
+                        }
+                        is AnvilInputResult.Cancelled -> {}
+                    }
+                }
+                ClickResult.CLOSE
             }
         }
     }
