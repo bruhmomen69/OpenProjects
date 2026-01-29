@@ -20,6 +20,7 @@ import bruh.auctionhouse.model.Transaction
 import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -165,7 +166,7 @@ class AuctionService(
         }
 
         // Remove item from inventory
-        withContext(Dispatchers.Main) {
+        withContext(plugin.entityDispatcher(seller)) {
             seller.inventory.removeItem(item)
         }
 
@@ -690,7 +691,7 @@ class AuctionService(
         sourceId: UUID,
         itemType: ExpiredItemType,
         reason: String
-    ): Boolean = withContext(Dispatchers.Main) {
+    ): Boolean = withContext(plugin.entityDispatcher(player)) {
         val remaining = player.inventory.addItem(itemStack.clone())
 
         if (remaining.isEmpty()) {

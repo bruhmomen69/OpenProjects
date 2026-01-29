@@ -20,6 +20,7 @@ import bruh.auctionhouse.model.Transaction
 import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -220,7 +221,7 @@ class OrderService(
         }
 
         // Remove items from inventory
-        withContext(Dispatchers.Main) {
+        withContext(plugin.entityDispatcher(creator)) {
             creator.inventory.removeItem(item)
         }
 
@@ -417,7 +418,7 @@ class OrderService(
 
         // Remove items from filler (for buy orders)
         if (order.orderType == OrderType.BUY_ORDER) {
-            withContext(Dispatchers.Main) {
+            withContext(plugin.entityDispatcher(filler)) {
                 items.forEach { item ->
                     filler.inventory.removeItemAnySlot(item)
                 }
@@ -705,7 +706,7 @@ class OrderService(
         sourceId: UUID,
         itemType: ExpiredItemType,
         reason: String
-    ) = withContext(Dispatchers.Main) {
+    ) = withContext(plugin.entityDispatcher(player)) {
         var totalStored = 0
 
         // Collect all overflow items

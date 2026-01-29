@@ -87,10 +87,12 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 sql {
                     mysql("""
                         INSERT INTO consolidated_expired_items
+                        (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)
                     sqlite("""
                         INSERT INTO consolidated_expired_items
+                        (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)
                 },
