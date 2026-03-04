@@ -3,7 +3,11 @@ package bruh.essentiallystateless
 import bruh.essentiallystateless.commands.*
 import bruh.essentiallystateless.config.EssentiallyStatelessConfig
 import bruh.essentiallystateless.config.EssentiallyStatelessConfigLoader
+import bruh.essentiallystateless.config.toCommonServerCommandsConfig
 import bruh.essentiallystateless.translations.CommandMessages
+import bruh.commands.commonservercommands.CommandPlugin
+import bruh.commands.commonservercommands.CommonServerCommandsFactory
+import bruh.commands.commonservercommands.config.CommonServerCommandsConfig
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import bruh.zchat.utils.translations.translationApi
@@ -18,20 +22,32 @@ import revxrsal.commands.bukkit.BukkitLamp
  * 
  * This plugin provides essential server commands without storing any runtime-modified state.
  * All state is stored within Minecraft itself (player data, world data, etc.).
+ * 
+ * This plugin implements CommandPlugin to allow reuse of common commands from the
+ * common-server-commands utility module.
  */
-class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
-    lateinit var config: EssentiallyStatelessConfig
-        private set
+class EssentiallyStatelessPlugin : SuspendingJavaPlugin(), CommandPlugin {
+    // Plugin-specific config
+    private var essentiallyStatelessConfig: EssentiallyStatelessConfig = EssentiallyStatelessConfig()
+    
     lateinit var configLoader: EssentiallyStatelessConfigLoader
         private set
-    lateinit var menuAPI: MenuAPI
+    
+    // CommandPlugin interface implementation - delegates to essentiallyStatelessConfig
+    override val config: CommonServerCommandsConfig
+        get() = essentiallyStatelessConfig.toCommonServerCommandsConfig()
+    
+    override lateinit var menuAPI: MenuAPI
         private set
-    lateinit var translations: TranslationAPI
+    
+    override lateinit var translations: TranslationAPI
         private set
+
+    override fun getUnderlyingPlugin(): SuspendingJavaPlugin = this
 
     override suspend fun onLoadAsync() {
         configLoader = EssentiallyStatelessConfigLoader(dataFolder.toPath(), slF4JLogger)
-        config = configLoader.load()
+        essentiallyStatelessConfig = configLoader.load()
     }
 
     override suspend fun onEnableAsync() {
@@ -40,7 +56,7 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
         // Initialize translation system
         translations = translationApi()
         translations.register("commands", CommandMessages::class)
-        translations.switchLanguage(config.language)
+        translations.switchLanguage(essentiallyStatelessConfig.language)
         translations.load()
         slF4JLogger.info("Translation system initialized")
 
@@ -60,28 +76,28 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
         val lamp = BukkitLamp.builder(this)
             .suggestionProviders { providers ->
                 // GameMode suggestions
-                providers.addProviderForAnnotation(SuggestGameMode::class.java) { _ ->
+                providers.addProviderForAnnotation(bruh.commands.commonservercommands.commands.SuggestGameMode::class.java) { _ ->
                     SuggestionProvider { _ ->
                         GameMode.entries.map { it.name.lowercase() }
                     }
                 }
                 
                 // World suggestions
-                providers.addProviderForAnnotation(SuggestWorld::class.java) { _ ->
+                providers.addProviderForAnnotation(bruh.commands.commonservercommands.commands.SuggestWorld::class.java) { _ ->
                     SuggestionProvider { _ ->
                         server.worlds.map { it.name }
                     }
                 }
                 
                 // Online player suggestions
-                providers.addProviderForAnnotation(SuggestOnlinePlayer::class.java) { _ ->
+                providers.addProviderForAnnotation(bruh.commands.commonservercommands.commands.SuggestOnlinePlayer::class.java) { _ ->
                     SuggestionProvider { _ ->
                         server.onlinePlayers.map { it.name }
                     }
                 }
                 
                 // Entity type suggestions
-                providers.addProviderForAnnotation(SuggestEntityType::class.java) { _ ->
+                providers.addProviderForAnnotation(bruh.commands.commonservercommands.commands.SuggestEntityType::class.java) { _ ->
                     SuggestionProvider { _ ->
                         EntityType.entries
                             .filter { it.isSpawnable && it.isAlive }
@@ -91,17 +107,11 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin() {
             }
             .build()
 
-        // Register all command classes
-        lamp.register(GameModeCommands(this, translations))
-        lamp.register(TimeWeatherCommands(this, translations))
-        lamp.register(PlayerCommands(this, translations))
-        lamp.register(TeleportCommands(this, translations))
-        lamp.register(InventoryCommands(this, translations, menuAPI))
-        lamp.register(ItemCommands(this, translations))
-        lamp.register(WorldCommands(this, translations))
-        lamp.register(AdminCommands(this, translations))
-        lamp.register(InfoCommands(this, translations))
-        lamp.register(FunCommands(this, translations))
+        // Register all common server commands using factory
+        val commandFactory = CommonServerCommandsFactory(this)
+        commandFactory.createAllCommands().forEach { lamp.register(it) }
+        
+        // Register plugin-specific main command
         lamp.register(EssentiallyStatelessMainCommand(this, translations, configLoader))
     }
 }

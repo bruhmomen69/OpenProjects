@@ -1,14 +1,13 @@
-package bruh.essentiallystateless.config
+package bruh.commands.commonservercommands.config
 
-import bruh.commands.commonservercommands.config.CommonServerCommandsConfig
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
 
 /**
- * Main configuration for EssentiallyStateless plugin.
+ * Main configuration for common server commands module.
  */
 @ConfigSerializable
-data class EssentiallyStatelessConfig(
+data class CommonServerCommandsConfig(
     @Comment("Language for translations. Configure translations in the 'translations' folder.")
     val language: String = "en",
     
@@ -48,21 +47,3 @@ data class EssentiallyStatelessConfig(
     @Comment("Me action format using MiniMessage. Use <player> and <action> placeholders.")
     val meFormat: String = "<gray>* <player> <action></gray>"
 )
-
-fun EssentiallyStatelessConfig.toCommonServerCommandsConfig(): CommonServerCommandsConfig {
-    return CommonServerCommandsConfig(
-        language = language,
-        defaultFlySpeed = defaultFlySpeed,
-        defaultWalkSpeed = defaultWalkSpeed,
-        maxFlySpeed = maxFlySpeed,
-        maxWalkSpeed = maxWalkSpeed,
-        defaultHealAmount = defaultHealAmount,
-        defaultFeedAmount = defaultFeedAmount,
-        maxRemoveEntities = maxRemoveEntities,
-        maxSpawnMobs = maxSpawnMobs,
-        nearRadius = nearRadius,
-        broadcastFormat = broadcastFormat,
-        worldBroadcastFormat = worldBroadcastFormat,
-        meFormat = meFormat
-    )
-}

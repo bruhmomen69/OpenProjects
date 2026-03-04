@@ -3,6 +3,11 @@
 A comprehensive stateless essential commands plugin for PaperMC that provides over 70 essential server commands without
 storing any runtime-modified state outside the Minecraft server itself.
 
+**Note:** As of the recent refactoring, the core commands are provided by the `common-server-commands` utility module,
+which is now available for reuse in other plugins. See [Common Server Commands Module](../utils/common-server-commands/README.md) for details.
+
+Config integration with the shared module now uses a type-safe adapter mapping rather than casting, to ensure compatibility and prevent runtime type issues.
+
 ## What is EssentiallyStateless?
 
 EssentiallyStateless is a complete rewrite of classic essential commands plugins, designed specifically for modern

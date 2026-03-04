@@ -26,6 +26,7 @@ include(":utils:database")
 include(":utils:translations")
 include(":utils:menuapi")
 include(":utils:itemapi")
+include(":utils:common-server-commands")
 include(":ZealousChat")
 // EssentiallyStateless
 include(":EssentiallyStateless")
