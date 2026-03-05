@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.service.AuctionService
@@ -23,13 +24,14 @@ import org.bukkit.entity.Player
 /**
  * Menu for selecting quantity of items to claim from a consolidated expired item group.
  */
-class ClaimQuantityMenu(menuAPI = menuAPI, consolidatedService = consolidatedService, auctionService = auctionService, orderService = orderService, auctionRepository = auctionRepository, bidRepository = bidRepository,
+class ClaimQuantityMenu(
     private val menuAPI: MenuAPI,
     private val consolidatedService: ConsolidatedExpiredItemService,
     private val auctionService: AuctionService,
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -194,7 +196,7 @@ class ClaimQuantityMenu(menuAPI = menuAPI, consolidatedService = consolidatedSer
                     // Return to consolidated expired items menu
                     if (result.success) {
                         ConsolidatedExpiredItemsMenu(
-                            menuAPI, consolidatedService, auctionService, orderService, bidRepository, config,
+                            menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config,
                             translationAPI, plugin, economy, player
                         ).open()
                     }
@@ -214,7 +216,7 @@ class ClaimQuantityMenu(menuAPI = menuAPI, consolidatedService = consolidatedSer
             onClick { _, _ ->
                 // Return to consolidated expired items menu
                 ConsolidatedExpiredItemsMenu(
-                    menuAPI, consolidatedService, auctionService, orderService, bidRepository, config,
+                    menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config,
                     translationAPI, plugin, economy, player
                 ).open()
                 ClickResult.CLOSE

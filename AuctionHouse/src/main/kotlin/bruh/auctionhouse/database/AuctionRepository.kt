@@ -103,38 +103,60 @@ class AuctionRepository(private val database: Database) {
         pageSize: Int
     ): List<Auction> = withContext(Dispatchers.IO) {
         val offset = page * pageSize
-        
+
         var sqlQuery = "SELECT * FROM auctions WHERE status = 'ACTIVE'"
         val params = mutableListOf<Any>()
-        
+
         filter.searchQuery?.let {
             sqlQuery += " AND (item_display_name LIKE ? OR item_material LIKE ?)"
             params.add("%$it%")
             params.add("%$it%")
         }
-        
+
         filter.material?.let {
             sqlQuery += " AND item_material = ?"
             params.add(it)
         }
-        
+
         filter.auctionType?.let {
             sqlQuery += " AND auction_type = ?"
             params.add(it.name)
         }
-        
+
+        filter.minPrice?.let {
+            sqlQuery += " AND start_price >= ?"
+            params.add(it)
+        }
+
+        filter.maxPrice?.let {
+            sqlQuery += " AND start_price <= ?"
+            params.add(it)
+        }
+
+        filter.sellerName?.let {
+            sqlQuery += " AND seller_name = ?"
+            params.add(it)
+        }
+
+        filter.endingWithin?.let { duration ->
+            val endTime = java.time.Instant.now().plus(duration)
+            sqlQuery += " AND ends_at <= ?"
+            params.add(endTime)
+        }
+
         sqlQuery += when (sort) {
             AuctionSort.ENDING_SOON -> " ORDER BY ends_at ASC"
             AuctionSort.NEWEST -> " ORDER BY created_at DESC"
             AuctionSort.PRICE_LOW -> " ORDER BY start_price ASC"
             AuctionSort.PRICE_HIGH -> " ORDER BY start_price DESC"
             AuctionSort.MOST_BIDS -> " ORDER BY bid_count DESC"
+            AuctionSort.RECENTLY_UPDATED -> " ORDER BY created_at DESC, bid_count DESC"
         }
-        
+
         sqlQuery += " LIMIT ? OFFSET ?"
         params.add(pageSize)
         params.add(offset)
-        
+
         database.query(sql(sqlQuery), *params.toTypedArray()) { rs ->
             Auction(
                 id = UUID.fromString(rs.getString("id")),
@@ -367,6 +389,27 @@ class AuctionRepository(private val database: Database) {
         filter.auctionType?.let {
             sqlQuery += " AND auction_type = ?"
             params.add(it.name)
+        }
+
+        filter.minPrice?.let {
+            sqlQuery += " AND start_price >= ?"
+            params.add(it)
+        }
+
+        filter.maxPrice?.let {
+            sqlQuery += " AND start_price <= ?"
+            params.add(it)
+        }
+
+        filter.sellerName?.let {
+            sqlQuery += " AND seller_name = ?"
+            params.add(it)
+        }
+
+        filter.endingWithin?.let { duration ->
+            val endTime = java.time.Instant.now().plus(duration)
+            sqlQuery += " AND ends_at <= ?"
+            params.add(endTime)
         }
 
         database.querySingle(sql(sqlQuery), *params.toTypedArray()) { rs ->

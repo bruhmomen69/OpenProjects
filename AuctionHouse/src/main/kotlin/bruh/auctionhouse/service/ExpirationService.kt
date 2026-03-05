@@ -6,7 +6,7 @@ import kotlinx.coroutines.runBlocking
 import org.bukkit.scheduler.BukkitTask
 import org.slf4j.Logger
 import java.time.Duration
-import kotlin.math.minOf
+import kotlin.math.min
 
 /**
  * Service that handles automatic expiration of auctions and orders.
@@ -85,10 +85,10 @@ class ExpirationService(
             val orderDays = config.orders.expiredStorageDays
 
             // Delete old expired items
-            val deletedCount = plugin.getExpiredItemRepository().deleteOldItems(minOf(auctionDays, orderDays))
+            val deletedCount = plugin.getExpiredItemRepository().deleteOldItems(min(auctionDays, orderDays))
 
             if (deletedCount > 0) {
-                logger.info("Cleaned up {} expired items older than {} days", deletedCount, minOf(auctionDays, orderDays))
+                logger.info("Cleaned up {} expired items older than {} days", deletedCount, min(auctionDays, orderDays))
             }
         } catch (e: Exception) {
             logger.error("Error cleaning up old expired items", e)

@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.model.OrderFilter
 import bruh.auctionhouse.model.OrderSort
@@ -31,6 +32,7 @@ class OrderBrowserMenu(
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -122,7 +124,7 @@ class OrderBrowserMenu(
                 // Check if player is holding an item
                 if (player.inventory.itemInMainHand.type.isAir) {
                     player.sendMessage(mm.deserialize("<red>You must hold an item to create a sell order!"))
-                    return@onClick
+                    ClickResult.CLOSE
                 }
                 // Open sell order creation - reuse OrderCreateMenu but with sell mode
                 // For now, we'll open the create menu and let them select
@@ -190,7 +192,7 @@ class OrderBrowserMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                val menu = OrderFulfillMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player, order)
+                val menu = OrderFulfillMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player, order)
                 val opened = menu.open()
                 if (opened) ClickResult.CLOSE else ClickResult.ALLOW
             }
@@ -243,7 +245,7 @@ class OrderBrowserMenu(
     private fun createBackButton(): VItem {
         return MenuUtils.backButton(translationAPI).apply {
             onClick { _, _ ->
-                AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+                AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }

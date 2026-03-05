@@ -119,7 +119,7 @@ class OrderService(
     private fun computeItemLoreHash(item: ItemStack): String {
         val meta = item.itemMeta ?: return ""
         val lore = meta.lore ?: return ""
-        return lore.joinToString("|") { mm.serialize(it) }.hashCode().toString()
+        return lore.joinToString("|").hashCode().toString()
     }
 
     /**

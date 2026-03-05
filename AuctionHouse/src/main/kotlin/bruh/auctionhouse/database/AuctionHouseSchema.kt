@@ -416,6 +416,94 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                     ALTER TABLE auctions ADD COLUMN extension_count INTEGER NOT NULL DEFAULT 0
                 """)
             })
+        },
+        migration(4, "Add watchlist and notifications tables") {
+            // Create watchlist table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        auction_id VARCHAR(36) NOT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity BOOLEAN NOT NULL DEFAULT FALSE,
+                        UNIQUE KEY unique_player_auction (player_uuid, auction_id),
+                        INDEX idx_player (player_uuid),
+                        INDEX idx_auction (auction_id)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id BIGSERIAL PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        auction_id VARCHAR(36) NOT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity BOOLEAN NOT NULL DEFAULT FALSE,
+                        CONSTRAINT unique_player_auction UNIQUE (player_uuid, auction_id)
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_uuid TEXT NOT NULL,
+                        auction_id TEXT NOT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE(player_uuid, auction_id)
+                    )
+                """)
+            })
+
+            // Create notifications table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        type VARCHAR(30) NOT NULL,
+                        title VARCHAR(100) NOT NULL,
+                        message TEXT NOT NULL,
+                        related_auction_id VARCHAR(36),
+                        related_order_id VARCHAR(36),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        expires_at TIMESTAMP,
+                        INDEX idx_player (player_uuid, is_read),
+                        INDEX idx_created (created_at)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id BIGSERIAL PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        type VARCHAR(30) NOT NULL,
+                        title VARCHAR(100) NOT NULL,
+                        message TEXT NOT NULL,
+                        related_auction_id VARCHAR(36),
+                        related_order_id VARCHAR(36),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        expires_at TIMESTAMP
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_uuid TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        related_auction_id TEXT,
+                        related_order_id TEXT,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_read INTEGER NOT NULL DEFAULT 0,
+                        expires_at TIMESTAMP
+                    )
+                """)
+            })
         }
     )
 }

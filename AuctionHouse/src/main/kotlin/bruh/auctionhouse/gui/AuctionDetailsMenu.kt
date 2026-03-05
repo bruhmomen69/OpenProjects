@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionType
 import bruh.auctionhouse.service.AuctionService
@@ -33,6 +34,7 @@ class AuctionDetailsMenu(
     private val orderService: bruh.auctionhouse.service.OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -82,10 +84,13 @@ class AuctionDetailsMenu(
                 item(22, createBidHistoryButton())
             }
 
+            // Watchlist button (heart icon)
+            item(20, createWatchlistButton())
+
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -154,15 +159,15 @@ class AuctionDetailsMenu(
 
                 item(slot, VItem(XMaterial.PAPER) {
                     name = mm.deserialize("<gold>Bid: ${MenuUtils.formatPrice(bid.bidAmount, plugin.economy)}")
-                    val lore = mutableListOf<Component>()
-                    lore.add(mm.deserialize("<gray>Bidder: <white>${bid.bidderName}"))
-                    lore.add(mm.deserialize("<gray>Time: <white>${formatBidTime(bid.bidTime)}"))
-                    lore.add(mm.deserialize("<gray>Status: ${if (bid.isOutbid) "<red>Outbid" else "<green>Active"}"))
+                    val loreList = mutableListOf<Component>()
+                    loreList.add(mm.deserialize("<gray>Bidder: <white>${bid.bidderName}"))
+                    loreList.add(mm.deserialize("<gray>Time: <white>${formatBidTime(bid.bidTime)}"))
+                    loreList.add(mm.deserialize("<gray>Status: ${if (bid.isOutbid) "<red>Outbid" else "<green>Active"}"))
                     if (isPlayerBid && isActive) {
-                        lore.add(Component.empty())
-                        lore.add(mm.deserialize("<yellow>Click to withdraw your bid"))
+                        loreList.add(Component.empty())
+                        loreList.add(mm.deserialize("<yellow>Click to withdraw your bid"))
                     }
-                    loreList = lore
+                    lore = loreList
 
                     if (isPlayerBid && isActive) {
                         onClick { _, _ ->
@@ -372,6 +377,46 @@ class AuctionDetailsMenu(
                         }
                     }
                 }
+                ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun createWatchlistButton(): VItem {
+        val isWatching = runBlocking {
+            watchlistRepository.isWatching(player.uniqueId, auction.id)
+        }
+
+        return VItem(if (isWatching) XMaterial.RED_DYE else XMaterial.GRAY_DYE) {
+            name = mm.deserialize(if (isWatching) "<red>❤ Watching" else "<gray>♡ Add to Watchlist")
+            val loreList = mutableListOf<Component>()
+            if (isWatching) {
+                loreList.add(mm.deserialize("<gray>This auction is in your"))
+                loreList.add(mm.deserialize("<gray>watchlist"))
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<red>Click to remove"))
+            } else {
+                loreList.add(mm.deserialize("<gray>Get notified about:"))
+                loreList.add(mm.deserialize("<gray>• New bids"))
+                loreList.add(mm.deserialize("<gray>• Price drops"))
+                loreList.add(mm.deserialize("<gray>• Ending soon"))
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<green>Click to add to watchlist"))
+            }
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                runBlocking {
+                    if (isWatching) {
+                        watchlistRepository.remove(player.uniqueId, auction.id)
+                        player.sendMessage(mm.deserialize("<yellow>Removed from watchlist."))
+                    } else {
+                        watchlistRepository.add(player.uniqueId, auction.id)
+                        player.sendMessage(mm.deserialize("<green>Added to watchlist!"))
+                    }
+                }
+                open()
                 ClickResult.CLOSE
             }
         }

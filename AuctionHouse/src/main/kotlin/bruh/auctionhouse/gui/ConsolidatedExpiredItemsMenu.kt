@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
@@ -31,6 +32,7 @@ class ConsolidatedExpiredItemsMenu(
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -47,7 +49,7 @@ class ConsolidatedExpiredItemsMenu(
         if (consolidatedItems.isEmpty()) {
             player.sendMessage(mm.deserialize("<gray>You have no expired items to claim."))
             // Open the main auction house menu instead
-            AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+            AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
             return
         }
 
@@ -75,7 +77,7 @@ class ConsolidatedExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -127,6 +129,7 @@ class ConsolidatedExpiredItemsMenu(
             orderService = orderService,
             auctionRepository = auctionRepository,
             bidRepository = bidRepository,
+            watchlistRepository = watchlistRepository,
             config = config,
             translationAPI = translationAPI,
             plugin = plugin,

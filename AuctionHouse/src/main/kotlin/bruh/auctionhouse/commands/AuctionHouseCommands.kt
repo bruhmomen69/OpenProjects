@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.gui.AuctionCreateMenu
 import bruh.auctionhouse.gui.AuctionHouseMenu
 import bruh.auctionhouse.gui.ConsolidatedExpiredItemsMenu
@@ -43,6 +44,7 @@ class AuctionHouseCommands(
 ) {
     private val auctionRepository = AuctionRepository(plugin.database)
     private val bidRepository = BidRepository(plugin.database)
+    private val watchlistRepository = WatchlistRepository(plugin.database)
 
     /**
      * Default command - opens the main auction house menu.
@@ -53,7 +55,7 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+        AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
     }
 
     /**
@@ -186,8 +188,8 @@ class AuctionHouseCommands(
             return
         }
         ConsolidatedExpiredItemsMenu(
-            menuAPI, consolidatedExpiredItemService, auctionService, orderService, bidRepository, config,
-            translationAPI, plugin, economy, player
+            menuAPI, consolidatedExpiredItemService, auctionService, orderService, auctionRepository, bidRepository,
+            watchlistRepository, config, translationAPI, plugin, economy, player
         ).open()
     }
 
@@ -197,7 +199,7 @@ class AuctionHouseCommands(
     @Subcommand("myauctions")
     @CommandPermission("auctionhouse.myauctions")
     fun myAuctions(player: Player) {
-        MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+        MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
     }
 
     /**

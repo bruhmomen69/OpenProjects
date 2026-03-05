@@ -17,6 +17,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import java.math.BigDecimal
 import java.time.Duration
+import java.lang.Runnable
 
 /**
  * Listener for player events, handling login notifications for auction/order events.
@@ -44,26 +45,28 @@ class PlayerListener(
         if (!config.notifications.alertOnLogin) return
 
         // Run asynchronously to avoid blocking the join
-        plugin.server.scheduler.runTaskAsynchronously(plugin) {
+        plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
             try {
-                // Check for outbid notifications (bids that were outbid while player was offline)
-                if (config.notifications.alertOutbid) {
-                    checkOutbidNotifications(playerId, player)
-                }
+                kotlinx.coroutines.runBlocking {
+                    // Check for outbid notifications (bids that were outbid while player was offline)
+                    if (config.notifications.alertOutbid) {
+                        checkOutbidNotifications(playerId, player)
+                    }
 
-                // Check for sold auction notifications
-                if (config.notifications.alertSold) {
-                    checkSoldNotifications(playerId, player)
-                }
+                    // Check for sold auction notifications
+                    if (config.notifications.alertSold) {
+                        checkSoldNotifications(playerId, player)
+                    }
 
-                // Check for order filled notifications
-                if (config.notifications.alertOrderFilled) {
-                    checkOrderFilledNotifications(playerId, player)
+                    // Check for order filled notifications
+                    if (config.notifications.alertOrderFilled) {
+                        checkOrderFilledNotifications(playerId, player)
+                    }
                 }
             } catch (e: Exception) {
-                plugin.slf4jLogger.error("Error processing login notifications for ${player.name}", e)
+                plugin.slF4JLogger.error("Error processing login notifications for ${player.name}", e)
             }
-        }
+        })
     }
 
     /**

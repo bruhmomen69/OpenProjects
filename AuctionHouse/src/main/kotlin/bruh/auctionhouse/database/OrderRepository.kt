@@ -278,7 +278,7 @@ class OrderRepository(private val database: Database) {
 
         filter.material?.let {
             sqlQuery += " AND item_material = ?"
-            params.add(it.name)
+            params.add(it)
         }
 
         filter.orderType?.let {

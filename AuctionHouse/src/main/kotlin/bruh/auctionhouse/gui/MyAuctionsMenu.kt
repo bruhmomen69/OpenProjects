@@ -5,9 +5,11 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
 import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
@@ -26,9 +28,10 @@ import org.bukkit.entity.Player
 class MyAuctionsMenu(
     private val menuAPI: MenuAPI,
     private val auctionService: AuctionService,
-    private val orderService: bruh.auctionhouse.service.OrderService,
+    private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -66,7 +69,7 @@ class MyAuctionsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -165,7 +168,6 @@ class MyAuctionsMenu(
 
                 lore.add(mm.deserialize("<gray>Bids: <white>${auction.bidCount}"))
                 lore.add(mm.deserialize("<gray>Views: <white>${auction.viewCount}"))
-                loreList = lore
             })
 
             // Back button

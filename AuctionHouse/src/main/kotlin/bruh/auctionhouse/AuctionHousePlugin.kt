@@ -10,9 +10,11 @@ import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.ConsolidatedExpiredItemRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
+import bruh.auctionhouse.database.NotificationRepository
 import bruh.auctionhouse.database.OrderFillRepository
 import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.TransactionRepository
+import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.economy.VaultEconomyProvider
 import bruh.auctionhouse.hooks.PlaceholderAPIHook
@@ -70,7 +72,8 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
     lateinit var orderService: OrderService
         private set
 
-    private lateinit var database: Database
+    internal lateinit var database: Database
+        private set
     private lateinit var auctionRepository: AuctionRepository
     private lateinit var bidRepository: BidRepository
     private lateinit var orderRepository: OrderRepository
@@ -79,6 +82,8 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
     private lateinit var consolidatedExpiredItemRepository: ConsolidatedExpiredItemRepository
     private lateinit var consolidatedExpiredItemService: ConsolidatedExpiredItemService
     private lateinit var transactionRepository: TransactionRepository
+    private lateinit var watchlistRepository: WatchlistRepository
+    private lateinit var notificationRepository: NotificationRepository
     private lateinit var expirationService: ExpirationService
 
     /**
@@ -145,6 +150,8 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         expiredItemRepository = ExpiredItemRepository(database)
         consolidatedExpiredItemRepository = ConsolidatedExpiredItemRepository(database)
         transactionRepository = TransactionRepository(database)
+        watchlistRepository = WatchlistRepository(database)
+        notificationRepository = NotificationRepository(database)
         slF4JLogger.info("Repositories created")
 
         // Step 5.5: Run data migration if needed
