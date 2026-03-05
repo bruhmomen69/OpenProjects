@@ -28,6 +28,7 @@ import java.util.UUID
  * @property viewCount Number of times the auction has been viewed
  * @property bidCount Number of bids placed
  * @property isAnonymous Whether the seller is hidden
+ * @property extensionCount Number of times the auction has been extended (anti-snipe)
  */
 data class Auction(
     val id: UUID,
@@ -36,13 +37,13 @@ data class Auction(
     val itemStack: ItemStack,
     val itemMaterial: String,
     val itemDisplayName: String?,
-    
+
     val auctionType: AuctionType,
     val startPrice: Double,
     val buyNowPrice: Double?,
     val reservePrice: Double?,
     val minIncrement: Double,
-    
+
     val status: AuctionStatus,
     val createdAt: Instant,
     val endsAt: Instant,
@@ -50,10 +51,11 @@ data class Auction(
     val soldToUuid: UUID? = null,
     val soldToName: String? = null,
     val finalPrice: Double? = null,
-    
+
     val viewCount: Int = 0,
     val bidCount: Int = 0,
-    val isAnonymous: Boolean = false
+    val isAnonymous: Boolean = false,
+    val extensionCount: Int = 0
 ) {
     /**
      * Checks if the auction is currently active.

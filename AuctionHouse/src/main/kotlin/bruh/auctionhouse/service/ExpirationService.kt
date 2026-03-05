@@ -5,6 +5,8 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import kotlinx.coroutines.runBlocking
 import org.bukkit.scheduler.BukkitTask
 import org.slf4j.Logger
+import java.time.Duration
+import kotlin.math.minOf
 
 /**
  * Service that handles automatic expiration of auctions and orders.
@@ -18,6 +20,7 @@ class ExpirationService(
     private val logger: Logger
 ) {
     private var task: BukkitTask? = null
+    private var cleanupTask: BukkitTask? = null
 
     /**
      * Starts the expiration checking task.
@@ -32,7 +35,18 @@ class ExpirationService(
             1200L, // Initial delay: 1 minute
             1200L  // Period: 1 minute
         )
-        logger.info("Expiration service started - checking every minute")
+
+        // Start cleanup task for old expired items (runs daily)
+        cleanupTask = plugin.server.scheduler.runTaskTimerAsynchronously(
+            plugin,
+            Runnable {
+                runBlocking { cleanupOldExpiredItems() }
+            },
+            72000L, // Initial delay: 1 hour (in ticks)
+            14400L // Period: 4 hours (in ticks)
+        )
+
+        logger.info("Expiration service started - checking every minute, cleanup every 4 hours")
     }
 
     /**
@@ -41,6 +55,8 @@ class ExpirationService(
     fun stop() {
         task?.cancel()
         task = null
+        cleanupTask?.cancel()
+        cleanupTask = null
         logger.info("Expiration service stopped")
     }
 
@@ -57,6 +73,25 @@ class ExpirationService(
             orderService.processExpiredOrders()
         } catch (e: Exception) {
             logger.error("Error processing expirations", e)
+        }
+    }
+
+    /**
+     * Cleans up expired items older than the configured storage days.
+     */
+    suspend fun cleanupOldExpiredItems() {
+        try {
+            val auctionDays = config.auctions.expiredStorageDays
+            val orderDays = config.orders.expiredStorageDays
+
+            // Delete old expired items
+            val deletedCount = plugin.getExpiredItemRepository().deleteOldItems(minOf(auctionDays, orderDays))
+
+            if (deletedCount > 0) {
+                logger.info("Cleaned up {} expired items older than {} days", deletedCount, minOf(auctionDays, orderDays))
+            }
+        } catch (e: Exception) {
+            logger.error("Error cleaning up old expired items", e)
         }
     }
 }

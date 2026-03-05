@@ -23,20 +23,21 @@ import java.time.Instant
 import java.util.concurrent.CompletableFuture
 
 /**
- * Main menu for creating buy orders.
+ * Main menu for creating buy/sell orders.
  * Features separate stack and item controls for easy quantity input.
  *
  * Slot Layout:
- * 13 - Selected Material display
- * 19 - Stack decrement
- * 20 - Stacks display (click to edit)
- * 21 - Stack increment
- * 25 - Item decrement
- * 26 - Items display (click to edit)
- * 27 - Item increment
+ * 13 - Selected Material display / Item display for sell orders
+ * 19 - Stack decrement (buy orders only)
+ * 20 - Stacks display (click to edit) (buy orders only)
+ * 21 - Stack increment (buy orders only)
+ * 22 - Order type toggle
+ * 25 - Item decrement (buy orders only)
+ * 26 - Items display (click to edit) (buy orders only)
+ * 27 - Item increment (buy orders only)
  * 30 - Price per unit
  * 31 - Duration
- * 32 - Allow partial toggle
+ * 32 - Allow partial toggle (buy orders only)
  * 40 - Confirm
  * 45 - Back
  * 53 - Close
@@ -52,10 +53,22 @@ class OrderCreateMenu(
 ) {
     private val mm = MiniMessage.miniMessage()
     private var state = OrderCreateState()
+    private var orderType = bruh.auctionhouse.model.OrderType.BUY_ORDER
     private var onCloseCallback: (() -> Unit)? = null
 
     fun open(onCloseCallback: (() -> Unit)? = null) {
         this.onCloseCallback = onCloseCallback
+        // For sell orders, get item from player's hand
+        if (orderType == bruh.auctionhouse.model.OrderType.SELL_ORDER) {
+            val itemInHand = player.inventory.itemInMainHand
+            if (!itemInHand.type.isAir) {
+                state = state.copy(
+                    selectedMaterial = itemInHand.type,
+                    stacks = itemInHand.amount / 64,
+                    items = itemInHand.amount % 64
+                )
+            }
+        }
         refreshMenu()
     }
 
@@ -68,17 +81,24 @@ class OrderCreateMenu(
 
             item(13, createMaterialDisplay())
 
-            item(19, createStackDecrement())
-            item(20, createStacksDisplay())
-            item(21, createStackIncrement())
+            // Order type toggle
+            item(22, createOrderTypeToggle())
 
-            item(25, createItemDecrement())
-            item(26, createItemsDisplay())
-            item(27, createItemIncrement())
+            // Buy order controls (only show for buy orders)
+            if (orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER) {
+                item(19, createStackDecrement())
+                item(20, createStacksDisplay())
+                item(21, createStackIncrement())
+
+                item(25, createItemDecrement())
+                item(26, createItemsDisplay())
+                item(27, createItemIncrement())
+
+                item(32, createPartialToggle())
+            }
 
             item(30, createPriceButton())
             item(31, createDurationButton())
-            item(32, createPartialToggle())
 
             item(40, createConfirmButton())
 
@@ -87,6 +107,35 @@ class OrderCreateMenu(
         }
 
         menuAPI.open(menu, player)
+    }
+
+    private fun createOrderTypeToggle(): VItem {
+        val isBuyOrder = orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER
+        return VItem(if (isBuyOrder) XMaterial.DIAMOND else XMaterial.GOLD_INGOT) {
+            name = mm.deserialize(if (isBuyOrder) "<blue>Buy Order" else "<yellow>Sell Order")
+            val loreList = mutableListOf<Component>()
+            if (isBuyOrder) {
+                loreList.add(mm.deserialize("<gray>Buying items from other players"))
+                loreList.add(mm.deserialize("<gray>You will pay when someone sells to you"))
+            } else {
+                loreList.add(mm.deserialize("<gray>Selling items to other players"))
+                loreList.add(mm.deserialize("<red>You must hold the item to sell"))
+            }
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to toggle"))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                orderType = if (isBuyOrder) {
+                    bruh.auctionhouse.model.OrderType.SELL_ORDER
+                } else {
+                    bruh.auctionhouse.model.OrderType.BUY_ORDER
+                }
+                refreshMenu()
+                ClickResult.ALLOW
+            }
+        }
     }
 
     private fun createMaterialDisplay(): VItem {
@@ -401,30 +450,37 @@ class OrderCreateMenu(
     }
 
     private fun createConfirmButton(): VItem {
-        val canConfirm = state.isValid()
+        val isBuyOrder = orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER
+        val canConfirm = if (isBuyOrder) state.isValid() else state.selectedMaterial != null && state.totalQuantity > 0
         val listingFee = calculateListingFee()
 
         return VItem(if (canConfirm) XMaterial.EMERALD_BLOCK else XMaterial.REDSTONE_BLOCK) {
             name = if (canConfirm) {
-                mm.deserialize("<green>Create Order")
+                mm.deserialize("<green>Create ${if (isBuyOrder) "Buy" else "Sell"} Order")
             } else {
                 mm.deserialize("<red>Cannot Create Order")
             }
-            lore = mutableListOf(
-                mm.deserialize("<gray>Listing Fee: <gold>${MenuUtils.formatPrice(listingFee, economy)}"),
-                Component.empty(),
-                mm.deserialize("<white>Summary:"),
-                mm.deserialize("<gray>Item: ${state.selectedMaterial?.name ?: "None"}"),
-                mm.deserialize("<gray>Quantity: ${state.totalQuantity} items"),
-                mm.deserialize("<gray>Price: ${MenuUtils.formatPrice(state.pricePerUnit, economy)}/item"),
-                mm.deserialize("<gray>Total: ${MenuUtils.formatPrice(state.totalValue, economy)}"),
-                Component.empty(),
-                if (canConfirm) {
-                    mm.deserialize("<green>Click to create order")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>Listing Fee: <gold>${MenuUtils.formatPrice(listingFee, economy)}"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<white>Summary:"))
+            loreList.add(mm.deserialize("<gray>Type: ${if (isBuyOrder) "<blue>Buy Order" else "<yellow>Sell Order"}"))
+            loreList.add(mm.deserialize("<gray>Item: ${state.selectedMaterial?.name ?: "None"}"))
+            loreList.add(mm.deserialize("<gray>Quantity: ${state.totalQuantity} items"))
+            loreList.add(mm.deserialize("<gray>Price: ${MenuUtils.formatPrice(state.pricePerUnit, economy)}/item"))
+            loreList.add(mm.deserialize("<gray>Total: ${MenuUtils.formatPrice(state.totalValue, economy)}"))
+            loreList.add(Component.empty())
+            if (canConfirm) {
+                if (isBuyOrder) {
+                    loreList.add(mm.deserialize("<green>Click to create buy order"))
                 } else {
-                    mm.deserialize("<red>Select a material and quantity")
+                    loreList.add(mm.deserialize("<green>Click to create sell order"))
+                    loreList.add(mm.deserialize("<red>Item will be removed from your inventory!"))
                 }
-            )
+            } else {
+                loreList.add(mm.deserialize("<red>Select a material and quantity"))
+            }
+            lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
@@ -450,16 +506,34 @@ class OrderCreateMenu(
     private fun createOrder() {
         runBlocking {
             val material = state.selectedMaterial ?: return@runBlocking
-            val result = orderService.createBuyOrder(
-                creator = player,
-                material = material,
-                displayName = null,
-                quantity = state.totalQuantity,
-                pricePerUnit = state.pricePerUnit,
-                allowPartial = state.allowPartial,
-                minFillQuantity = state.minFillQuantity,
-                duration = state.duration
-            )
+
+            val result = if (orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER) {
+                // Create buy order
+                orderService.createBuyOrder(
+                    creator = player,
+                    material = material,
+                    displayName = null,
+                    quantity = state.totalQuantity,
+                    pricePerUnit = state.pricePerUnit,
+                    allowPartial = state.allowPartial,
+                    minFillQuantity = state.minFillQuantity,
+                    duration = state.duration
+                )
+            } else {
+                // Create sell order - need item from inventory
+                val itemInHand = player.inventory.itemInMainHand
+                if (itemInHand.type != material || itemInHand.amount < state.totalQuantity) {
+                    player.sendMessage(mm.deserialize("<red>You don't have the required item in your hand!"))
+                    return@runBlocking
+                }
+
+                orderService.createSellOrder(
+                    creator = player,
+                    item = itemInHand.clone(),
+                    pricePerUnit = state.pricePerUnit,
+                    duration = state.duration
+                )
+            }
 
             player.sendMessage(result.message)
 

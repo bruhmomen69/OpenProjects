@@ -2,6 +2,8 @@ package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionFilter
@@ -28,6 +30,8 @@ class AuctionHouseMenu(
     private val menuAPI: MenuAPI,
     private val auctionService: AuctionService,
     private val orderService: bruh.auctionhouse.service.OrderService,
+    private val auctionRepository: AuctionRepository,
+    private val bidRepository: BidRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -147,15 +151,23 @@ class AuctionHouseMenu(
 
             onClick { _, _ ->
                 // Handle click - open auction details
-                AuctionDetailsMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player, auction).open()
+                AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player, auction).open()
                 ClickResult.CLOSE
             }
         }
     }
 
     private fun createFilterButton(): VItem {
-        return VItem(XMaterial.HOPPER) {
-            name = translationAPI.getComponentSync(GuiMessages.FILTER_ALL)
+        val (material, displayName) = when (currentFilter.auctionType) {
+            null -> XMaterial.HOPPER to "All Types"
+            AuctionType.AUCTION -> XMaterial.GOLD_INGOT to "Auction Only"
+            AuctionType.BIN -> XMaterial.EMERALD to "BIN Only"
+            AuctionType.BOTH -> XMaterial.DIAMOND to "Auction + BIN"
+        }
+
+        return VItem(material) {
+            name = mm.deserialize("<yellow>Filter: <white>$displayName")
+            lore = mutableListOf(mm.deserialize("<gray>Click to change filter"))
             hideAllFlags()
 
             onClick { _, _ ->
@@ -261,7 +273,7 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderBrowserMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
+                OrderBrowserMenu(menuAPI, auctionService, orderService, bidRepository, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }

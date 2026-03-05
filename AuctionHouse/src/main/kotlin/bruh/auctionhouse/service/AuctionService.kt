@@ -268,6 +268,8 @@ class AuctionService(
                         unparsed("amount", economy.format(BigDecimal.valueOf(amount)))
                     }
                 )
+                // Play outbid sound
+                playSound(player, config.notifications.sounds.outbid)
             }
         }
 
@@ -290,13 +292,18 @@ class AuctionService(
         if (config.auctions.antiSnipe.enabled) {
             val timeRemaining = Duration.between(Instant.now(), auction.endsAt)
             if (timeRemaining.toMinutes() <= config.auctions.antiSnipe.thresholdMinutes) {
-                // Note: In a full implementation, we would need to track extension count
-                // and update the auction's endsAt time in the database
-                val newEndTime = auction.endsAt.plus(
-                    Duration.ofMinutes(config.auctions.antiSnipe.extensionMinutes.toLong())
-                )
-                // This would require a repository method to update end time
-                logger.debug("Anti-snipe triggered for auction $auctionId, extending to $newEndTime")
+                // Check if max extensions reached
+                val currentExtensions = auctionRepository.getExtensionCount(auctionId)
+                if (currentExtensions < config.auctions.antiSnipe.maxExtensions) {
+                    val newEndTime = auction.endsAt.plus(
+                        Duration.ofMinutes(config.auctions.antiSnipe.extensionMinutes.toLong())
+                    )
+                    auctionRepository.updateEndTime(auctionId, newEndTime)
+                    auctionRepository.incrementExtensionCount(auctionId)
+                    logger.info("Anti-snipe triggered for auction $auctionId, extending to $newEndTime (extension ${currentExtensions + 1}/${config.auctions.antiSnipe.maxExtensions})")
+                } else {
+                    logger.debug("Anti-snipe max extensions reached for auction $auctionId")
+                }
             }
         }
 
@@ -406,7 +413,12 @@ class AuctionService(
                     unparsed("price", economy.format(BigDecimal.valueOf(binPrice)))
                 }
             )
+            // Play sold sound
+            playSound(sellerPlayer, config.notifications.sounds.sold)
         }
+
+        // Play won sound for buyer
+        playSound(buyer, config.notifications.sounds.won)
 
         PurchaseResult(
             true, auction,
@@ -497,17 +509,11 @@ class AuctionService(
         pageSize: Int
     ): PagedResult<Auction> = withContext(Dispatchers.IO) {
         val auctions = auctionRepository.getActiveAuctions(filter, sort, page, pageSize)
-        // Note: We need a total count query for accurate pagination
-        // For now, we'll estimate based on the results
-        val hasMore = auctions.size == pageSize
-        val estimatedTotal = if (hasMore) {
-            (page + 2) * pageSize // At least one more page
-        } else {
-            page * pageSize + auctions.size
-        }
-        val totalPages = (estimatedTotal + pageSize - 1) / pageSize
+        // Get accurate total count
+        val total = auctionRepository.countActiveAuctions(filter)
+        val totalPages = (total + pageSize - 1) / pageSize
 
-        PagedResult(auctions, page, totalPages.coerceAtLeast(1), estimatedTotal)
+        PagedResult(auctions, page, totalPages.coerceAtLeast(1), total)
     }
 
     /**
@@ -601,6 +607,8 @@ class AuctionService(
                         unparsed("price", economy.format(BigDecimal.valueOf(highestBid.bidAmount)))
                     }
                 )
+                // Play won sound
+                playSound(player, config.notifications.sounds.won)
             } ?: run {
                 // Player offline - store in expired items
                 expiredItemManager.storeExpiredItem(
@@ -621,6 +629,8 @@ class AuctionService(
                         unparsed("price", economy.format(BigDecimal.valueOf(highestBid.bidAmount)))
                     }
                 )
+                // Play sold sound
+                playSound(seller, config.notifications.sounds.sold)
             }
         } else {
             // Auction expired without sale
@@ -643,6 +653,8 @@ class AuctionService(
                         unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
                     }
                 )
+                // Play expired sound
+                playSound(seller, config.notifications.sounds.expired)
             }
 
             // Refund highest bidder if exists but didn't meet reserve
@@ -714,5 +726,17 @@ class AuctionService(
         )
 
         false // Partial or no success - stored in expired items
+    }
+
+    /**
+     * Plays a sound to a player if the sound is configured.
+     */
+    private fun playSound(player: org.bukkit.entity.Player, soundName: String) {
+        try {
+            val sound = org.bukkit.Sound.valueOf(soundName)
+            player.playSound(player.location, sound, 1.0f, 1.0f)
+        } catch (e: IllegalArgumentException) {
+            logger.warn("Invalid sound configured: $soundName")
+        }
     }
 }

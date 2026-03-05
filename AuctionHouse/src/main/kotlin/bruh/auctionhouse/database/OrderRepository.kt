@@ -249,7 +249,7 @@ class OrderRepository(private val database: Database) {
             )
         }
     }
-    
+
     /**
      * Counts orders for a specific player with a specific status.
      */
@@ -261,5 +261,65 @@ class OrderRepository(private val database: Database) {
         ) { rs ->
             rs.getInt("count")
         } ?: 0
+    }
+
+    /**
+     * Counts total active orders matching filter criteria.
+     */
+    suspend fun countActiveOrders(filter: OrderFilter): Int = withContext(Dispatchers.IO) {
+        var sqlQuery = "SELECT COUNT(*) as count FROM orders WHERE status = 'PENDING'"
+        val params = mutableListOf<Any>()
+
+        filter.searchQuery?.let {
+            sqlQuery += " AND (item_display_name LIKE ? OR item_material LIKE ?)"
+            params.add("%$it%")
+            params.add("%$it%")
+        }
+
+        filter.material?.let {
+            sqlQuery += " AND item_material = ?"
+            params.add(it.name)
+        }
+
+        filter.orderType?.let {
+            sqlQuery += " AND order_type = ?"
+            params.add(it.name)
+        }
+
+        database.querySingle(sql(sqlQuery), *params.toTypedArray()) { rs ->
+            rs.getInt("count")
+        } ?: 0
+    }
+
+    /**
+     * Gets orders that were filled for a player (for login notifications).
+     */
+    suspend fun getPlayerFilledOrders(playerId: UUID): List<Order> = withContext(Dispatchers.IO) {
+        database.query(
+            sql("SELECT * FROM orders WHERE creator_uuid = ? AND status = 'FILLED' ORDER BY filled_at DESC LIMIT 10"),
+            playerId.toString()
+        ) { rs ->
+            Order(
+                id = UUID.fromString(rs.getString("id")),
+                creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
+                creatorName = rs.getString("creator_name"),
+                orderType = OrderType.valueOf(rs.getString("order_type")),
+                itemMaterial = rs.getString("item_material").let { Material.valueOf(it) },
+                itemDisplayName = rs.getString("item_display_name"),
+                itemLoreHash = rs.getString("item_lore_hash"),
+                itemNbtHash = rs.getString("item_nbt_hash"),
+                itemStack = rs.getBytes("item_stack")?.let { deserializeItem(it) },
+                quantityRequested = rs.getInt("quantity_requested"),
+                quantityFilled = rs.getInt("quantity_filled"),
+                pricePerUnit = rs.getDouble("price_per_unit"),
+                totalPrice = rs.getDouble("total_price"),
+                status = OrderStatus.valueOf(rs.getString("status")),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+                expiresAt = rs.getTimestamp("expires_at").toInstant(),
+                filledAt = rs.getTimestamp("filled_at")?.toInstant(),
+                allowPartial = rs.getBoolean("allow_partial"),
+                minFillQuantity = rs.getInt("min_fill_quantity").takeIf { it > 0 }
+            )
+        }
     }
 }

@@ -3,6 +3,8 @@ package bruh.auctionhouse.gui
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
 import bruh.auctionhouse.service.AuctionService
@@ -25,6 +27,8 @@ class MyAuctionsMenu(
     private val menuAPI: MenuAPI,
     private val auctionService: AuctionService,
     private val orderService: bruh.auctionhouse.service.OrderService,
+    private val auctionRepository: AuctionRepository,
+    private val bidRepository: BidRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -62,7 +66,7 @@ class MyAuctionsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -87,6 +91,16 @@ class MyAuctionsMenu(
             auction.soldToName?.let {
                 loreList.add(mm.deserialize("<gray>To: <white>$it"))
             }
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to view details"))
+        } else if (auction.status == AuctionStatus.EXPIRED) {
+            loreList.add(mm.deserialize("<gray>Expired at: <white>${auction.endsAt}"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<yellow>Click to view details"))
+        } else if (auction.status == AuctionStatus.CANCELLED) {
+            loreList.add(mm.deserialize("<gray>Cancelled"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<gray>Click to view details"))
         }
 
         return VItem(material) {
@@ -97,26 +111,74 @@ class MyAuctionsMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                if (auction.status == AuctionStatus.ACTIVE) {
-                    runBlocking {
-                        val result = auctionService.cancelAuction(player, auction.id)
-                        when (result) {
-                            is bruh.auctionhouse.service.ServiceResult.Success -> {
-                                player.sendMessage(translationAPI.getComponentSync(
-                                    AuctionMessages.AUCTION_CANCELLED
-                                ))
-                            }
-                            is bruh.auctionhouse.service.ServiceResult.Failure -> {
-                                player.sendMessage(result.message)
+                when (auction.status) {
+                    AuctionStatus.ACTIVE -> {
+                        runBlocking {
+                            val result = auctionService.cancelAuction(player, auction.id)
+                            when (result) {
+                                is bruh.auctionhouse.service.ServiceResult.Success -> {
+                                    player.sendMessage(translationAPI.getComponentSync(
+                                        AuctionMessages.AUCTION_CANCELLED
+                                    ))
+                                }
+                                is bruh.auctionhouse.service.ServiceResult.Failure -> {
+                                    player.sendMessage(result.message)
+                                }
                             }
                         }
+                        // Refresh menu
+                        open()
                     }
-                    // Refresh menu
-                    open()
+                    AuctionStatus.SOLD, AuctionStatus.EXPIRED, AuctionStatus.CANCELLED -> {
+                        // Open details view for ended auctions
+                        openAuctionDetails(auction)
+                    }
                 }
                 ClickResult.CLOSE
             }
         }
+    }
+
+    private fun openAuctionDetails(auction: Auction) {
+        val menu = menuAPI.simple {
+            rows = 5
+            title = mm.deserialize("<yellow>Auction Details")
+
+            background = MenuUtils.backgroundItem()
+
+            // Display the auction item
+            item(13, VItem(XMaterial.matchXMaterial(auction.itemMaterial).orElse(XMaterial.STONE)) {
+                name = auction.itemDisplayName?.let { mm.deserialize(it) } ?: Component.text(auction.itemMaterial.replace("_", " "))
+                val lore = mutableListOf<Component>()
+                lore.add(Component.empty())
+                lore.add(mm.deserialize("<gray>Status: ${getStatusColor(auction.status)}${auction.status}"))
+
+                if (auction.status == AuctionStatus.SOLD) {
+                    lore.add(mm.deserialize("<gray>Sold for: <gold>${MenuUtils.formatPrice(auction.finalPrice ?: 0.0, plugin.economy)}"))
+                    auction.soldToName?.let { lore.add(mm.deserialize("<gray>Buyer: <white>$it")) }
+                    auction.soldAt?.let { lore.add(mm.deserialize("<gray>Sold at: <white>$it")) }
+                } else if (auction.status == AuctionStatus.EXPIRED) {
+                    lore.add(mm.deserialize("<gray>Expired at: <white>${auction.endsAt}"))
+                } else if (auction.status == AuctionStatus.CANCELLED) {
+                    lore.add(mm.deserialize("<gray>Cancelled"))
+                }
+
+                lore.add(mm.deserialize("<gray>Bids: <white>${auction.bidCount}"))
+                lore.add(mm.deserialize("<gray>Views: <white>${auction.viewCount}"))
+                loreList = lore
+            })
+
+            // Back button
+            val backItem = MenuUtils.backButton(translationAPI).apply {
+                onClick { _, _ ->
+                    open()
+                    ClickResult.CLOSE
+                }
+            }
+            item(49, backItem)
+        }
+
+        menuAPI.open(menu, player)
     }
 
     private fun getStatusColor(status: AuctionStatus): String {

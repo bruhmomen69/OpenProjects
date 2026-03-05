@@ -2,6 +2,8 @@ package bruh.auctionhouse.gui
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.model.OrderType
@@ -29,6 +31,8 @@ class OrderFulfillMenu(
     private val menuAPI: MenuAPI,
     private val auctionService: AuctionService,
     private val orderService: OrderService,
+    private val auctionRepository: AuctionRepository,
+    private val bidRepository: BidRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
@@ -138,7 +142,7 @@ class OrderFulfillMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    OrderBrowserMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
+                    OrderBrowserMenu(menuAPI, auctionService, orderService, bidRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -286,6 +290,19 @@ class OrderFulfillMenu(
 
             onClick { _, _ ->
                 runBlocking {
+                    // Re-count items immediately before fulfillment to catch inventory changes
+                    val currentInventoryCount = countMatchingItems()
+                    if (currentInventoryCount < quantity) {
+                        player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
+                            unparsed("required", quantity.toString())
+                            unparsed("have", currentInventoryCount.toString())
+                            unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
+                        })
+                        player.sendMessage(mm.deserialize("<red>Items may have been moved or dropped since opening this menu."))
+                        return@runBlocking
+                    }
+
+                    // Re-find items to ensure we have the actual current items
                     val items = findItemsInInventory()
                     if (items.isEmpty() && order.orderType == OrderType.BUY_ORDER) {
                         player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {

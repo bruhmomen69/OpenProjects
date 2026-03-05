@@ -186,6 +186,13 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         )
         expirationService.start()
 
+        // Step 8.5: Register player listener for login notifications
+        val playerListener = bruh.auctionhouse.listeners.PlayerListener(
+            this, config, translations, auctionService, bidRepository, orderRepository, orderFillRepository
+        )
+        server.pluginManager.registerEvents(playerListener, this)
+        slF4JLogger.info("Player listener registered for login notifications")
+
         // Step 9: Register commands
         val lamp = BukkitLamp.builder(this).build()
         lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI, economy))

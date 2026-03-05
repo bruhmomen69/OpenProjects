@@ -52,6 +52,77 @@ class OrderService(
     private val logger = plugin.slF4JLogger
 
     /**
+     * Validates if an item matches an order's requirements based on config settings.
+     */
+    private fun itemMatchesOrder(item: ItemStack, order: Order): ItemMatchResult {
+        // Check material type
+        if (item.type != order.itemMaterial) {
+            return ItemMatchResult.MaterialMismatch
+        }
+
+        // Check display name if required
+        if (config.orders.matching.requireExactName) {
+            val itemDisplayName = item.itemMeta?.displayName()?.let { mm.serialize(it) }
+            if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
+                return ItemMatchResult.NameMismatch
+            }
+        }
+
+        // Check NBT if required
+        if (config.orders.matching.requireExactNbt) {
+            val itemNbtHash = computeItemNbtHash(item)
+            if (order.itemNbtHash != null && order.itemNbtHash != itemNbtHash) {
+                return ItemMatchResult.NbtMismatch
+            }
+        }
+
+        // Check lore if order has lore hash
+        if (order.itemLoreHash != null) {
+            val itemLoreHash = computeItemLoreHash(item)
+            if (order.itemLoreHash != itemLoreHash) {
+                return ItemMatchResult.LoreMismatch
+            }
+        }
+
+        return ItemMatchResult.Match
+    }
+
+    /**
+     * Computes a hash of an item's NBT data for comparison.
+     */
+    private fun computeItemNbtHash(item: ItemStack): String {
+        // Simple hash based on item meta properties
+        val meta = item.itemMeta ?: return ""
+        val sb = StringBuilder()
+        
+        // Add enchantments
+        meta.enchants.forEach { (enchant, level) ->
+            sb.append(enchant.key.key).append(":").append(level).append(";")
+        }
+        
+        // Add custom model data
+        if (meta.hasCustomModelData()) {
+            sb.append("cmd:").append(meta.customModelData).append(";")
+        }
+        
+        // Add item flags
+        meta.itemFlags.forEach { flag ->
+            sb.append("flag:").append(flag.name).append(";")
+        }
+        
+        return sb.toString().hashCode().toString()
+    }
+
+    /**
+     * Computes a hash of an item's lore for comparison.
+     */
+    private fun computeItemLoreHash(item: ItemStack): String {
+        val meta = item.itemMeta ?: return ""
+        val lore = meta.lore ?: return ""
+        return lore.joinToString("|") { mm.serialize(it) }.hashCode().toString()
+    }
+
+    /**
      * Creates a new buy order.
      *
      * @param creator The player creating the order
@@ -293,6 +364,24 @@ class OrderService(
                 false, 0, 0.0,
                 mm.deserialize("<red>You cannot fulfill your own order.")
             )
+        }
+
+        // Validate items match order requirements (NBT, lore, name based on config)
+        for (item in items) {
+            val matchResult = itemMatchesOrder(item, order)
+            if (matchResult != ItemMatchResult.Match) {
+                val reason = when (matchResult) {
+                    ItemMatchResult.Match -> ""
+                    ItemMatchResult.MaterialMismatch -> "Material does not match"
+                    ItemMatchResult.NameMismatch -> "Item name does not match order requirements"
+                    ItemMatchResult.NbtMismatch -> "Item NBT data does not match order requirements"
+                    ItemMatchResult.LoreMismatch -> "Item lore does not match order requirements"
+                }
+                return@withContext FulfillResult(
+                    false, 0, 0.0,
+                    mm.deserialize("<red>$reason")
+                )
+            }
         }
 
         // Validate items match order requirements
@@ -573,17 +662,11 @@ class OrderService(
         pageSize: Int
     ): PagedResult<Order> = withContext(Dispatchers.IO) {
         val orders = orderRepository.getActiveOrders(filter, sort, page, pageSize)
-        // Note: We need a total count query for accurate pagination
-        // For now, we'll estimate based on the results
-        val hasMore = orders.size == pageSize
-        val estimatedTotal = if (hasMore) {
-            (page + 2) * pageSize // At least one more page
-        } else {
-            page * pageSize + orders.size
-        }
-        val totalPages = (estimatedTotal + pageSize - 1) / pageSize
+        // Get accurate total count
+        val total = orderRepository.countActiveOrders(filter)
+        val totalPages = (total + pageSize - 1) / pageSize
 
-        PagedResult(orders, page, totalPages.coerceAtLeast(1), estimatedTotal)
+        PagedResult(orders, page, totalPages.coerceAtLeast(1), total)
     }
 
     /**
@@ -739,4 +822,15 @@ class OrderService(
             )
         }
     }
+}
+
+/**
+ * Result of item matching validation.
+ */
+sealed class ItemMatchResult {
+    object Match : ItemMatchResult()
+    object MaterialMismatch : ItemMatchResult()
+    object NameMismatch : ItemMatchResult()
+    object NbtMismatch : ItemMatchResult()
+    object LoreMismatch : ItemMatchResult()
 }

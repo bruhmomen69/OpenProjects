@@ -3,6 +3,8 @@ package bruh.auctionhouse.gui
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.model.ExpiredItem
 import bruh.auctionhouse.service.AuctionService
@@ -28,6 +30,8 @@ class ExpiredItemsMenu(
     private val menuAPI: MenuAPI,
     private val auctionService: AuctionService,
     private val orderService: bruh.auctionhouse.service.OrderService,
+    private val auctionRepository: AuctionRepository,
+    private val bidRepository: BidRepository,
     private val expiredItemRepository: ExpiredItemRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -71,7 +75,7 @@ class ExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }

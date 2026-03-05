@@ -29,5 +29,8 @@ enum class OrderMessages(
     // Order status
     ORDER_EXPIRED("order_expired", "<yellow>Your order has expired."),
     ORDER_ALREADY_FILLED("order_already_filled", "<red>This order has already been filled."),
-    ORDER_SYSTEM_DISABLED("order_system_disabled", "<red>The order system is currently disabled.");
+    ORDER_SYSTEM_DISABLED("order_system_disabled", "<red>The order system is currently disabled."),
+
+    // Login notifications
+    ORDER_FILLED_LOGIN("order_filled_login", "<yellow>Welcome back! <gold>{count}</gold> of your order(s) were filled while you were away.");
 }

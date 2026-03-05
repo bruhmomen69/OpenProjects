@@ -86,7 +86,7 @@ class BidRepository(private val database: Database) {
             bidId
         )
     }
-    
+
     /**
      * Gets the bid history for an auction with a limit.
      */
@@ -104,6 +104,56 @@ class BidRepository(private val database: Database) {
                 bidAmount = rs.getDouble("bid_amount"),
                 bidTime = rs.getTimestamp("bid_time").toInstant(),
                 isOutbid = rs.getBoolean("is_outbid")
+            )
+        }
+    }
+
+    /**
+     * Gets count of outbid bids for a player (for login notifications).
+     */
+    suspend fun getOutbidBidsForPlayer(playerId: UUID): Int = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT COUNT(*) as count FROM auction_bids WHERE bidder_uuid = ? AND is_outbid = TRUE"),
+            playerId.toString()
+        ) { rs ->
+            rs.getInt("count")
+        } ?: 0
+    }
+
+    /**
+     * Gets the highest active bid for a player on an auction.
+     */
+    suspend fun getPlayerActiveBid(playerId: UUID, auctionId: UUID): Bid? = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT * FROM auction_bids WHERE auction_id = ? AND bidder_uuid = ? AND is_outbid = FALSE ORDER BY bid_amount DESC LIMIT 1"),
+            auctionId.toString(),
+            playerId.toString()
+        ) { rs ->
+            Bid(
+                id = rs.getLong("id"),
+                auctionId = UUID.fromString(rs.getString("auction_id")),
+                bidderUuid = UUID.fromString(rs.getString("bidder_uuid")),
+                bidderName = rs.getString("bidder_name"),
+                bidAmount = rs.getDouble("bid_amount"),
+                bidTime = rs.getTimestamp("bid_time").toInstant(),
+                isOutbid = rs.getBoolean("is_outbid")
+            )
+        }
+    }
+
+    /**
+     * Deletes a bid and returns its amount for refund.
+     */
+    suspend fun deleteBid(bidId: Long): Double? = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT bid_amount FROM auction_bids WHERE id = ?"),
+            bidId
+        ) { rs ->
+            rs.getDouble("bid_amount")
+        }?.also { amount ->
+            database.execute(
+                sql("DELETE FROM auction_bids WHERE id = ?"),
+                bidId
             )
         }
     }

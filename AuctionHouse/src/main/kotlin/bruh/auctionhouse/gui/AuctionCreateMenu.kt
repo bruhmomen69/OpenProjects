@@ -170,15 +170,29 @@ class AuctionCreateMenu(
                     ClickResult.ALLOW
                 } else {
                     runBlocking {
+                        // For AUCTION and BOTH types, BIN must be greater than start price
+                        val minBinPrice = if (auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) {
+                            startPrice.coerceAtLeast(config.auctions.minStartPrice)
+                        } else {
+                            config.auctions.minStartPrice
+                        }
+
                         val result = menuAPI.promptDouble(
                             player,
                             "Enter BIN Price",
                             binPrice,
-                            config.auctions.minStartPrice,
+                            minBinPrice,
                             config.auctions.maxStartPrice
                         )
                         when (result) {
-                            is AnvilInputResult.Success -> binPrice = result.value
+                            is AnvilInputResult.Success -> {
+                                // Validate BIN > start price for auction types
+                                if ((auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) && result.value <= startPrice) {
+                                    player.sendMessage(mm.deserialize("<red>BIN price must be greater than start price!"))
+                                } else {
+                                    binPrice = result.value
+                                }
+                            }
                             is AnvilInputResult.Cancelled -> {}
                         }
                         refreshMenu()
@@ -259,10 +273,7 @@ class AuctionCreateMenu(
                         player, auctionItem, auctionType, startPrice, actualBinPrice, duration, anonymous
                     )
                     player.sendMessage(result.message)
-
-                    if (result.success) {
-                        player.inventory.setItemInMainHand(null)
-                    }
+                    // Note: Item removal is handled by AuctionService.createAuction()
                 }
                 ClickResult.CLOSE
             }

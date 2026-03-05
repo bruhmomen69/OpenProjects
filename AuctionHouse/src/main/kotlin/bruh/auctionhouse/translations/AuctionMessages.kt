@@ -48,7 +48,11 @@ enum class AuctionMessages(
     EXPIRED_RETRIEVED("expired_retrieved", "<green>Retrieved <gold>{item}</gold>."),
     EXPIRED_INVENTORY_FULL("expired_inventory_full", "<red>Your inventory is full!"),
     EXPIRED_NONE("expired_none", "<gray>You have no expired items to retrieve."),
-    
+
+    // Login notifications
+    BID_OUTBID_LOGIN("bid_outbid_login", "<yellow>Welcome back! You were outbid on <gold>{count}</gold> auction(s) while you were away."),
+    AUCTION_SOLD_LOGIN("auction_sold_login", "<yellow>Welcome back! <gold>{count}</gold> of your auction(s) sold while you were away."),
+
     // Admin
     ADMIN_PURGED("admin_purged", "<green>Purged {count} old records."),
     ADMIN_TOGGLE_ON("admin_toggle_on", "<green>Auction House enabled."),

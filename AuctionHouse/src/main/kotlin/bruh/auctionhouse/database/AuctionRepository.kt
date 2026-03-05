@@ -50,10 +50,11 @@ class AuctionRepository(private val database: Database) {
             auction.finalPrice,
             auction.viewCount,
             auction.bidCount,
-            auction.isAnonymous
+            auction.isAnonymous,
+            auction.extensionCount
         )
     }
-    
+
     /**
      * Gets an auction by its ID.
      */
@@ -86,7 +87,8 @@ class AuctionRepository(private val database: Database) {
                 finalPrice = rs.getDouble("final_price").takeIf { it > 0 },
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
-                isAnonymous = rs.getBoolean("is_anonymous")
+                isAnonymous = rs.getBoolean("is_anonymous"),
+                extensionCount = rs.getInt("extension_count")
             )
         }
     }
@@ -155,11 +157,12 @@ class AuctionRepository(private val database: Database) {
                 finalPrice = rs.getDouble("final_price").takeIf { it > 0 },
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
-                isAnonymous = rs.getBoolean("is_anonymous")
+                isAnonymous = rs.getBoolean("is_anonymous"),
+                extensionCount = rs.getInt("extension_count")
             )
         }
     }
-    
+
     /**
      * Updates the status of an auction.
      */
@@ -170,7 +173,7 @@ class AuctionRepository(private val database: Database) {
             id.toString()
         )
     }
-    
+
     /**
      * Marks an auction as sold.
      */
@@ -187,7 +190,7 @@ class AuctionRepository(private val database: Database) {
             id.toString()
         )
     }
-    
+
     /**
      * Gets auctions for a specific player.
      */
@@ -197,13 +200,13 @@ class AuctionRepository(private val database: Database) {
         } else {
             "SELECT * FROM auctions WHERE seller_uuid = ? ORDER BY created_at DESC"
         }
-        
+
         val params = if (status != null) {
             arrayOf(sellerUuid.toString(), status.name)
         } else {
             arrayOf(sellerUuid.toString())
         }
-        
+
         database.query(sql(sqlQuery), *params) { rs ->
             Auction(
                 id = UUID.fromString(rs.getString("id")),
@@ -226,7 +229,8 @@ class AuctionRepository(private val database: Database) {
                 finalPrice = rs.getDouble("final_price").takeIf { it > 0 },
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
-                isAnonymous = rs.getBoolean("is_anonymous")
+                isAnonymous = rs.getBoolean("is_anonymous"),
+                extensionCount = rs.getInt("extension_count")
             )
         }
     }
@@ -260,7 +264,8 @@ class AuctionRepository(private val database: Database) {
                 finalPrice = rs.getDouble("final_price").takeIf { it > 0 },
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
-                isAnonymous = rs.getBoolean("is_anonymous")
+                isAnonymous = rs.getBoolean("is_anonymous"),
+                extensionCount = rs.getInt("extension_count")
             )
         }
     }
@@ -284,7 +289,17 @@ class AuctionRepository(private val database: Database) {
             id.toString()
         )
     }
-    
+
+    /**
+     * Decrements the bid count for an auction (for bid withdrawal).
+     */
+    suspend fun decrementBidCount(id: UUID) = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("UPDATE auctions SET bid_count = GREATEST(0, bid_count - 1) WHERE id = ?"),
+            id.toString()
+        )
+    }
+
     /**
      * Counts auctions for a specific player with a specific status.
      */
@@ -294,6 +309,67 @@ class AuctionRepository(private val database: Database) {
             sellerUuid.toString(),
             status.name
         ) { rs ->
+            rs.getInt("count")
+        } ?: 0
+    }
+
+    /**
+     * Updates the end time of an auction (for anti-snipe).
+     */
+    suspend fun updateEndTime(id: UUID, newEndTime: Instant) = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("UPDATE auctions SET ends_at = ? WHERE id = ?"),
+            newEndTime,
+            id.toString()
+        )
+    }
+
+    /**
+     * Gets the extension count for an auction (for anti-snipe limit).
+     */
+    suspend fun getExtensionCount(id: UUID): Int = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT extension_count FROM auctions WHERE id = ?"),
+            id.toString()
+        ) { rs ->
+            rs.getInt("extension_count")
+        } ?: 0
+    }
+
+    /**
+     * Increments the extension count for an auction.
+     */
+    suspend fun incrementExtensionCount(id: UUID) = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("UPDATE auctions SET extension_count = extension_count + 1 WHERE id = ?"),
+            id.toString()
+        )
+    }
+
+    /**
+     * Counts total active auctions matching filter criteria.
+     */
+    suspend fun countActiveAuctions(filter: AuctionFilter): Int = withContext(Dispatchers.IO) {
+        var sqlQuery = "SELECT COUNT(*) as count FROM auctions WHERE status = 'ACTIVE'"
+        val params = mutableListOf<Any>()
+
+        filter.searchQuery?.let {
+            sqlQuery += " AND (item_display_name LIKE ? OR item_material LIKE ?)"
+            params.add("%$it%")
+            params.add("%$it%")
+        }
+
+        filter.material?.let {
+            sqlQuery += " AND item_material = ?"
+            params.add(it)
+        }
+
+        filter.auctionType?.let {
+            sqlQuery += " AND auction_type = ?"
+            params.add(it.name)
+        }
+
+        database.querySingle(sql(sqlQuery), *params.toTypedArray()) { rs ->
             rs.getInt("count")
         } ?: 0
     }

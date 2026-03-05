@@ -402,6 +402,20 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                     CREATE INDEX IF NOT EXISTS idx_consolidated_group ON expired_items(consolidated_group_id)
                 """)
             })
+        },
+        migration(3, "Add extension_count column to auctions table") {
+            // Add extension_count column to auctions table for anti-snipe tracking
+            execute(sql {
+                mysql("""
+                    ALTER TABLE auctions ADD COLUMN extension_count INT NOT NULL DEFAULT 0
+                """)
+                postgres("""
+                    ALTER TABLE auctions ADD COLUMN extension_count INT NOT NULL DEFAULT 0
+                """)
+                sqlite("""
+                    ALTER TABLE auctions ADD COLUMN extension_count INTEGER NOT NULL DEFAULT 0
+                """)
+            })
         }
     )
 }
