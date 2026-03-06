@@ -12,6 +12,7 @@ import bruh.auctionhouse.model.AuctionSort
 import bruh.auctionhouse.model.AuctionType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -46,25 +47,19 @@ class AuctionHouseMenu(
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
-    
-    companion object {
-        // Persist filter and page state per player
-        private val playerFilters = ConcurrentHashMap<UUID, AuctionFilter>()
-        private val playerPages = ConcurrentHashMap<UUID, Int>()
-    }
-    
+
     private var currentFilter: AuctionFilter
     private var currentPage: Int
 
     init {
-        // Load persisted filter state or use defaults
-        currentFilter = playerFilters[player.uniqueId] ?: AuctionFilter()
-        currentPage = playerPages[player.uniqueId] ?: 0
+        // Load persisted filter state from PlayerStateManager
+        currentFilter = PlayerStateManager.getAuctionFilter(player.uniqueId)
+        currentPage = PlayerStateManager.getAuctionPage(player.uniqueId)
     }
 
     private fun saveFilterState() {
-        playerFilters[player.uniqueId] = currentFilter
-        playerPages[player.uniqueId] = currentPage
+        PlayerStateManager.setAuctionFilter(player.uniqueId, currentFilter)
+        PlayerStateManager.setAuctionPage(player.uniqueId, currentPage)
     }
 
     fun open(page: Int = 0) {

@@ -6,6 +6,7 @@ import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
 import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -32,9 +33,6 @@ class AdminViewPlayerMenu(
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
-    private var targetPlayer: Player? = null
-    private var targetPlayerUuid: UUID? = null
-    private var currentFilter: AuctionStatus? = null
 
     fun open() {
         val menu = menuAPI.simple {
@@ -59,7 +57,7 @@ class AdminViewPlayerMenu(
                             is AnvilInputResult.Success -> {
                                 val offlinePlayer = Bukkit.getOfflinePlayer(result.value)
                                 if (offlinePlayer.uniqueId != null) {
-                                    targetPlayerUuid = offlinePlayer.uniqueId
+                                    PlayerStateManager.setAdminTarget(player.uniqueId, offlinePlayer.uniqueId, offlinePlayer.name ?: result.value)
                                     openAuctionsMenu(offlinePlayer.name ?: result.value)
                                 } else {
                                     player.sendMessage(mm.deserialize("<red>Player not found: ${result.value}"))
@@ -88,9 +86,12 @@ class AdminViewPlayerMenu(
     }
 
     private fun openAuctionsMenu(playerName: String) {
+        val adminTarget = PlayerStateManager.getAdminTarget(player.uniqueId)
+        val currentFilter = PlayerStateManager.getAdminAuctionStatusFilter(player.uniqueId)
+
         val auctions = auctionRepository?.let { repo ->
             runBlocking {
-                targetPlayerUuid?.let { uuid ->
+                adminTarget?.let { (uuid, _) ->
                     repo.getPlayerAuctions(uuid, currentFilter)
                 }
             }
@@ -142,6 +143,7 @@ class AdminViewPlayerMenu(
     }
 
     private fun createFilterButton(status: AuctionStatus?, material: XMaterial, label: String): VItem {
+        val currentFilter = PlayerStateManager.getAdminAuctionStatusFilter(player.uniqueId)
         val isSelected = currentFilter == status
         return VItem(material) {
             name = mm.deserialize(
@@ -151,10 +153,10 @@ class AdminViewPlayerMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                currentFilter = status
-                targetPlayerUuid?.let { uuid ->
-                    val offlinePlayer = Bukkit.getOfflinePlayer(uuid)
-                    openAuctionsMenu(offlinePlayer.name ?: "Unknown")
+                PlayerStateManager.setAdminAuctionStatusFilter(player.uniqueId, status)
+                val adminTarget = PlayerStateManager.getAdminTarget(player.uniqueId)
+                adminTarget?.let { (_, name) ->
+                    openAuctionsMenu(name)
                 }
                 ClickResult.ALLOW
             }

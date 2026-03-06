@@ -3,6 +3,8 @@ package bruh.auctionhouse.gui
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.PlayerBanRepository
+import bruh.auctionhouse.model.PlayerBan
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
@@ -25,14 +27,16 @@ class AdminBannedPlayersMenu(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
-    private val player: Player
+    private val player: Player,
+    private val playerBanRepository: PlayerBanRepository
 ) {
     private val mm = MiniMessage.miniMessage()
 
-    // In production, this would be stored in a database or config
-    private val bannedPlayers = mutableMapOf<String, String>() // playerName -> reason
-
     fun open() {
+        val bannedPlayers = runBlocking {
+            playerBanRepository.getAllBans()
+        }
+
         val menu = menuAPI.simple {
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.ADMIN_BANNED_PLAYERS)
@@ -66,15 +70,32 @@ class AdminBannedPlayersMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 val playerName = result.value
+                                val offlinePlayer = Bukkit.getOfflinePlayer(playerName)
+                                if (offlinePlayer.uniqueId == null) {
+                                    player.sendMessage(mm.deserialize("<red>Player not found: $playerName"))
+                                    return@runBlocking
+                                }
+
                                 val reasonResult = menuAPI.promptText(player, "Enter ban reason (optional)")
                                 when (reasonResult) {
                                     is AnvilInputResult.Success -> {
-                                        bannedPlayers[playerName] = reasonResult.value.ifEmpty { "No reason provided" }
-                                        player.sendMessage(mm.deserialize("<green>Banned $playerName from auction house"))
-                                        
-                                        // Cancel their auctions if configured
-                                        if (config.restrictions.admin.onBanCancelAuctions) {
-                                            player.sendMessage(mm.deserialize("<yellow>Their auctions will be cancelled"))
+                                        val ban = PlayerBan.create(
+                                            playerUuid = offlinePlayer.uniqueId,
+                                            playerName = playerName,
+                                            banReason = reasonResult.value.ifEmpty { "No reason provided" },
+                                            bannedBy = player.uniqueId,
+                                            bannedByName = player.name
+                                        )
+                                        val success = playerBanRepository.addBan(ban)
+                                        if (success) {
+                                            player.sendMessage(mm.deserialize("<green>Banned $playerName from auction house"))
+
+                                            // Cancel their auctions if configured
+                                            if (config.restrictions.admin.onBanCancelAuctions) {
+                                                player.sendMessage(mm.deserialize("<yellow>Their auctions will be cancelled"))
+                                            }
+                                        } else {
+                                            player.sendMessage(mm.deserialize("<yellow>$playerName is already banned"))
                                         }
                                     }
                                     is AnvilInputResult.Cancelled -> {}
@@ -104,8 +125,9 @@ class AdminBannedPlayersMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 val playerName = result.value
-                                if (bannedPlayers.containsKey(playerName)) {
-                                    bannedPlayers.remove(playerName)
+                                val existingBan = playerBanRepository.getByPlayerName(playerName)
+                                if (existingBan != null) {
+                                    playerBanRepository.removeBan(existingBan.playerUuid)
                                     player.sendMessage(mm.deserialize("<green>Unbanned $playerName from auction house"))
                                 } else {
                                     player.sendMessage(mm.deserialize("<yellow>$playerName is not banned"))
@@ -120,21 +142,25 @@ class AdminBannedPlayersMenu(
             })
 
             // List banned players
-            bannedPlayers.forEach { (playerName, reason) ->
-                val slot = 10 + bannedPlayers.keys.indexOf(playerName)
-                if (slot < 53) {
+            bannedPlayers.forEachIndexed { index, ban ->
+                val slot = 10 + index
+                if (slot < 54) {
                     item(slot, VItem(XMaterial.PLAYER_HEAD) {
-                        name = mm.deserialize("<red>$playerName")
+                        name = mm.deserialize("<red>${ban.playerName}")
                         lore = mutableListOf(
-                            mm.deserialize("<gray>Reason: <white>$reason"),
+                            mm.deserialize("<gray>Reason: <white>${ban.banReason}"),
+                            mm.deserialize("<gray>Banned by: <white>${ban.bannedByName ?: "Unknown"}"),
+                            mm.deserialize("<gray>At: <white>${java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(ban.bannedAt)}"),
                             Component.empty(),
                             mm.deserialize("<red>Click to unban")
                         )
                         hideAllFlags()
 
                         onClick { _, _ ->
-                            bannedPlayers.remove(playerName)
-                            player.sendMessage(mm.deserialize("<green>Unbanned $playerName from auction house"))
+                            runBlocking {
+                                playerBanRepository.removeBan(ban.playerUuid)
+                            }
+                            player.sendMessage(mm.deserialize("<green>Unbanned ${ban.playerName} from auction house"))
                             open()
                             ClickResult.CLOSE
                         }

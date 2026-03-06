@@ -518,6 +518,42 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                     ALTER TABLE auctions ADD COLUMN manual_extension_count INTEGER NOT NULL DEFAULT 0
                 """)
             })
+        },
+        migration(6, "Add player_bans table for persistent ban storage") {
+            // Create player_bans table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS player_bans (
+                        player_uuid VARCHAR(36) PRIMARY KEY,
+                        player_name VARCHAR(255) NOT NULL,
+                        ban_reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        banned_by VARCHAR(36),
+                        banned_by_name VARCHAR(255),
+                        INDEX idx_banned_at (banned_at)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS player_bans (
+                        player_uuid VARCHAR(36) PRIMARY KEY,
+                        player_name VARCHAR(255) NOT NULL,
+                        ban_reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        banned_by VARCHAR(36),
+                        banned_by_name VARCHAR(255)
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS player_bans (
+                        player_uuid TEXT PRIMARY KEY,
+                        player_name TEXT NOT NULL,
+                        ban_reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        banned_by TEXT,
+                        banned_by_name TEXT
+                    )
+                """)
+            })
         }
     )
 }

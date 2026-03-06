@@ -31,6 +31,7 @@ class AdminDashboardMenu(
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
+    private val playerBanRepository = plugin.playerBanRepository
 
     fun open() {
         val activeAuctions = auctionRepository?.let { runBlocking { it.getActiveAuctionsCount() } } ?: 0
@@ -138,7 +139,7 @@ class AdminDashboardMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
-                    AdminBannedPlayersMenu(menuAPI, config, translationAPI, plugin, player).open()
+                    AdminBannedPlayersMenu(menuAPI, config, translationAPI, plugin, player, playerBanRepository).open()
                     ClickResult.CLOSE
                 }
             })

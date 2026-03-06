@@ -13,8 +13,10 @@ import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.database.NotificationRepository
 import bruh.auctionhouse.database.OrderFillRepository
 import bruh.auctionhouse.database.OrderRepository
+import bruh.auctionhouse.database.PlayerBanRepository
 import bruh.auctionhouse.database.TransactionRepository
 import bruh.auctionhouse.database.WatchlistRepository
+import bruh.auctionhouse.util.PlayerStateManager
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.economy.VaultEconomyProvider
 import bruh.auctionhouse.hooks.PlaceholderAPIHook
@@ -94,6 +96,8 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         private set
     lateinit var notificationRepository: NotificationRepository
         private set
+    lateinit var playerBanRepository: PlayerBanRepository
+        private set
     lateinit var expirationService: ExpirationService
         private set
 
@@ -163,6 +167,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         transactionRepository = TransactionRepository(database)
         watchlistRepository = WatchlistRepository(database)
         notificationRepository = NotificationRepository(database)
+        playerBanRepository = PlayerBanRepository(database)
         slF4JLogger.info("Repositories created")
 
         // Step 5.5: Run data migration if needed
@@ -245,6 +250,10 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         if (::expirationService.isInitialized) {
             expirationService.stop()
         }
+
+        // Clear player state
+        PlayerStateManager.clearAllState()
+        slF4JLogger.info("Cleared player state")
 
         // Close MenuAPI
         if (::menuAPI.isInitialized) {
