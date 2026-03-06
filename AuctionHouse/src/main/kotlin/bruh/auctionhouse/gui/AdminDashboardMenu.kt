@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.TransactionRepository
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
@@ -85,7 +86,9 @@ class AdminDashboardMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 // In full implementation, this would open search results
-                                player.sendMessage(mm.deserialize("<yellow>Search for '${result.value}' - feature coming soon"))
+                                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.FEATURE_COMING_SOON) {
+                                    unparsed("feature", "Search for '${result.value}'")
+                                })
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
@@ -105,7 +108,9 @@ class AdminDashboardMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
-                    player.sendMessage(mm.deserialize("<yellow>Active auctions browser - feature coming soon"))
+                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.FEATURE_COMING_SOON) {
+                        unparsed("feature", "Active auctions browser")
+                    })
                     ClickResult.CLOSE
                 }
             })

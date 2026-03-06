@@ -7,12 +7,13 @@ import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.Order
+import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.auctionhouse.model.OrderFilter
 import bruh.auctionhouse.model.OrderSort
 import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
-import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -48,7 +49,7 @@ class OrderBrowserMenu(
         currentPage = page
 
         if (!config.orders.enabled) {
-            player.sendMessage(mm.deserialize("<red>The order system is currently disabled."))
+            player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
             return
         }
 
@@ -123,7 +124,7 @@ class OrderBrowserMenu(
             onClick { _, _ ->
                 // Check if player is holding an item
                 if (player.inventory.itemInMainHand.type.isAir) {
-                    player.sendMessage(mm.deserialize("<red>You must hold an item to create a sell order!"))
+                    player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_MUST_HOLD_ITEM))
                     ClickResult.CLOSE
                 }
                 // Open sell order creation - reuse OrderCreateMenu but with sell mode

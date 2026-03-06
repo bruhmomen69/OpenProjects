@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.TransactionRepository
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
@@ -72,12 +73,18 @@ class AdminBlacklistMenu(
                                     if (!currentList.contains(materialName)) {
                                         currentList.add(materialName)
                                         // Note: In production, this would save to config
-                                        player.sendMessage(mm.deserialize("<green>Added $materialName to blacklist"))
+                                        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ADDED) {
+                                            unparsed("material", materialName)
+                                        })
                                     } else {
-                                        player.sendMessage(mm.deserialize("<yellow>$materialName is already blacklisted"))
+                                        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ALREADY_EXISTS) {
+                                            unparsed("material", materialName)
+                                        })
                                     }
                                 } catch (e: IllegalArgumentException) {
-                                    player.sendMessage(mm.deserialize("<red>Invalid material: $materialName"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_INVALID) {
+                                        unparsed("material", materialName)
+                                    })
                                 }
                             }
                             is AnvilInputResult.Cancelled -> {}
@@ -108,9 +115,13 @@ class AdminBlacklistMenu(
                                 if (currentList.contains(materialName)) {
                                     currentList.remove(materialName)
                                     // Note: In production, this would save to config
-                                    player.sendMessage(mm.deserialize("<green>Removed $materialName from blacklist"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
+                                        unparsed("material", materialName)
+                                    })
                                 } else {
-                                    player.sendMessage(mm.deserialize("<yellow>$materialName is not blacklisted"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_NOT_FOUND) {
+                                        unparsed("material", materialName)
+                                    })
                                 }
                             }
                             is AnvilInputResult.Cancelled -> {}
@@ -135,7 +146,9 @@ class AdminBlacklistMenu(
                             val currentList = config.restrictions.blacklistedMaterials.toMutableList()
                             currentList.remove(material)
                             // Note: In production, this would save to config
-                            player.sendMessage(mm.deserialize("<green>Removed $material from blacklist"))
+                            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
+                                unparsed("material", material)
+                            })
                             open()
                             ClickResult.CLOSE
                         }

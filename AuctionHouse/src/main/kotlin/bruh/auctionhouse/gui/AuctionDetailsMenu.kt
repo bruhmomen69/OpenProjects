@@ -137,7 +137,7 @@ class AuctionDetailsMenu(
         }
 
         if (bidHistory.isEmpty()) {
-            player.sendMessage(mm.deserialize("<red>No bid history available."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_BID_HISTORY))
             return
         }
 
@@ -241,7 +241,7 @@ class AuctionDetailsMenu(
                     mm.deserialize("<green>Bid withdrawn! ${MenuUtils.formatPrice(refundAmount, plugin.economy)} has been refunded.")
                 )
             } else {
-                player.sendMessage(mm.deserialize("<red>Failed to withdraw bid."))
+                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BID_WITHDRAW_FAILED))
             }
         }
     }
@@ -271,14 +271,16 @@ class AuctionDetailsMenu(
         runBlocking {
             // Check if player can afford the fee
             if (!economy.has(player, java.math.BigDecimal.valueOf(fee))) {
-                player.sendMessage(mm.deserialize("<red>You don't have enough money for the extension fee."))
+                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.INSUFFICIENT_FUNDS_EXTENSION))
                 return@runBlocking
             }
 
             // Check manual extension count (separate from anti-snipe auto extensions)
             val currentManualExtensions = auctionRepository.getManualExtensionCount(auction.id)
             if (currentManualExtensions >= config.auctions.manualExtension.maxManualExtensions) {
-                player.sendMessage(mm.deserialize("<red>Maximum manual extension limit reached (${config.auctions.manualExtension.maxManualExtensions})."))
+                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MAX_EXTENSION_REACHED) {
+                    unparsed("max", config.auctions.manualExtension.maxManualExtensions.toString())
+                })
                 return@runBlocking
             }
 
@@ -523,7 +525,7 @@ class AuctionDetailsMenu(
                         if (currentBin != null) {
                             // Clear BIN price
                             updatePrices(null, null)
-                            player.sendMessage(mm.deserialize("<green>BIN price removed."))
+                            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BIN_PRICE_REMOVED))
                         } else {
                             // Set BIN price
                             val result = menuAPI.promptDouble(
@@ -562,7 +564,7 @@ class AuctionDetailsMenu(
             val result = auctionService.editAuctionPrice(player, auction.id, newStart, newBin)
             when (result) {
                 is bruh.auctionhouse.service.ServiceResult.Success -> {
-                    player.sendMessage(mm.deserialize("<green>Prices updated successfully!"))
+                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.PRICES_UPDATED))
                     open()
                 }
                 is bruh.auctionhouse.service.ServiceResult.Failure -> {
@@ -600,10 +602,10 @@ class AuctionDetailsMenu(
                 runBlocking {
                     if (isWatching) {
                         watchlistRepository.remove(player.uniqueId, auction.id)
-                        player.sendMessage(mm.deserialize("<yellow>Removed from watchlist."))
+                        player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_REMOVED))
                     } else {
                         watchlistRepository.add(player.uniqueId, auction.id)
-                        player.sendMessage(mm.deserialize("<green>Added to watchlist!"))
+                        player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_ADDED))
                     }
                 }
                 open()

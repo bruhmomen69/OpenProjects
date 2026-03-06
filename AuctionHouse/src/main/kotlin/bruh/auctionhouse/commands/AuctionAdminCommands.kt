@@ -97,7 +97,9 @@ class AuctionAdminCommands(
     ) {
         val target = Bukkit.getPlayer(playerName)
         if (target == null) {
-            actor.reply(mm.deserialize("<red>Player not found: $playerName"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_PLAYER_NOT_FOUND) {
+                unparsed("player", playerName)
+            })
             return
         }
 
@@ -121,12 +123,12 @@ class AuctionAdminCommands(
     @Subcommand("status")
     @CommandPermission("auctionhouse.admin.status")
     fun status(actor: BukkitCommandActor) {
-        val status = buildString {
-            append("<green>AuctionHouse Status:</green>\n")
-            append("<gray>Enabled: <white>${plugin.isReady}</white>\n")
-            append("<gray>Version: <white>${plugin.pluginMeta.version}</white>")
-        }
-        actor.reply(mm.deserialize(status))
+        actor.reply(
+            translationAPI.getComponentSync(AuctionMessages.ADMIN_STATUS) {
+                unparsed("enabled", plugin.isReady.toString())
+                unparsed("version", plugin.pluginMeta.version)
+            }
+        )
     }
 
     /**
@@ -148,7 +150,7 @@ class AuctionAdminCommands(
 
         val player = actor.asPlayer()
         if (player == null) {
-            actor.reply(mm.deserialize("<red>This command must be run by a player."))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.PLAYER_ONLY))
             return
         }
 
@@ -211,7 +213,9 @@ class AuctionAdminCommands(
 
         // Notify seller if online
         plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
-            seller.sendMessage(mm.deserialize("<red>Your auction was deleted by an admin.${reason?.let { " Reason: $it" } ?: ""}"))
+            seller.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_DELETED_NOTIFICATION) {
+                unparsed("reason", reason?.let { " Reason: $it" } ?: "")
+            })
         }
 
         plugin.logger.info("Admin ${actor.sender().name} deleted auction $uuid without refund (seller: ${auction.sellerName})${reason?.let { " - Reason: $it" } ?: ""}")
@@ -254,10 +258,18 @@ class AuctionAdminCommands(
             )
         )
 
-        actor.reply(mm.deserialize("<green>Refunded ${economy.format(java.math.BigDecimal.valueOf(amount))} to ${player.name}."))
+        actor.reply(
+            translationAPI.getComponentSync(AuctionMessages.ADMIN_REFUNDED_SUCCESS) {
+                unparsed("amount", economy.format(java.math.BigDecimal.valueOf(amount)))
+                unparsed("player", player.name ?: "Unknown")
+            }
+        )
 
         if (player.isOnline) {
-            player.player?.sendMessage(mm.deserialize("<green>You received a refund of ${economy.format(java.math.BigDecimal.valueOf(amount))}${reason?.let { " - Reason: $it" } ?: ""}"))
+            player.player?.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_REFUNDED_NOTIFICATION) {
+                unparsed("amount", economy.format(java.math.BigDecimal.valueOf(amount)))
+                unparsed("reason", reason?.let { " - Reason: $it" } ?: "")
+            })
         }
 
         plugin.logger.info("Admin ${actor.sender().name} refunded ${amount} to ${player.name}${reason?.let { " - Reason: $it" } ?: ""}")
@@ -282,7 +294,9 @@ class AuctionAdminCommands(
 
         val buyer = Bukkit.getPlayer(buyerName)
         if (buyer == null) {
-            actor.reply(mm.deserialize("<red>Player not found: $buyerName"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_PLAYER_NOT_FOUND) {
+                unparsed("player", buyerName)
+            })
             return
         }
 
@@ -292,7 +306,9 @@ class AuctionAdminCommands(
             return
         }
 
-        actor.reply(mm.deserialize("<green>Force sold auction to $buyerName."))
+        actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_FORCE_SOLD) {
+            unparsed("player", buyerName)
+        })
         plugin.logger.info("Admin ${actor.sender().name} force sold auction $uuid to $buyerName")
     }
 
@@ -317,22 +333,21 @@ class AuctionAdminCommands(
             val activeCount = auctions.count { it.isActive() }
             val soldCount = auctions.count { it.status == AuctionStatus.SOLD }
 
-            actor.reply(mm.deserialize(
-                "<green>=== Statistics for ${player.name} ===</green>\n" +
-                "<gray>Total Auctions Created: <white>${auctions.size}</white>\n" +
-                "<gray>Active Auctions: <white>$activeCount</white>\n" +
-                "<gray>Sold Auctions: <white>$soldCount</white>"
-            ))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_STATS_PLAYER) {
+                unparsed("player", player.name ?: "Unknown")
+                unparsed("total", auctions.size.toString())
+                unparsed("active", activeCount.toString())
+                unparsed("sold", soldCount.toString())
+            })
         } else {
             // Global stats
             val activeAuctions = auctionRepository.getActiveAuctionsCount()
             val activeOrders = 0 // Would need order repository
 
-            actor.reply(mm.deserialize(
-                "<green>=== AuctionHouse Statistics ===</green>\n" +
-                "<gray>Active Auctions: <white>$activeAuctions</white>\n" +
-                "<gray>Active Orders: <white>$activeOrders</white>"
-            ))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_STATS_GLOBAL) {
+                unparsed("auctions", activeAuctions.toString())
+                unparsed("orders", activeOrders.toString())
+            })
         }
     }
 
@@ -363,16 +378,24 @@ class AuctionAdminCommands(
         val auctions = auctionRepository.getPlayerAuctions(player.uniqueId, status)
 
         if (auctions.isEmpty()) {
-            actor.reply(mm.deserialize("<gray>${player.name} has no ${filter ?: "active"} auctions."))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_VIEW_NO_AUCTIONS) {
+                unparsed("player", player.name ?: "Unknown")
+                unparsed("filter", filter ?: "active")
+            })
             return
         }
 
-        actor.reply(mm.deserialize(
-            "<green>=== ${player.name}'s Auctions (${auctions.size}) ===</green>\n" +
-            auctions.take(5).joinToString("\n") { auction ->
-                "<gray>- ${auction.itemMaterial}: ${economy.format(java.math.BigDecimal.valueOf(auction.startPrice))} (${auction.status})"
-            } + if (auctions.size > 5) "\n<gray>...and ${auctions.size - 5} more" else ""
-        ))
+        val auctionList = auctions.take(5).joinToString("\n") { auction ->
+            "<gray>- ${auction.itemMaterial}: ${economy.format(java.math.BigDecimal.valueOf(auction.startPrice))} (${auction.status})"
+        }
+        val moreText = if (auctions.size > 5) "\n<gray>...and ${auctions.size - 5} more" else ""
+
+        actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_VIEW_AUCTIONS_LIST) {
+            unparsed("player", player.name ?: "Unknown")
+            unparsed("count", auctions.size.toString())
+            unparsed("list", auctionList)
+            unparsed("more", moreText)
+        })
 
         // Open GUI menu if player is online
         if (actor.isPlayer) {
@@ -388,7 +411,7 @@ class AuctionAdminCommands(
     @CommandPermission("auctionhouse.admin.dashboard")
     fun adminDashboard(actor: BukkitCommandActor) {
         val player = actor.asPlayer() ?: run {
-            actor.reply(mm.deserialize("<red>This command must be run by a player."))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.PLAYER_ONLY))
             return
         }
 
@@ -426,9 +449,13 @@ class AuctionAdminCommands(
 
         // Notify player if online
         offlinePlayer.player?.sendMessage(
-            mm.deserialize("<red>You have been banned from the auction house$durationText.</red>")
+            translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_PLAYER_NOTIFICATION) {
+                unparsed("duration", durationText)
+            }
         )
-        offlinePlayer.player?.sendMessage(mm.deserialize("<red>Reason: $banReason</red>"))
+        offlinePlayer.player?.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_NOTIFICATION) {
+            unparsed("reason", banReason)
+        })
 
         // Cancel auctions if configured
         if (config.restrictions.admin.onBanCancelAuctions) {
@@ -438,7 +465,9 @@ class AuctionAdminCommands(
                     auctionRepository.updateStatus(auction.id, AuctionStatus.CANCELLED)
                 }
                 if (auctions.isNotEmpty()) {
-                    actor.reply(mm.deserialize("<yellow>Cancelled ${auctions.size} active auctions."))
+                    actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_AUCTIONS_CANCELLED) {
+                        unparsed("count", auctions.size.toString())
+                    })
                 }
             }
         }
@@ -478,8 +507,8 @@ class AuctionAdminCommands(
     @CommandPermission("auctionhouse.admin.ban")
     fun adminBannedList(actor: BukkitCommandActor) {
         // In production, this would query the database
-        actor.reply(mm.deserialize("<green>=== Banned Players ===</green>"))
-        actor.reply(mm.deserialize("<gray>No banned players (feature placeholder)</gray>"))
+        actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BANNED_LIST_TITLE))
+        actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BANNED_LIST_EMPTY))
     }
 
     /**
@@ -495,7 +524,9 @@ class AuctionAdminCommands(
         val material = try {
             Material.valueOf(materialName.uppercase())
         } catch (e: IllegalArgumentException) {
-            actor.reply(mm.deserialize("<red>Invalid material: $materialName"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_INVALID) {
+                unparsed("material", materialName)
+            })
             return
         }
 
@@ -510,7 +541,9 @@ class AuctionAdminCommands(
             )
             plugin.logger.info("Admin ${actor.sender().name} added $materialName to blacklist${reason?.let { " - Reason: $it" } ?: ""}")
         } else {
-            actor.reply(mm.deserialize("<yellow>$materialName is already blacklisted"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ALREADY_EXISTS) {
+                unparsed("material", materialName)
+            })
         }
     }
 
@@ -534,7 +567,9 @@ class AuctionAdminCommands(
             )
             plugin.logger.info("Admin ${actor.sender().name} removed $materialName from blacklist")
         } else {
-            actor.reply(mm.deserialize("<yellow>$materialName is not blacklisted"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_NOT_FOUND) {
+                unparsed("material", materialName)
+            })
         }
     }
 
@@ -545,12 +580,18 @@ class AuctionAdminCommands(
     @CommandPermission("auctionhouse.admin.blacklist")
     fun adminBlacklistList(actor: BukkitCommandActor) {
         val blacklisted = config.restrictions.blacklistedMaterials
-        actor.reply(mm.deserialize("<green>=== Blacklisted Materials (${blacklisted.size}) ===</green>"))
+        actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_LIST_TITLE) {
+            unparsed("count", blacklisted.size.toString())
+        })
         blacklisted.take(10).forEach { material ->
-            actor.reply(mm.deserialize("<gray>- $material"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_LIST_ITEM) {
+                unparsed("material", material)
+            })
         }
         if (blacklisted.size > 10) {
-            actor.reply(mm.deserialize("<gray>...and ${blacklisted.size - 10} more"))
+            actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_LIST_MORE) {
+                unparsed("count", (blacklisted.size - 10).toString())
+            })
         }
     }
 }

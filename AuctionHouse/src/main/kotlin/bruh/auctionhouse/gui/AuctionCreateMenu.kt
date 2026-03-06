@@ -43,7 +43,7 @@ class AuctionCreateMenu(
     fun open() {
         // Check if player is holding an item
         if (auctionItem.type.isAir) {
-            player.sendMessage(mm.deserialize("<red>You must hold an item to sell!"))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MUST_HOLD_ITEM))
             return
         }
 
@@ -188,7 +188,7 @@ class AuctionCreateMenu(
                             is AnvilInputResult.Success -> {
                                 // Validate BIN > start price for auction types
                                 if ((auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) && result.value <= startPrice) {
-                                    player.sendMessage(mm.deserialize("<red>BIN price must be greater than start price!"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BIN_PRICE_MUST_BE_GREATER))
                                 } else {
                                     binPrice = result.value
                                 }
@@ -267,8 +267,10 @@ class AuctionCreateMenu(
             val totalValue = startPrice.coerceAtLeast(binPriceTotal)
             if (MenuUtils.isExpensiveAction(totalValue, config.gui.confirm.expensiveThreshold)) {
                 loreList.add(Component.empty())
-                loreList.add(mm.deserialize("<red>⚠ High Value Transaction"))
-                loreList.add(mm.deserialize("<red>Threshold: ${MenuUtils.formatPrice(config.gui.confirm.expensiveThreshold, plugin.economy)}"))
+                loreList.add(translationAPI.getComponentSync(GuiMessages.EXPENSIVE_TRANSACTION_WARNING))
+                loreList.add(translationAPI.getComponentSync(GuiMessages.EXPENSIVE_TRANSACTION_THRESHOLD) {
+                    unparsed("threshold", MenuUtils.formatPrice(config.gui.confirm.expensiveThreshold, plugin.economy))
+                })
             }
             
             loreList.add(Component.empty())
@@ -284,7 +286,7 @@ class AuctionCreateMenu(
                     val totalValue = startPrice.coerceAtLeast(binPrice ?: 0.0)
                     if (MenuUtils.isExpensiveAction(totalValue, config.gui.confirm.expensiveThreshold)) {
                         // Show confirmation message
-                        player.sendMessage(mm.deserialize("<yellow>⚠ Confirm expensive auction: Type 'confirm' in chat within 10 seconds"))
+                        player.sendMessage(translationAPI.getComponentSync(GuiMessages.CONFIRM_EXPENSIVE_AUCTION))
                         // Note: Full implementation would require a pending confirmation system
                         // For now, we just warn the user
                     }

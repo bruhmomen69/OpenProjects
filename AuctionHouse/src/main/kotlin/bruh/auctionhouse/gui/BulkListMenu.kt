@@ -45,13 +45,13 @@ class BulkListMenu(
     fun open() {
         // Check if player is holding an item
         if (auctionItem.type.isAir) {
-            player.sendMessage(mm.deserialize("<red>You must hold an item to sell!"))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MUST_HOLD_ITEM))
             return
         }
 
         // Check if bulk listing is enabled
         if (!config.auctions.bulkListing.enabled) {
-            player.sendMessage(mm.deserialize("<red>Bulk listing is currently disabled."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_DISABLED))
             return
         }
 
@@ -222,7 +222,9 @@ class BulkListMenu(
 
                         // Confirm if creating many auctions
                         if (quantity > 10) {
-                            player.sendMessage(mm.deserialize("<yellow>Creating $quantity auctions. Confirm by clicking again."))
+                            player.sendMessage(translationAPI.getComponentSync(GuiMessages.BULK_LISTING_CONFIRMATION) {
+                                unparsed("count", quantity.toString())
+                            })
                             // In a full implementation, we'd add a confirmation menu here
                         }
 
@@ -370,7 +372,7 @@ class BulkListMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 if ((auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) && result.value <= startPrice) {
-                                    player.sendMessage(mm.deserialize("<red>BIN price must be greater than start price!"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BIN_PRICE_MUST_BE_GREATER))
                                 } else {
                                     binPrice = result.value
                                 }

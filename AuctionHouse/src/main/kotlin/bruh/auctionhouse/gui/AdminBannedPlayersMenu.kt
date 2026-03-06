@@ -5,6 +5,7 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.PlayerBanRepository
 import bruh.auctionhouse.model.PlayerBan
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
@@ -72,7 +73,9 @@ class AdminBannedPlayersMenu(
                                 val playerName = result.value
                                 val offlinePlayer = Bukkit.getOfflinePlayer(playerName)
                                 if (offlinePlayer.uniqueId == null) {
-                                    player.sendMessage(mm.deserialize("<red>Player not found: $playerName"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_PLAYER_NOT_FOUND) {
+                                        unparsed("player", playerName)
+                                    })
                                     return@runBlocking
                                 }
 
@@ -88,14 +91,18 @@ class AdminBannedPlayersMenu(
                                         )
                                         val success = playerBanRepository.addBan(ban)
                                         if (success) {
-                                            player.sendMessage(mm.deserialize("<green>Banned $playerName from auction house"))
+                                            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_SUCCESS) {
+                                                unparsed("player", playerName)
+                                            })
 
                                             // Cancel their auctions if configured
                                             if (config.restrictions.admin.onBanCancelAuctions) {
-                                                player.sendMessage(mm.deserialize("<yellow>Their auctions will be cancelled"))
+                                                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_AUCTIONS_CANCELLED))
                                             }
                                         } else {
-                                            player.sendMessage(mm.deserialize("<yellow>$playerName is already banned"))
+                                            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_ALREADY_BANNED) {
+                                                unparsed("player", playerName)
+                                            })
                                         }
                                     }
                                     is AnvilInputResult.Cancelled -> {}
@@ -128,9 +135,13 @@ class AdminBannedPlayersMenu(
                                 val existingBan = playerBanRepository.getByPlayerName(playerName)
                                 if (existingBan != null) {
                                     playerBanRepository.removeBan(existingBan.playerUuid)
-                                    player.sendMessage(mm.deserialize("<green>Unbanned $playerName from auction house"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_UNBAN_SUCCESS) {
+                                        unparsed("player", playerName)
+                                    })
                                 } else {
-                                    player.sendMessage(mm.deserialize("<yellow>$playerName is not banned"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_UNBAN_NOT_BANNED) {
+                                        unparsed("player", playerName)
+                                    })
                                 }
                             }
                             is AnvilInputResult.Cancelled -> {}
@@ -160,7 +171,9 @@ class AdminBannedPlayersMenu(
                             runBlocking {
                                 playerBanRepository.removeBan(ban.playerUuid)
                             }
-                            player.sendMessage(mm.deserialize("<green>Unbanned ${ban.playerName} from auction house"))
+                            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_UNBAN_SUCCESS) {
+                                unparsed("player", ban.playerName)
+                            })
                             open()
                             ClickResult.CLOSE
                         }

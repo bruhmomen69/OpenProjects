@@ -6,11 +6,12 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
+import bruh.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.ExpiredItem
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
-import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -50,7 +51,7 @@ class ExpiredItemsMenu(
         }
 
         if (expiredItems.isEmpty()) {
-            player.sendMessage(mm.deserialize("<gray>You have no claimable items to retrieve."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_CLAIMABLE_ITEMS))
             return
         }
 
@@ -128,7 +129,7 @@ class ExpiredItemsMenu(
 
         if (availableSpace <= 0) {
             // No space at all - keep in expired items
-            player.sendMessage(mm.deserialize("<red>Your inventory is full! Clear some space and try again."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.INVENTORY_FULL))
             return
         }
 
@@ -137,13 +138,13 @@ class ExpiredItemsMenu(
             val remaining = player.inventory.addItem(itemStack.clone())
             if (remaining.isEmpty()) {
                 expiredItemRepository.markAsClaimed(expiredItem.id)
-                player.sendMessage(mm.deserialize("<green>Item retrieved successfully!"))
+                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ITEM_RETRIEVED))
             } else {
                 // This shouldn't happen if we calculated correctly, but handle it anyway
                 val remainingAmount = remaining.values.sumOf { it.amount }
                 storeOverflowAsNewExpiredItem(expiredItem, remainingAmount)
                 expiredItemRepository.markAsClaimed(expiredItem.id)
-                player.sendMessage(mm.deserialize("<yellow>Partial retrieval! Some items couldn't fit and remain in expired items."))
+                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.PARTIAL_RETRIEVAL))
             }
         } else {
             // Partial retrieval - give what fits, store remainder as new expired item
@@ -161,7 +162,10 @@ class ExpiredItemsMenu(
             // Mark original as claimed
             expiredItemRepository.markAsClaimed(expiredItem.id)
 
-            player.sendMessage(mm.deserialize("<yellow>Partial retrieval! Retrieved $availableSpace/${totalAmount} items. The rest remain in expired items."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.PARTIAL_RETRIEVAL_COUNT) {
+                unparsed("available", availableSpace.toString())
+                unparsed("total", totalAmount.toString())
+            })
         }
     }
 

@@ -5,6 +5,7 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.TransactionRepository
 import bruh.auctionhouse.model.Transaction
 import bruh.auctionhouse.model.TransactionType
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -39,7 +40,7 @@ class TransactionHistoryMenu(
         currentPage = page
 
         if (!config.gui.transactionHistory.enabled) {
-            player.sendMessage(mm.deserialize("<red>Transaction history is currently disabled."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.TRANSACTION_HISTORY_DISABLED))
             return
         }
 
@@ -202,7 +203,7 @@ class TransactionHistoryMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                player.sendMessage(mm.deserialize("<yellow>Date range filtering coming soon!"))
+                player.sendMessage(translationAPI.getComponentSync(AuctionMessages.DATE_RANGE_FILTERING_SOON))
                 ClickResult.ALLOW
             }
         }

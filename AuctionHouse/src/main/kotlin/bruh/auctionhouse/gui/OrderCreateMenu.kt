@@ -575,7 +575,7 @@ class OrderCreateMenu(
                 // Create sell order - need item from inventory
                 val itemInHand = player.inventory.itemInMainHand
                 if (itemInHand.type != material || itemInHand.amount < state.totalQuantity) {
-                    player.sendMessage(mm.deserialize("<red>You don't have the required item in your hand!"))
+                    player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_MUST_HOLD_ITEM))
                     return@runBlocking
                 }
 

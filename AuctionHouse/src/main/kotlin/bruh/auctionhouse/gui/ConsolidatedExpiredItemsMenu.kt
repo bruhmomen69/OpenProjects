@@ -6,11 +6,12 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.WatchlistRepository
+import bruh.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
 import bruh.auctionhouse.service.OrderService
-import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
@@ -47,7 +48,7 @@ class ConsolidatedExpiredItemsMenu(
         }
 
         if (consolidatedItems.isEmpty()) {
-            player.sendMessage(mm.deserialize("<gray>You have no claimable items to retrieve."))
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_CLAIMABLE_ITEMS))
             // Open the main auction house menu instead
             AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
             return

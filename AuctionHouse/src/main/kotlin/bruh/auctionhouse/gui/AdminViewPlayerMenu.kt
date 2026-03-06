@@ -5,6 +5,7 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
@@ -60,7 +61,9 @@ class AdminViewPlayerMenu(
                                     PlayerStateManager.setAdminTarget(player.uniqueId, offlinePlayer.uniqueId, offlinePlayer.name ?: result.value)
                                     openAuctionsMenu(offlinePlayer.name ?: result.value)
                                 } else {
-                                    player.sendMessage(mm.deserialize("<red>Player not found: ${result.value}"))
+                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_PLAYER_NOT_FOUND) {
+                                        unparsed("player", result.value)
+                                    })
                                 }
                             }
                             is AnvilInputResult.Cancelled -> {}

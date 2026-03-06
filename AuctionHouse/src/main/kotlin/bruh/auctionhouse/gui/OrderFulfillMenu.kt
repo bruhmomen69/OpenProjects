@@ -6,12 +6,13 @@ import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
+import bruh.auctionhouse.translations.AuctionMessages
+import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.translations.OrderMessages
 import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
-import bruh.auctionhouse.translations.GuiMessages
-import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.MenuAPI
@@ -300,7 +301,7 @@ class OrderFulfillMenu(
                             unparsed("have", currentInventoryCount.toString())
                             unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
                         })
-                        player.sendMessage(mm.deserialize("<red>Items may have been moved or dropped since opening this menu."))
+                        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ITEMS_MAY_HAVE_MOVED))
                         return@runBlocking
                     }
 

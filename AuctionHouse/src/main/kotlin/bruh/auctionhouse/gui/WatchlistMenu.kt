@@ -204,7 +204,7 @@ class WatchlistMenu(
                     runBlocking {
                         watchlistRepository.remove(player.uniqueId, auction.id)
                     }
-                    player.sendMessage(mm.deserialize("<yellow>Removed from watchlist."))
+                    player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_REMOVED))
                     open()
                 } else {
                     AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
@@ -236,7 +236,7 @@ class WatchlistMenu(
                         watchlistRepository.remove(player.uniqueId, entry.auctionId)
                     }
                 }
-                player.sendMessage(mm.deserialize("<green>Cleared all watched auctions."))
+                player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_CLEARED))
                 open()
                 ClickResult.CLOSE
             }

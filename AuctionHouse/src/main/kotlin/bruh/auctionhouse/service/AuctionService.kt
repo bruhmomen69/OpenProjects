@@ -114,7 +114,10 @@ class AuctionService(
             if (binPrice < minBin) {
                 return@withContext CreateAuctionResult(
                     false, null, 0.0,
-                    mm.deserialize("<red>BIN price must be at least ${economy.format(BigDecimal.valueOf(minBin))} (${config.auctions.minBinMultiplier}x start price)")
+                    translationAPI.getComponent(AuctionMessages.BIN_PRICE_TOO_LOW) {
+                        unparsed("min", economy.format(BigDecimal.valueOf(minBin)))
+                        unparsed("multiplier", config.auctions.minBinMultiplier.toString())
+                    }
                 )
             }
         }
@@ -142,7 +145,9 @@ class AuctionService(
         if (totalFee > 0 && !economy.has(seller, BigDecimal.valueOf(totalFee))) {
             return@withContext CreateAuctionResult(
                 false, null, 0.0,
-                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(totalFee))} to list this auction.")
+                translationAPI.getComponent(AuctionMessages.INSUFFICIENT_FUNDS_LISTING) {
+                    unparsed("amount", economy.format(BigDecimal.valueOf(totalFee)))
+                }
             )
         }
 
@@ -231,7 +236,7 @@ class AuctionService(
         if (auction.sellerUuid == bidder.uniqueId) {
             return@withContext BidResult(
                 false, false, null,
-                mm.deserialize("<red>You cannot bid on your own auction.")
+                translationAPI.getComponent(AuctionMessages.CANNOT_BID_OWN_AUCTION)
             )
         }
 
@@ -341,14 +346,14 @@ class AuctionService(
         if (auction.sellerUuid == buyer.uniqueId) {
             return@withContext PurchaseResult(
                 false, null,
-                mm.deserialize("<red>You cannot buy your own auction.")
+                translationAPI.getComponent(AuctionMessages.CANNOT_BUY_OWN_AUCTION)
             )
         }
 
         val binPrice = auction.buyNowPrice
             ?: return@withContext PurchaseResult(
                 false, null,
-                mm.deserialize("<red>This auction does not have a buy-it-now price.")
+                translationAPI.getComponent(AuctionMessages.NO_BIN_PRICE)
             )
 
         if (!economy.has(buyer, BigDecimal.valueOf(binPrice))) {
@@ -536,7 +541,7 @@ class AuctionService(
         // Check auction is active
         if (!auction.isActive()) {
             return@withContext ServiceResult.Failure(
-                mm.deserialize("<red>Cannot edit prices on an ended auction.")
+                translationAPI.getComponent(AuctionMessages.CANNOT_EDIT_ENDED)
             )
         }
 
@@ -544,7 +549,7 @@ class AuctionService(
         val highestBid = bidRepository.getHighestBid(auctionId)
         if (highestBid != null) {
             return@withContext ServiceResult.Failure(
-                mm.deserialize("<red>Cannot edit prices after bids have been placed.")
+                translationAPI.getComponent(AuctionMessages.CANNOT_EDIT_BID_PLACED)
             )
         }
 
@@ -573,7 +578,10 @@ class AuctionService(
             val minBin = finalStartPrice * config.auctions.minBinMultiplier
             if (newBuyNowPrice < minBin) {
                 return@withContext ServiceResult.Failure(
-                    mm.deserialize("<red>BIN price must be at least ${economy.format(BigDecimal.valueOf(minBin))} (${config.auctions.minBinMultiplier}x start price)")
+                    translationAPI.getComponent(AuctionMessages.BIN_PRICE_TOO_LOW) {
+                        unparsed("min", economy.format(BigDecimal.valueOf(minBin)))
+                        unparsed("multiplier", config.auctions.minBinMultiplier.toString())
+                    }
                 )
             }
         }
@@ -843,7 +851,9 @@ class AuctionService(
         )
 
         player.sendMessage(
-            mm.deserialize("<yellow>Your inventory was full. $totalRemaining item(s) have been stored in your expired items menu.")
+            translationAPI.getComponentSync(AuctionMessages.INVENTORY_FULL_STORED) {
+                unparsed("count", totalRemaining.toString())
+            }
         )
 
         false // Partial or no success - stored in expired items
@@ -888,7 +898,7 @@ class AuctionService(
         if (!config.auctions.bulkListing.enabled) {
             return@withContext BulkListingResult(
                 false, 0, 0, 0.0,
-                mm.deserialize("<red>Bulk listing is currently disabled.")
+                translationAPI.getComponent(AuctionMessages.BULK_LISTING_DISABLED)
             )
         }
 
@@ -951,7 +961,10 @@ class AuctionService(
             if (binPrice < minBin) {
                 return@withContext BulkListingResult(
                     false, 0, 0, 0.0,
-                    mm.deserialize("<red>BIN price must be at least ${economy.format(BigDecimal.valueOf(minBin))} (${config.auctions.minBinMultiplier}x start price)")
+                    translationAPI.getComponent(AuctionMessages.BIN_PRICE_TOO_LOW) {
+                        unparsed("min", economy.format(BigDecimal.valueOf(minBin)))
+                        unparsed("multiplier", config.auctions.minBinMultiplier.toString())
+                    }
                 )
             }
         }
@@ -978,7 +991,10 @@ class AuctionService(
         if (totalFee > 0 && !economy.has(seller, BigDecimal.valueOf(totalFee))) {
             return@withContext BulkListingResult(
                 false, 0, 0, 0.0,
-                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(totalFee))} to list $quantity auctions.")
+                translationAPI.getComponent(AuctionMessages.INSUFFICIENT_FUNDS_BULK_LISTING) {
+                    unparsed("amount", economy.format(BigDecimal.valueOf(totalFee)))
+                    unparsed("quantity", quantity.toString())
+                }
             )
         }
 
@@ -1076,16 +1092,16 @@ class AuctionService(
 
         val success = auctionsCreated > 0
         val message = when {
-            auctionsFailed == 0 -> translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_CREATED) {
+            auctionsFailed == 0 -> translationAPI.getComponent(AuctionMessages.BULK_LISTING_CREATED) {
                 unparsed("count", auctionsCreated.toString())
                 unparsed("fee", economy.format(BigDecimal.valueOf(feesCharged)))
             }
-            auctionsCreated > 0 -> translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_PARTIAL) {
+            auctionsCreated > 0 -> translationAPI.getComponent(AuctionMessages.BULK_LISTING_PARTIAL) {
                 unparsed("success", auctionsCreated.toString())
                 unparsed("total", quantity.toString())
                 unparsed("failed", auctionsFailed.toString())
             }
-            else -> mm.deserialize("<red>Failed to create any auctions.")
+            else -> translationAPI.getComponent(AuctionMessages.BULK_LISTING_FAILED)
         }
 
         BulkListingResult(

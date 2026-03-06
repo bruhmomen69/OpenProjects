@@ -9,6 +9,7 @@ import bruh.auctionhouse.model.AuctionFilter
 import bruh.auctionhouse.model.AuctionSort
 import bruh.auctionhouse.model.AuctionType
 import bruh.auctionhouse.service.AuctionService
+import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
@@ -579,12 +580,14 @@ class AdvancedSearchMenu(
         // We need to pass the filter to the AuctionHouseMenu
         // For now, we'll just open the main menu and it will use its own filter
         // A better approach would be to have a callback
-        player.sendMessage(mm.deserialize("<green>Applying search with $activeCount filters..."))
+        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.SEARCH_APPLYING) {
+            unparsed("count", activeCount.toString())
+        })
 
         // Open the main auction house with the filter
         // This requires modifying AuctionHouseMenu to accept a filter
         // For now, we'll just show a message
-        player.sendMessage(mm.deserialize("<yellow>Search feature integrated with main menu"))
+        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.SEARCH_FEATURE_INTEGRATED))
 
         // Call parent menu to refresh
         parentMenu()

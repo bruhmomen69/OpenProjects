@@ -198,7 +198,9 @@ class OrderService(
         if (!economy.has(creator, BigDecimal.valueOf(totalRequired))) {
             return@withContext CreateOrderResult(
                 false, null, 0.0,
-                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(totalRequired))} to create this order.")
+                translationAPI.getComponent(OrderMessages.ORDER_INSUFFICIENT_FUNDS) {
+                    unparsed("amount", economy.format(BigDecimal.valueOf(totalRequired)))
+                }
             )
         }
 
@@ -309,7 +311,9 @@ class OrderService(
         if (listingFee > 0 && !economy.has(creator, BigDecimal.valueOf(listingFee))) {
             return@withContext CreateOrderResult(
                 false, null, 0.0,
-                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(listingFee))} to list this order.")
+                translationAPI.getComponent(OrderMessages.ORDER_INSUFFICIENT_FUNDS_LISTING) {
+                    unparsed("amount", economy.format(BigDecimal.valueOf(listingFee)))
+                }
             )
         }
 
@@ -388,7 +392,7 @@ class OrderService(
         if (order.creatorUuid == filler.uniqueId) {
             return@withContext FulfillResult(
                 false, 0, 0.0,
-                mm.deserialize("<red>You cannot fulfill your own order.")
+                translationAPI.getComponent(OrderMessages.ORDER_CANNOT_OWN_ORDER)
             )
         }
 
@@ -405,7 +409,9 @@ class OrderService(
                 }
                 return@withContext FulfillResult(
                     false, 0, 0.0,
-                    mm.deserialize("<red>$reason")
+                    translationAPI.getComponent(OrderMessages.ORDER_ITEM_MISMATCH) {
+                        unparsed("reason", reason)
+                    }
                 )
             }
         }
@@ -417,14 +423,18 @@ class OrderService(
         if (totalQuantity > remaining) {
             return@withContext FulfillResult(
                 false, 0, 0.0,
-                mm.deserialize("<red>You provided too many items. Maximum needed: $remaining")
+                translationAPI.getComponent(OrderMessages.ORDER_TOO_MANY_ITEMS) {
+                    unparsed("max", remaining.toString())
+                }
             )
         }
 
         if (!order.allowPartial && totalQuantity < remaining) {
             return@withContext FulfillResult(
                 false, 0, 0.0,
-                mm.deserialize("<red>This order requires the full quantity ($remaining) at once.")
+                translationAPI.getComponent(OrderMessages.ORDER_REQUIRES_FULL_QUANTITY) {
+                    unparsed("quantity", remaining.toString())
+                }
             )
         }
 
@@ -456,7 +466,7 @@ class OrderService(
                 ) {
                     return@withContext FulfillResult(
                         false, 0, 0.0,
-                        mm.deserialize("<red>The order creator no longer has sufficient funds.")
+                        translationAPI.getComponent(OrderMessages.ORDER_CREATOR_NO_FUNDS)
                     )
                 }
 
@@ -478,7 +488,7 @@ class OrderService(
                             reason = "ORDER_FILL"
                         )
                         creatorPlayer.sendMessage(
-                            mm.deserialize("<green>Your buy order was filled! Items are available in your expired items menu.")
+                            translationAPI.getComponentSync(OrderMessages.ORDER_FILLED_NOTIFICATION)
                         )
                     } else {
                         // Try to give items, store overflow in expired items
@@ -518,7 +528,7 @@ class OrderService(
                 if (!economy.has(filler, BigDecimal.valueOf(fillPrice))) {
                     return@withContext FulfillResult(
                         false, 0, 0.0,
-                        mm.deserialize("<red>You don't have enough money to fulfill this order.")
+                        translationAPI.getComponent(OrderMessages.ORDER_FULFILL_NO_MONEY)
                     )
                 }
 
@@ -845,7 +855,9 @@ class OrderService(
 
         if (totalStored > 0) {
             player.sendMessage(
-                mm.deserialize("<yellow>Your inventory was full. $totalStored item(s) have been stored in your expired items menu.")
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVENTORY_FULL) {
+                    unparsed("count", totalStored.toString())
+                }
             )
         }
     }
