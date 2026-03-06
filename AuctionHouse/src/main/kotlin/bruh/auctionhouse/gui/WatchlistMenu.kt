@@ -4,9 +4,12 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.Auction
+import bruh.auctionhouse.model.Order
+import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
@@ -29,6 +32,7 @@ class WatchlistMenu(
     private val orderService: bruh.auctionhouse.service.OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -38,12 +42,19 @@ class WatchlistMenu(
 ) {
     private val mm = MiniMessage.miniMessage()
     private var currentSort = WatchlistSort.ENDING_SOON
+    private var currentTab = WatchlistTab.AUCTIONS
 
     enum class WatchlistSort {
         ENDING_SOON,
         PRICE_LOW,
         PRICE_HIGH,
         RECENTLY_ADDED
+    }
+
+    enum class WatchlistTab {
+        AUCTIONS,
+        ORDERS,
+        ALL
     }
 
     fun open() {
@@ -53,13 +64,25 @@ class WatchlistMenu(
 
         // Get active auctions for watched items
         val watchedAuctions = mutableListOf<Pair<Auction, Boolean>>()
-        for (entry in watchlistEntries) {
-            val auction = runBlocking { auctionRepository.getById(entry.auctionId) }
+        for (entry in watchlistEntries.filter { it.auctionId != null }) {
+            val auction = runBlocking { auctionRepository.getById(entry.auctionId!!) }
             if (auction != null && auction.isActive()) {
                 watchedAuctions.add(auction to entry.hasNewActivity)
             } else {
                 // Remove expired/cancelled auctions from watchlist
-                runBlocking { watchlistRepository.remove(player.uniqueId, entry.auctionId) }
+                runBlocking { watchlistRepository.remove(player.uniqueId, entry.auctionId!!) }
+            }
+        }
+
+        // Get active orders for watched items
+        val watchedOrders = mutableListOf<Pair<Order, Boolean>>()
+        for (entry in watchlistEntries.filter { it.orderId != null }) {
+            val order = runBlocking { orderRepository.getById(entry.orderId!!) }
+            if (order != null && order.isActive()) {
+                watchedOrders.add(order to entry.hasNewActivity)
+            } else {
+                // Remove expired/cancelled orders from watchlist
+                runBlocking { watchlistRepository.removeOrder(player.uniqueId, entry.orderId!!) }
             }
         }
 
@@ -78,26 +101,59 @@ class WatchlistMenu(
             }
         }
 
+        // Sort the watched orders based on current sort order
+        val sortedOrders = when (currentSort) {
+            WatchlistSort.ENDING_SOON -> watchedOrders.sortedBy { it.first.expiresAt }
+            WatchlistSort.PRICE_LOW -> watchedOrders.sortedBy { it.first.pricePerUnit }
+            WatchlistSort.PRICE_HIGH -> watchedOrders.sortedByDescending { it.first.pricePerUnit }
+            WatchlistSort.RECENTLY_ADDED -> watchedOrders.sortedByDescending {
+                watchlistEntries.find { entry -> entry.orderId == it.first.id }?.addedAt
+                    ?: java.time.Instant.MIN
+            }
+        }
+
+        val totalCount = when (currentTab) {
+            WatchlistTab.AUCTIONS -> watchedAuctions.size
+            WatchlistTab.ORDERS -> watchedOrders.size
+            WatchlistTab.ALL -> watchedAuctions.size + watchedOrders.size
+        }
+
         val menu = menuAPI.simple {
             rows = 6
-            title = mm.deserialize("<yellow>My Watchlist <gray>(${watchedAuctions.size})")
+            title = mm.deserialize("<yellow>My Watchlist <gray>($totalCount)")
 
             background = MenuUtils.backgroundItem()
 
+            // Tab buttons
+            item(3, createTabButton(WatchlistTab.ALL, watchedAuctions.size + watchedOrders.size))
+            item(4, createTabButton(WatchlistTab.AUCTIONS, watchedAuctions.size))
+            item(5, createTabButton(WatchlistTab.ORDERS, watchedOrders.size))
+
             // Clear All button (top right)
-            item(8, createClearAllButton(watchedAuctions.size))
+            item(8, createClearAllButton(watchedAuctions.size + watchedOrders.size))
+
+            var slotIndex = 0
+            val startSlot = 9
 
             // Display watched auctions
-            sortedAuctions.forEachIndexed { index, (auction, hasActivity) ->
-                if (index < 42) { // Max 42 items (rows 1-4)
-                    val slot = when {
-                        index < 9 -> 9 + index
-                        index < 18 -> 18 + (index - 9)
-                        index < 27 -> 27 + (index - 18)
-                        index < 36 -> 36 + (index - 27)
-                        else -> 45 + (index - 36)
+            if (currentTab == WatchlistTab.AUCTIONS || currentTab == WatchlistTab.ALL) {
+                sortedAuctions.forEachIndexed { index, (auction, hasActivity) ->
+                    if (slotIndex < 36) {
+                        val slot = startSlot + slotIndex
+                        item(slot, createWatchedAuctionItem(auction, hasActivity))
+                        slotIndex++
                     }
-                    item(slot, createWatchedAuctionItem(auction, hasActivity))
+                }
+            }
+
+            // Display watched orders
+            if (currentTab == WatchlistTab.ORDERS || currentTab == WatchlistTab.ALL) {
+                sortedOrders.forEachIndexed { index, (order, hasActivity) ->
+                    if (slotIndex < 36) {
+                        val slot = startSlot + slotIndex
+                        item(slot, createWatchedOrderItem(order, hasActivity))
+                        slotIndex++
+                    }
                 }
             }
 
@@ -107,7 +163,7 @@ class WatchlistMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -122,21 +178,100 @@ class WatchlistMenu(
             item(53, closeItem)
 
             // Empty state
-            if (watchedAuctions.isEmpty()) {
+            if (watchedAuctions.isEmpty() && watchedOrders.isEmpty()) {
                 item(22, VItem(XMaterial.BARRIER) {
-                    name = mm.deserialize("<red>No Watched Auctions")
+                    name = mm.deserialize("<red>No Watched Items")
                     lore = mutableListOf(
                         mm.deserialize("<gray>You haven't added any"),
-                        mm.deserialize("<gray>auctions to your watchlist."),
+                        mm.deserialize("<gray>auctions or orders to your watchlist."),
                         Component.empty(),
-                        mm.deserialize("<green>Click an auction's heart icon"),
-                        mm.deserialize("<green>to add it to your watchlist!")
+                        mm.deserialize("<green>Click the heart icon"),
+                        mm.deserialize("<green>to add items to your watchlist!")
                     )
                 })
             }
         }
 
         menuAPI.open(menu, player)
+    }
+
+    private fun createTabButton(tab: WatchlistTab, count: Int): VItem {
+        val isSelected = currentTab == tab
+        val (name, material) = when (tab) {
+            WatchlistTab.ALL -> "All" to XMaterial.CHEST
+            WatchlistTab.AUCTIONS -> "Auctions" to XMaterial.GOLD_INGOT
+            WatchlistTab.ORDERS -> "Orders" to XMaterial.DIAMOND
+        }
+
+        return VItem(material) {
+            this.name = mm.deserialize("${if (isSelected) "<green>" else "<gray>"}$name <white>($count)")
+            hideAllFlags()
+
+            onClick { _, _ ->
+                currentTab = tab
+                open()
+                ClickResult.ALLOW
+            }
+        }
+    }
+
+    private fun createWatchedOrderItem(order: Order, hasNewActivity: Boolean): VItem {
+        val material = XMaterial.matchXMaterial(order.itemMaterial.name).orElse(XMaterial.STONE)
+        val isBuyOrder = order.orderType == OrderType.BUY_ORDER
+
+        return VItem(material) {
+            name = order.itemDisplayName?.let {
+                mm.deserialize(it)
+            } ?: Component.text(order.itemMaterial.name.replace("_", " "))
+
+            val loreList = mutableListOf<Component>()
+
+            // Activity indicator
+            if (hasNewActivity) {
+                loreList.add(mm.deserialize("<red>⚠ New Activity!"))
+                loreList.add(Component.empty())
+            }
+
+            // Order type badge
+            loreList.add(translationAPI.getComponentSync(
+                if (isBuyOrder) GuiMessages.ORDER_TYPE_BUY else GuiMessages.ORDER_TYPE_SELL
+            ))
+
+            // Quantity info
+            loreList.add(mm.deserialize("<yellow>Quantity: <white>${order.quantityFilled}/${order.quantityRequested}"))
+
+            // Price per unit
+            loreList.add(mm.deserialize("<yellow>Price: <gold>${MenuUtils.formatPrice(order.pricePerUnit, economy)}/each"))
+
+            // Time remaining
+            val timeLeft = MenuUtils.formatTimeRemaining(order.expiresAt)
+            val timeColor = when {
+                order.expiresAt.isBefore(java.time.Instant.now().plus(java.time.Duration.ofHours(1))) -> "<red>"
+                order.expiresAt.isBefore(java.time.Instant.now().plus(java.time.Duration.ofDays(1))) -> "<yellow>"
+                else -> "<green>"
+            }
+            loreList.add(mm.deserialize("<gray>Time Left: ${timeColor}${timeLeft}"))
+
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to fulfill"))
+            loreList.add(mm.deserialize("<red>Right-click to remove from watchlist"))
+
+            lore = loreList
+            hideAllFlags()
+
+            onClick { click, _ ->
+                if (click.isRightClick) {
+                    runBlocking {
+                        watchlistRepository.removeOrder(player.uniqueId, order.id)
+                    }
+                    player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_REMOVED))
+                    open()
+                } else {
+                    OrderFulfillMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, order).open()
+                }
+                ClickResult.CLOSE
+            }
+        }
     }
 
     private fun createWatchedAuctionItem(auction: Auction, hasNewActivity: Boolean): VItem {
@@ -207,7 +342,7 @@ class WatchlistMenu(
                     player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_REMOVED))
                     open()
                 } else {
-                    AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
+                    AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
                 }
                 ClickResult.CLOSE
             }
@@ -218,7 +353,7 @@ class WatchlistMenu(
         return VItem(XMaterial.BARRIER) {
             name = mm.deserialize("<red>Clear All")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Remove all auctions from"))
+            loreList.add(mm.deserialize("<gray>Remove all items from"))
             loreList.add(mm.deserialize("<gray>your watchlist"))
             loreList.add(Component.empty())
             loreList.add(mm.deserialize("<gray>Currently watching: <white>$count"))
@@ -233,7 +368,11 @@ class WatchlistMenu(
                 }
                 watchlistEntries.forEach { entry ->
                     runBlocking {
-                        watchlistRepository.remove(player.uniqueId, entry.auctionId)
+                        if (entry.auctionId != null) {
+                            watchlistRepository.remove(player.uniqueId, entry.auctionId)
+                        } else if (entry.orderId != null) {
+                            watchlistRepository.removeOrder(player.uniqueId, entry.orderId)
+                        }
                     }
                 }
                 player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_CLEARED))

@@ -219,7 +219,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         // Step 9: Register commands
         val lamp = BukkitLamp.builder(this).build()
         lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI, economy))
-        lamp.register(OrderCommands(this, config, orderService, translations, menuAPI))
+        lamp.register(OrderCommands(this, config, orderService, auctionService, translations, menuAPI, economy))
         lamp.register(AuctionAdminCommands(this, config, auctionService, auctionRepository, transactionRepository, economy, translations, menuAPI))
         slF4JLogger.info("Commands registered")
 

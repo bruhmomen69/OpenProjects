@@ -45,5 +45,10 @@ enum class OrderMessages(
     ORDER_FILLED_NOTIFICATION("order_filled_notification", "<green>Your buy order was filled! Items are available in your expired items menu."),
     ORDER_FULFILL_NO_MONEY("order_fulfill_no_money", "<red>You don't have enough money to fulfill this order."),
     ORDER_INVENTORY_FULL("order_inventory_full", "<red>Your inventory was full. <count> item(s) have been stored in your expired items."),
-    ORDER_MUST_HOLD_ITEM("order_must_hold_item", "<red>You must hold an item to create a sell order.")
+    ORDER_MUST_HOLD_ITEM("order_must_hold_item", "<red>You must hold an item to create a sell order."),
+    ORDER_CANNOT_EDIT_PARTIAL("order_cannot_edit_partial", "<red>Cannot edit price on orders that have been partially filled."),
+    ORDER_PRICE_UPDATED("order_price_updated", "<green>Order price updated to <gold><price></gold> per unit."),
+    ORDER_QUICK_SELL_NO_ORDER("order_quick_sell_no_order", "<red>No buy order found for that material."),
+    ORDER_QUICK_SELL_CONFIRM("order_quick_sell_confirm", "<yellow>Sell <white><quantity> <material></white> for <gold><price></gold> to <white><buyer></white>?"),
+    ORDER_QUICK_SELL_SUCCESS("order_quick_sell_success", "<green>Sold <quantity> <material> for <gold><price></gold>!")
 }

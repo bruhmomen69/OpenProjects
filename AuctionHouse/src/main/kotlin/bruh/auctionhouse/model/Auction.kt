@@ -59,23 +59,13 @@ data class Auction(
     val extensionCount: Int = 0,
     val manualExtensionCount: Int = 0
 ) {
-    /**
-     * Checks if the auction is currently active.
-     */
+    val shortId: String get() = id.toString().take(8)
+    
     fun isActive(): Boolean = status == AuctionStatus.ACTIVE
     
-    /**
-     * Checks if the auction has ended (either by status or time).
-     */
     fun hasEnded(): Boolean = status != AuctionStatus.ACTIVE || Instant.now().isAfter(endsAt)
     
-    /**
-     * Checks if bidding is allowed on this auction.
-     */
     fun canBid(): Boolean = isActive() && (auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH)
     
-    /**
-     * Checks if BIN purchase is allowed on this auction.
-     */
     fun canBuyNow(): Boolean = isActive() && (auctionType == AuctionType.BIN || auctionType == AuctionType.BOTH) && buyNowPrice != null
 }

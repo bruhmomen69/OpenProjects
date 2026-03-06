@@ -2,9 +2,16 @@ package bruh.auctionhouse.commands
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.AuctionRepository
+import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
+import bruh.auctionhouse.database.WatchlistRepository
+import bruh.auctionhouse.gui.MyOrdersMenu
 import bruh.auctionhouse.gui.OrderBrowserMenu
+import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.economy.EconomyProvider
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import org.bukkit.Material
@@ -17,22 +24,21 @@ import revxrsal.commands.bukkit.annotation.CommandPermission
 import java.time.Duration
 import java.util.UUID
 
-/**
- * Order commands (/order, /orders).
- * Provides commands for managing buy and sell orders.
- */
 @Command("order", "orders")
 class OrderCommands(
     private val plugin: AuctionHousePlugin,
     private val config: AuctionHouseConfig,
     private val orderService: OrderService,
+    private val auctionService: AuctionService,
     private val translationAPI: TranslationAPI,
-    private val menuAPI: MenuAPI
+    private val menuAPI: MenuAPI,
+    private val economy: EconomyProvider
 ) {
+    private val auctionRepository = AuctionRepository(plugin.database)
+    private val bidRepository = BidRepository(plugin.database)
+    private val orderRepository = OrderRepository(plugin.database)
+    private val watchlistRepository = WatchlistRepository(plugin.database)
 
-    /**
-     * List orders - opens the order browser menu.
-     */
     @Subcommand("list")
     @CommandPermission("order.list")
     fun list(player: Player) {
@@ -40,14 +46,9 @@ class OrderCommands(
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
             return
         }
-        // Note: OrderBrowserMenu requires additional dependencies that would need to be injected
-        // For now, we show a message that orders are listed
-        player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_CREATED))
+        OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
     }
 
-    /**
-     * Create a buy order.
-     */
     @Subcommand("buy")
     @CommandPermission("order.buy")
     suspend fun createBuyOrder(
@@ -72,9 +73,6 @@ class OrderCommands(
         player.sendMessage(result.message)
     }
 
-    /**
-     * Create a sell order from held item.
-     */
     @Subcommand("sell")
     @CommandPermission("order.sell")
     suspend fun createSellOrder(
@@ -94,7 +92,6 @@ class OrderCommands(
             return
         }
 
-        // If quantity specified, modify the item amount
         val itemToSell = if (quantity != null && quantity > 0 && quantity <= item.amount) {
             item.clone().apply { amount = quantity }
         } else {
@@ -113,23 +110,32 @@ class OrderCommands(
         player.sendMessage(result.message)
     }
 
-    /**
-     * Cancel an order.
-     */
     @Subcommand("cancel")
     @CommandPermission("order.cancel")
     suspend fun cancel(
         player: Player,
         @Named("orderId") orderId: String
     ) {
-        val uuid = try {
-            UUID.fromString(orderId)
-        } catch (e: IllegalArgumentException) {
+        val order = run {
+            val byFullUuid = try {
+                orderService.getOrder(UUID.fromString(orderId))
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+            
+            if (byFullUuid != null) {
+                byFullUuid
+            } else {
+                orderService.findOrderByShortId(orderId)
+            }
+        }
+        
+        if (order == null) {
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_FOUND))
             return
         }
 
-        val result = orderService.cancelOrder(player, uuid)
+        val result = orderService.cancelOrder(player, order.id)
         player.sendMessage(
             when (result) {
                 is bruh.auctionhouse.service.ServiceResult.Success ->
@@ -140,9 +146,6 @@ class OrderCommands(
         )
     }
 
-    /**
-     * Open fulfill menu for an order.
-     */
     @Subcommand("fulfill")
     @CommandPermission("order.fulfill")
     fun fulfill(
@@ -161,16 +164,11 @@ class OrderCommands(
             return
         }
 
-        // Note: OrderFulfillMenu requires Order object, not UUID
-        // For now, we show a message that fulfillment is handled via GUI
         player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_FULFILLED) {
             unparsed("amount", "0")
         })
     }
 
-    /**
-     * View player's orders.
-     */
     @Subcommand("myorders")
     @CommandPermission("order.myorders")
     fun myOrders(player: Player) {
@@ -178,7 +176,6 @@ class OrderCommands(
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
             return
         }
-        // Note: Would need a MyOrdersMenu similar to MyAuctionsMenu
-        player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_CREATED))
+        MyOrdersMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
     }
 }

@@ -716,19 +716,81 @@ class OrderService(
     suspend fun getPlayerOrders(playerId: UUID, status: OrderStatus?): List<Order> =
         orderRepository.getPlayerOrders(playerId, status)
 
-    /**
-     * Gets an order by ID.
-     *
-     * @param orderId The order UUID
-     * @return The order, or null if not found
-     */
     suspend fun getOrder(orderId: UUID): Order? =
         orderRepository.getById(orderId)
 
-    /**
-     * Processes expired orders.
-     * Handles refunds and item returns for expired orders.
-     */
+    suspend fun findOrderByShortId(shortId: String): Order? =
+        orderRepository.findByShortId(shortId)
+
+    suspend fun findBestBuyOrderForMaterial(material: Material): Order? =
+        orderRepository.findBestBuyOrderForMaterial(material)
+
+    suspend fun editOrderPrice(player: Player, orderId: UUID, newPricePerUnit: Double): ServiceResult<Order> = withContext(Dispatchers.IO) {
+        val order = orderRepository.getById(orderId)
+            ?: return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_NOT_FOUND)
+            )
+
+        if (order.creatorUuid != player.uniqueId) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_NOT_OWNER)
+            )
+        }
+
+        if (!order.isActive()) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_ALREADY_FILLED)
+            )
+        }
+
+        if (order.quantityFilled > 0) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_CANNOT_EDIT_PARTIAL)
+            )
+        }
+
+        if (newPricePerUnit < config.orders.minPricePerUnit || newPricePerUnit > config.orders.maxPricePerUnit) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(config.orders.minPricePerUnit)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
+            )
+        }
+
+        val oldPricePerUnit = order.pricePerUnit
+        val oldTotalPrice = order.totalPrice
+        val newTotalPrice = order.quantityRequested * newPricePerUnit
+
+        when (order.orderType) {
+            OrderType.BUY_ORDER -> {
+                val priceDifference = newTotalPrice - oldTotalPrice
+                if (priceDifference > 0) {
+                    if (!economy.has(player, BigDecimal.valueOf(priceDifference))) {
+                        return@withContext ServiceResult.Failure(
+                            translationAPI.getComponentSync(OrderMessages.ORDER_INSUFFICIENT_FUNDS) {
+                                unparsed("amount", economy.format(BigDecimal.valueOf(priceDifference)))
+                            }
+                        )
+                    }
+                    economy.withdraw(player, BigDecimal.valueOf(priceDifference))
+                } else if (priceDifference < 0) {
+                    economy.deposit(player, BigDecimal.valueOf(-priceDifference))
+                }
+            }
+            OrderType.SELL_ORDER -> {}
+        }
+
+        orderRepository.updatePrice(orderId, newPricePerUnit, newTotalPrice)
+
+        val updatedOrder = order.copy(
+            pricePerUnit = newPricePerUnit,
+            totalPrice = newTotalPrice
+        )
+
+        ServiceResult.Success(updatedOrder)
+    }
+
     suspend fun processExpiredOrders() = withContext(Dispatchers.IO) {
         val expiredOrders = orderRepository.getExpiredOrders()
 

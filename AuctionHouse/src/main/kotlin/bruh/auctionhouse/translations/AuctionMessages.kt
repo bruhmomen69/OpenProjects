@@ -29,6 +29,7 @@ enum class AuctionMessages(
     BID_OUTBID("bid_outbid", "<red>You have been outbid on <gold><item></gold>! New bid: <gold><amount></gold>."),
     BID_NO_BALANCE("bid_no_balance", "<red>You don't have enough money for this bid."),
     BID_CANNOT_ON_BIN("bid_cannot_on_bin", "<red>This is a BIN-only auction. Use /ah buy."),
+    BID_NOW_HIGHEST("bid_now_highest", "<green>You are now the highest bidder on <gold><item></gold> with a bid of <gold><amount></gold>!"),
     
     // BIN
     BIN_PURCHASED("bin_purchased", "<green>Purchased <gold><item></gold> for <gold><price></gold>!"),

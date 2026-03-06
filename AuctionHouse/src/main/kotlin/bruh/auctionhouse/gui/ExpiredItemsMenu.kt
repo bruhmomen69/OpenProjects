@@ -8,6 +8,7 @@ import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.ExpiredItem
 import bruh.auctionhouse.service.AuctionService
@@ -36,6 +37,7 @@ class ExpiredItemsMenu(
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
     private val expiredItemRepository: ExpiredItemRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -79,7 +81,7 @@ class ExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }

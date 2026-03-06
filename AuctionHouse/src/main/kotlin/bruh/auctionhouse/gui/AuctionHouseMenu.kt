@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.Auction
@@ -39,6 +40,7 @@ class AuctionHouseMenu(
     private val orderService: bruh.auctionhouse.service.OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -108,12 +110,11 @@ class AuctionHouseMenu(
                 }
             }
 
-            // Static control items
             staticItems[45] = createWatchlistButton()
             staticItems[46] = createFilterButton()
             staticItems[47] = createQuickSortButton()
             staticItems[48] = createSearchButton()
-            staticItems[49] = createBulkListButton()
+            staticItems[49] = createQuickSellButton()
             staticItems[50] = createMyAuctionsButton()
             staticItems[51] = createTransactionHistoryButton()
             staticItems[52] = createOrdersButton()
@@ -128,12 +129,13 @@ class AuctionHouseMenu(
 
         val loreList = mutableListOf<Component>()
 
-        // Seller
+        loreList.add(mm.deserialize("<gray>ID: <white>${auction.shortId}"))
+        loreList.add(Component.empty())
+
         loreList.add(translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_SELLER) {
             unparsed("seller", if (auction.isAnonymous) "Anonymous" else auction.sellerName)
         })
 
-        // Show ended status if auction has ended
         if (hasEnded) {
             loreList.add(mm.deserialize("<red>⚠ Auction Ended"))
         }
@@ -191,7 +193,7 @@ class AuctionHouseMenu(
 
             onClick { _, _ ->
                 // Handle click - open auction details
-                AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
+                AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
                 ClickResult.CLOSE
             }
         }
@@ -321,7 +323,7 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }
@@ -345,7 +347,7 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }
@@ -382,7 +384,7 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                WatchlistMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                WatchlistMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                 ClickResult.CLOSE
             }
         }
@@ -424,6 +426,43 @@ class AuctionHouseMenu(
             onClick { _, _ ->
                 TransactionHistoryMenu(menuAPI, plugin.transactionRepository, config, translationAPI, plugin, player).open()
                 ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun createQuickSellButton(): VItem {
+        val heldItem = player.inventory.itemInMainHand
+        val hasHeldItem = !heldItem.type.isAir
+
+        return VItem(if (hasHeldItem) XMaterial.EMERALD else XMaterial.GRAY_DYE) {
+            name = mm.deserialize("<green>Quick Sell")
+            val loreList = mutableListOf<Component>()
+            
+            if (hasHeldItem) {
+                loreList.add(mm.deserialize("<gray>Sell your held item to the"))
+                loreList.add(mm.deserialize("<gray>highest buy order instantly!"))
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<yellow>Item: <white>${heldItem.type.name.replace("_", " ")}"))
+                loreList.add(mm.deserialize("<yellow>Amount: <white>${heldItem.amount}"))
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<green>Click to quick sell"))
+            } else {
+                loreList.add(mm.deserialize("<gray>Sell items to buy orders"))
+                loreList.add(mm.deserialize("<gray>for instant payment!"))
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<red>Hold an item to quick sell"))
+            }
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                if (!hasHeldItem) {
+                    player.sendMessage(mm.deserialize("<red>Hold an item to use Quick Sell!"))
+                    ClickResult.CLOSE
+                } else {
+                    QuickSellMenu(menuAPI, orderService, config, translationAPI, plugin, economy, player, heldItem).open()
+                    ClickResult.CLOSE
+                }
             }
         }
     }

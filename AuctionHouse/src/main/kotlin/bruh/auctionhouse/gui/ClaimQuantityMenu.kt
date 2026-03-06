@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
@@ -31,6 +32,7 @@ class ClaimQuantityMenu(
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -196,7 +198,7 @@ class ClaimQuantityMenu(
                     // Return to consolidated expired items menu
                     if (result.success) {
                         ConsolidatedExpiredItemsMenu(
-                            menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config,
+                            menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config,
                             translationAPI, plugin, economy, player
                         ).open()
                     }
@@ -216,7 +218,7 @@ class ClaimQuantityMenu(
             onClick { _, _ ->
                 // Return to consolidated expired items menu
                 ConsolidatedExpiredItemsMenu(
-                    menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config,
+                    menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config,
                     translationAPI, plugin, economy, player
                 ).open()
                 ClickResult.CLOSE

@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
@@ -31,6 +32,7 @@ class MyAuctionsMenu(
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -69,7 +71,7 @@ class MyAuctionsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -83,6 +85,8 @@ class MyAuctionsMenu(
         val material = XMaterial.matchXMaterial(auction.itemMaterial).orElse(XMaterial.STONE)
 
         val loreList = mutableListOf<Component>()
+        loreList.add(mm.deserialize("<gray>ID: <white>${auction.shortId}"))
+        loreList.add(Component.empty())
         loreList.add(mm.deserialize("<gray>Status: ${getStatusColor(auction.status)}${auction.status}"))
 
         if (auction.status == AuctionStatus.ACTIVE) {

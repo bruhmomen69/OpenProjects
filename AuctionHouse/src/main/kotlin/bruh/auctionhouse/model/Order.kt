@@ -53,23 +53,13 @@ data class Order(
     val allowPartial: Boolean = true,
     val minFillQuantity: Int? = null
 ) {
-    /**
-     * Checks if the order is currently active (pending or partial).
-     */
+    val shortId: String get() = id.toString().take(8)
+    
     fun isActive(): Boolean = status == OrderStatus.PENDING || status == OrderStatus.PARTIAL
     
-    /**
-     * Gets the remaining quantity to be filled.
-     */
     fun remainingQuantity(): Int = quantityRequested - quantityFilled
     
-    /**
-     * Gets the total value of the order.
-     */
     fun totalValue(): Double = quantityRequested * pricePerUnit
     
-    /**
-     * Gets the remaining value of unfilled quantity.
-     */
     fun remainingValue(): Double = remainingQuantity() * pricePerUnit
 }

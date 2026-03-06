@@ -4,19 +4,23 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Represents a watched auction by a player.
+ * Represents a watched auction or order by a player.
  *
  * @property id Unique identifier for the watchlist entry
- * @property playerUuid UUID of the player watching the auction
- * @property auctionId UUID of the auction being watched
- * @property addedAt When the auction was added to watchlist
- * @property lastNotifiedAt Last time a notification was sent for this auction
+ * @property playerUuid UUID of the player watching the auction/order
+ * @property auctionId UUID of the auction being watched (null if watching an order)
+ * @property orderId UUID of the order being watched (null if watching an auction)
+ * @property orderType Type of order (BUY_ORDER or SELL_ORDER, null for auctions)
+ * @property addedAt When the item was added to watchlist
+ * @property lastNotifiedAt Last time a notification was sent for this item
  * @property hasNewActivity Whether there's new activity since last view
  */
 data class WatchlistEntry(
     val id: Long = 0,
     val playerUuid: UUID,
-    val auctionId: UUID,
+    val auctionId: UUID? = null,
+    val orderId: UUID? = null,
+    val orderType: OrderType? = null,
     val addedAt: Instant = Instant.now(),
     val lastNotifiedAt: Instant? = null,
     val hasNewActivity: Boolean = false

@@ -96,9 +96,15 @@ object PlayerStateManager {
         setState(playerId, currentState.withPage(page))
     }
 
-    /**
-     * Gets the watchlist sort preference for a player.
-     */
+    fun getOrderFilter(playerId: UUID): bruh.auctionhouse.model.OrderFilter {
+        return getState(playerId).orderFilter
+    }
+
+    fun setOrderFilter(playerId: UUID, filter: bruh.auctionhouse.model.OrderFilter) {
+        val currentState = getState(playerId)
+        setState(playerId, currentState.withOrderFilter(filter))
+    }
+
     fun getWatchlistSort(playerId: UUID): PlayerState.WatchlistSort {
         return getState(playerId).watchlistSort
     }

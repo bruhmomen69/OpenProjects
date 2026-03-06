@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
@@ -33,6 +34,7 @@ class ConsolidatedExpiredItemsMenu(
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -50,7 +52,7 @@ class ConsolidatedExpiredItemsMenu(
         if (consolidatedItems.isEmpty()) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_CLAIMABLE_ITEMS))
             // Open the main auction house menu instead
-            AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+            AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
             return
         }
 
@@ -78,14 +80,78 @@ class ConsolidatedExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
             staticItems[49] = backItem
+
+            // Claim All button
+            staticItems[45] = createClaimAllButton(consolidatedItems)
         }
 
         menuAPI.open(menu, player)
+    }
+
+    private fun createClaimAllButton(items: List<ConsolidatedExpiredItem>): VItem {
+        val totalItems = items.sumOf { it.remainingQuantity() }
+        
+        return VItem(XMaterial.CHEST) {
+            name = mm.deserialize("<green>Claim All Items")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>Total items: <white>$totalItems"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<yellow>Click to claim all items"))
+            loreList.add(mm.deserialize("<gray>Items that don't fit will remain."))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                runBlocking {
+                    claimAllItems(items)
+                }
+                ClickResult.CLOSE
+            }
+        }
+    }
+
+    private suspend fun claimAllItems(items: List<ConsolidatedExpiredItem>) {
+        if (items.isEmpty()) {
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_CLAIMABLE_ITEMS))
+            return
+        }
+
+        var totalClaimed = 0
+        var totalRemaining = 0
+        val itemsToRefresh = mutableListOf<ConsolidatedExpiredItem>()
+
+        for (item in items) {
+            if (item.remainingQuantity() <= 0) continue
+            
+            val result = consolidatedService.claimItems(player, item, item.remainingQuantity())
+            if (result.success) {
+                totalClaimed += result.claimedQuantity
+                if (result.claimedQuantity < item.remainingQuantity()) {
+                    totalRemaining += (item.remainingQuantity() - result.claimedQuantity)
+                }
+            } else {
+                totalRemaining += item.remainingQuantity()
+            }
+            
+            itemsToRefresh.add(item)
+        }
+
+        // Send summary message
+        if (totalClaimed > 0 && totalRemaining > 0) {
+            player.sendMessage(mm.deserialize("<green>Claimed <white>$totalClaimed <green>items. <yellow>$totalRemaining <yellow>items remaining (inventory full)."))
+        } else if (totalClaimed > 0) {
+            player.sendMessage(mm.deserialize("<green>Claimed <white>$totalClaimed <green>items."))
+        } else if (totalRemaining > 0) {
+            player.sendMessage(mm.deserialize("<red>Inventory full! <yellow>$totalRemaining <yellow>items remaining."))
+        }
+
+        // Refresh the menu
+        open()
     }
 
     private fun createConsolidatedItemDisplay(item: ConsolidatedExpiredItem): VItem {
@@ -130,6 +196,7 @@ class ConsolidatedExpiredItemsMenu(
             orderService = orderService,
             auctionRepository = auctionRepository,
             bidRepository = bidRepository,
+            orderRepository = orderRepository,
             watchlistRepository = watchlistRepository,
             config = config,
             translationAPI = translationAPI,

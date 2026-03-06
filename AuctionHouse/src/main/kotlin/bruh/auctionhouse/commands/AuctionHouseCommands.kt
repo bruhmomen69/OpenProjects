@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.gui.AuctionCreateMenu
 import bruh.auctionhouse.gui.AuctionHouseMenu
@@ -44,6 +45,7 @@ class AuctionHouseCommands(
 ) {
     private val auctionRepository = AuctionRepository(plugin.database)
     private val bidRepository = BidRepository(plugin.database)
+    private val orderRepository = OrderRepository(plugin.database)
     private val watchlistRepository = WatchlistRepository(plugin.database)
 
     /**
@@ -55,7 +57,7 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+        AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
     }
 
     /**
@@ -99,9 +101,6 @@ class AuctionHouseCommands(
         }
     }
 
-    /**
-     * Places a bid on an auction.
-     */
     @Subcommand("bid")
     @CommandPermission("auctionhouse.bid")
     suspend fun bid(
@@ -114,20 +113,21 @@ class AuctionHouseCommands(
             return
         }
 
-        val uuid = try {
-            UUID.fromString(auctionId)
+        val auction = try {
+            auctionService.getAuction(UUID.fromString(auctionId))
         } catch (e: IllegalArgumentException) {
+            auctionService.findAuctionByShortId(auctionId)
+        }
+
+        if (auction == null) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.AUCTION_NOT_FOUND))
             return
         }
 
-        val result = auctionService.placeBid(player, uuid, amount)
+        val result = auctionService.placeBid(player, auction.id, amount)
         player.sendMessage(result.message)
     }
 
-    /**
-     * Buy an auction using Buy-It-Now.
-     */
     @Subcommand("buy")
     @CommandPermission("auctionhouse.buy")
     suspend fun buy(
@@ -139,34 +139,39 @@ class AuctionHouseCommands(
             return
         }
 
-        val uuid = try {
-            UUID.fromString(auctionId)
+        val auction = try {
+            auctionService.getAuction(UUID.fromString(auctionId))
         } catch (e: IllegalArgumentException) {
+            auctionService.findAuctionByShortId(auctionId)
+        }
+
+        if (auction == null) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.AUCTION_NOT_FOUND))
             return
         }
 
-        val result = auctionService.buyNow(player, uuid)
+        val result = auctionService.buyNow(player, auction.id)
         player.sendMessage(result.message)
     }
 
-    /**
-     * Cancel an auction.
-     */
     @Subcommand("cancel")
     @CommandPermission("auctionhouse.cancel")
     suspend fun cancel(
         player: Player,
         @Named("auctionId") auctionId: String
     ) {
-        val uuid = try {
-            UUID.fromString(auctionId)
+        val auction = try {
+            auctionService.getAuction(UUID.fromString(auctionId))
         } catch (e: IllegalArgumentException) {
+            auctionService.findAuctionByShortId(auctionId)
+        }
+
+        if (auction == null) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.AUCTION_NOT_FOUND))
             return
         }
 
-        val result = auctionService.cancelAuction(player, uuid)
+        val result = auctionService.cancelAuction(player, auction.id)
         player.sendMessage(
             when (result) {
                 is bruh.auctionhouse.service.ServiceResult.Success ->
@@ -189,7 +194,7 @@ class AuctionHouseCommands(
             return
         }
         ConsolidatedExpiredItemsMenu(
-            menuAPI, consolidatedExpiredItemService, auctionService, orderService, auctionRepository, bidRepository,
+            menuAPI, consolidatedExpiredItemService, auctionService, orderService, auctionRepository, bidRepository, orderRepository,
             watchlistRepository, config, translationAPI, plugin, economy, player
         ).open()
     }
@@ -200,7 +205,7 @@ class AuctionHouseCommands(
     @Subcommand("myauctions")
     @CommandPermission("auctionhouse.myauctions")
     fun myAuctions(player: Player) {
-        MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+        MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
     }
 
     /**

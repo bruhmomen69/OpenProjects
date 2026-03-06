@@ -579,9 +579,10 @@ class OrderCreateMenu(
                     return@runBlocking
                 }
 
+                val itemForOrder = itemInHand.clone().apply { amount = state.totalQuantity }
                 orderService.createSellOrder(
                     creator = player,
-                    item = itemInHand.clone(),
+                    item = itemForOrder,
                     pricePerUnit = state.pricePerUnit,
                     duration = state.duration
                 )

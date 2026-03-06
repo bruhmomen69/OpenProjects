@@ -5,6 +5,7 @@ import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionType
@@ -36,6 +37,7 @@ class AuctionDetailsMenu(
     private val orderService: bruh.auctionhouse.service.OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -47,14 +49,13 @@ class AuctionDetailsMenu(
     private val mm = MiniMessage.miniMessage()
 
     fun open() {
-        // Increment view count
         runBlocking {
             auctionRepository.incrementViewCount(auction.id)
         }
 
         val menu = menuAPI.simple {
             rows = 5
-            title = translationAPI.getComponentSync(GuiMessages.MAIN_TITLE)
+            title = mm.deserialize("<yellow>Auction ${auction.shortId}")
 
             background = MenuUtils.backgroundItem()
 
@@ -97,7 +98,7 @@ class AuctionDetailsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -215,7 +216,6 @@ class AuctionDetailsMenu(
 
     private fun withdrawBid(bid: bruh.auctionhouse.model.Bid) {
         runBlocking {
-            // Check bid withdrawal cutoff
             val cutoffMinutes = config.auctions.bidWithdrawal.cutoffMinutes
             if (cutoffMinutes > 0) {
                 val timeRemaining = java.time.Duration.between(java.time.Instant.now(), auction.endsAt)
@@ -227,19 +227,28 @@ class AuctionDetailsMenu(
                 }
             }
 
-            // Get the bid amount for refund
             val refundAmount = bidRepository.deleteBid(bid.id)
 
             if (refundAmount != null) {
-                // Refund the player
                 economy.deposit(player, java.math.BigDecimal.valueOf(refundAmount))
 
-                // Decrement bid count
                 auctionRepository.decrementBidCount(auction.id)
 
                 player.sendMessage(
                     mm.deserialize("<green>Bid withdrawn! ${MenuUtils.formatPrice(refundAmount, plugin.economy)} has been refunded.")
                 )
+
+                val newHighestBid = bidRepository.getHighestBid(auction.id)
+                if (newHighestBid != null) {
+                    plugin.server.getPlayer(newHighestBid.bidderUuid)?.let { newWinner ->
+                        newWinner.sendMessage(
+                            translationAPI.getComponentSync(AuctionMessages.BID_NOW_HIGHEST) {
+                                unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
+                                unparsed("amount", MenuUtils.formatPrice(newHighestBid.bidAmount, plugin.economy))
+                            }
+                        )
+                    }
+                }
             } else {
                 player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BID_WITHDRAW_FAILED))
             }
@@ -319,6 +328,7 @@ class AuctionDetailsMenu(
 
             val loreList = mutableListOf<Component>()
             loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<gray>ID: <white>${auction.shortId}"))
             loreList.add(mm.deserialize("<gray>Seller: <white>${if (auction.isAnonymous) "Anonymous" else auction.sellerName}"))
 
             if (hasEnded) {

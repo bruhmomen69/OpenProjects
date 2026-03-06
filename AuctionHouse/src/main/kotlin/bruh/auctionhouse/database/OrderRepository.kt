@@ -306,9 +306,6 @@ class OrderRepository(private val database: Database) {
         } ?: 0
     }
 
-    /**
-     * Gets orders that were filled for a player (for login notifications).
-     */
     suspend fun getPlayerFilledOrders(playerId: UUID): List<Order> = withContext(Dispatchers.IO) {
         database.query(
             sql("SELECT * FROM orders WHERE creator_uuid = ? AND status = 'FILLED' ORDER BY filled_at DESC LIMIT 10"),
@@ -336,5 +333,73 @@ class OrderRepository(private val database: Database) {
                 minFillQuantity = rs.getInt("min_fill_quantity").takeIf { it > 0 }
             )
         }
+    }
+
+    suspend fun findByShortId(shortId: String): Order? = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT * FROM orders WHERE id LIKE ?"),
+            "$shortId%"
+        ) { rs ->
+            Order(
+                id = UUID.fromString(rs.getString("id")),
+                creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
+                creatorName = rs.getString("creator_name"),
+                orderType = OrderType.valueOf(rs.getString("order_type")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
+                itemDisplayName = rs.getString("item_display_name"),
+                itemLoreHash = rs.getString("item_lore_hash"),
+                itemNbtHash = rs.getString("item_nbt_hash"),
+                itemStack = deserializeItem(rs.getBytes("item_stack")),
+                quantityRequested = rs.getInt("quantity_requested"),
+                quantityFilled = rs.getInt("quantity_filled"),
+                pricePerUnit = rs.getDouble("price_per_unit"),
+                totalPrice = rs.getDouble("total_price"),
+                status = OrderStatus.valueOf(rs.getString("status")),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+                expiresAt = rs.getTimestamp("expires_at").toInstant(),
+                filledAt = rs.getTimestamp("filled_at")?.toInstant(),
+                allowPartial = rs.getBoolean("allow_partial"),
+                minFillQuantity = rs.getInt("min_fill_quantity").takeIf { it > 0 }
+            )
+        }
+    }
+
+    suspend fun findBestBuyOrderForMaterial(material: Material): Order? = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT * FROM orders WHERE order_type = 'BUY_ORDER' AND item_material = ? AND status IN ('PENDING', 'PARTIAL') AND expires_at > ? ORDER BY price_per_unit DESC LIMIT 1"),
+            material.name,
+            Instant.now()
+        ) { rs ->
+            Order(
+                id = UUID.fromString(rs.getString("id")),
+                creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
+                creatorName = rs.getString("creator_name"),
+                orderType = OrderType.valueOf(rs.getString("order_type")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
+                itemDisplayName = rs.getString("item_display_name"),
+                itemLoreHash = rs.getString("item_lore_hash"),
+                itemNbtHash = rs.getString("item_nbt_hash"),
+                itemStack = deserializeItem(rs.getBytes("item_stack")),
+                quantityRequested = rs.getInt("quantity_requested"),
+                quantityFilled = rs.getInt("quantity_filled"),
+                pricePerUnit = rs.getDouble("price_per_unit"),
+                totalPrice = rs.getDouble("total_price"),
+                status = OrderStatus.valueOf(rs.getString("status")),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+                expiresAt = rs.getTimestamp("expires_at").toInstant(),
+                filledAt = rs.getTimestamp("filled_at")?.toInstant(),
+                allowPartial = rs.getBoolean("allow_partial"),
+                minFillQuantity = rs.getInt("min_fill_quantity").takeIf { it > 0 }
+            )
+        }
+    }
+
+    suspend fun updatePrice(id: UUID, pricePerUnit: Double, totalPrice: Double) = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("UPDATE orders SET price_per_unit = ?, total_price = ? WHERE id = ?"),
+            pricePerUnit,
+            totalPrice,
+            id.toString()
+        )
     }
 }

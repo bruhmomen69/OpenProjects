@@ -634,10 +634,9 @@ class AuctionService(
     suspend fun getAuction(auctionId: UUID): Auction? =
         auctionRepository.getById(auctionId)
 
-    /**
-     * Processes expired auctions.
-     * Handles reserve price checks, winner determination, and expired item returns.
-     */
+    suspend fun findAuctionByShortId(shortId: String): Auction? =
+        auctionRepository.findByShortId(shortId)
+
     suspend fun processExpiredAuctions() = withContext(Dispatchers.IO) {
         val expiredAuctions = auctionRepository.getExpiredAuctions()
 
@@ -1019,13 +1018,7 @@ class AuctionService(
             )
         }
 
-        // Remove items from inventory
-        val itemToRemove = item.clone().apply { amount = quantity }
-        withContext(plugin.entityDispatcher(seller)) {
-            seller.inventory.removeItem(itemToRemove)
-        }
-
-        // Create auctions
+        // Create auctions first - only remove items for successful auctions
         var auctionsCreated = 0
         var auctionsFailed = 0
         var feesCharged = 0.0
@@ -1063,6 +1056,14 @@ class AuctionService(
             } catch (e: Exception) {
                 logger.error("Failed to create bulk auction $i/$quantity for ${seller.name}", e)
                 auctionsFailed++
+            }
+        }
+
+        // Only remove items that were successfully created as auctions
+        if (auctionsCreated > 0) {
+            val itemToRemove = item.clone().apply { amount = auctionsCreated }
+            withContext(plugin.entityDispatcher(seller)) {
+                seller.inventory.removeItem(itemToRemove)
             }
         }
 

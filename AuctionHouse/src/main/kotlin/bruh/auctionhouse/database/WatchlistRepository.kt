@@ -1,5 +1,6 @@
 package bruh.auctionhouse.database
 
+import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.model.WatchlistEntry
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
@@ -28,8 +29,8 @@ class WatchlistRepository(private val database: Database) {
 
         database.execute(
             sql {
-                mysql("INSERT INTO watchlist (player_uuid, auction_id, added_at, last_notified_at, has_new_activity) VALUES (?, ?, ?, ?, ?)")
-                sqlite("INSERT INTO watchlist (player_uuid, auction_id, added_at, last_notified_at, has_new_activity) VALUES (?, ?, ?, ?, ?)")
+                mysql("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?)")
+                sqlite("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?)")
             },
             entry.playerUuid.toString(),
             entry.auctionId.toString(),
@@ -49,6 +50,43 @@ class WatchlistRepository(private val database: Database) {
     }
 
     /**
+     * Adds an order to a player's watchlist.
+     */
+    suspend fun addOrder(playerUuid: UUID, orderId: UUID, orderType: OrderType): WatchlistEntry? = withContext(Dispatchers.IO) {
+        // Check if already watching
+        val existing = getByOrder(playerUuid, orderId)
+        if (existing != null) return@withContext null
+
+        val entry = WatchlistEntry(
+            playerUuid = playerUuid,
+            orderId = orderId,
+            orderType = orderType
+        )
+
+        database.execute(
+            sql {
+                mysql("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?)")
+                sqlite("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?)")
+            },
+            entry.playerUuid.toString(),
+            entry.orderId.toString(),
+            entry.orderType!!.name,
+            entry.addedAt,
+            entry.lastNotifiedAt,
+            entry.hasNewActivity
+        )
+
+        // Get the created entry with ID
+        val id = database.querySingle(
+            sql("SELECT id FROM watchlist WHERE player_uuid = ? AND order_id = ?"),
+            playerUuid.toString(),
+            orderId.toString()
+        ) { rs -> rs.getLong("id") }
+
+        entry.copy(id = id ?: 0)
+    }
+
+    /**
      * Removes an auction from a player's watchlist.
      */
     suspend fun remove(playerUuid: UUID, auctionId: UUID): Boolean = withContext(Dispatchers.IO) {
@@ -56,6 +94,17 @@ class WatchlistRepository(private val database: Database) {
             sql("DELETE FROM watchlist WHERE player_uuid = ? AND auction_id = ?"),
             playerUuid.toString(),
             auctionId.toString()
+        ) > 0
+    }
+
+    /**
+     * Removes an order from a player's watchlist.
+     */
+    suspend fun removeOrder(playerUuid: UUID, orderId: UUID): Boolean = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("DELETE FROM watchlist WHERE player_uuid = ? AND order_id = ?"),
+            playerUuid.toString(),
+            orderId.toString()
         ) > 0
     }
 
@@ -72,6 +121,30 @@ class WatchlistRepository(private val database: Database) {
                 id = rs.getLong("id"),
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
                 auctionId = UUID.fromString(rs.getString("auction_id")),
+                orderId = rs.getString("order_id")?.let { UUID.fromString(it) },
+                orderType = rs.getString("order_type")?.let { OrderType.valueOf(it) },
+                addedAt = rs.getTimestamp("added_at").toInstant(),
+                lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
+                hasNewActivity = rs.getBoolean("has_new_activity")
+            )
+        }
+    }
+
+    /**
+     * Gets a watchlist entry by order ID.
+     */
+    suspend fun getByOrder(playerUuid: UUID, orderId: UUID): WatchlistEntry? = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT * FROM watchlist WHERE player_uuid = ? AND order_id = ?"),
+            playerUuid.toString(),
+            orderId.toString()
+        ) { rs ->
+            WatchlistEntry(
+                id = rs.getLong("id"),
+                playerUuid = UUID.fromString(rs.getString("player_uuid")),
+                auctionId = rs.getString("auction_id")?.let { UUID.fromString(it) },
+                orderId = UUID.fromString(rs.getString("order_id")),
+                orderType = rs.getString("order_type")?.let { OrderType.valueOf(it) },
                 addedAt = rs.getTimestamp("added_at").toInstant(),
                 lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
                 hasNewActivity = rs.getBoolean("has_new_activity")
@@ -90,7 +163,51 @@ class WatchlistRepository(private val database: Database) {
             WatchlistEntry(
                 id = rs.getLong("id"),
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
+                auctionId = rs.getString("auction_id")?.let { UUID.fromString(it) },
+                orderId = rs.getString("order_id")?.let { UUID.fromString(it) },
+                orderType = rs.getString("order_type")?.let { OrderType.valueOf(it) },
+                addedAt = rs.getTimestamp("added_at").toInstant(),
+                lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
+                hasNewActivity = rs.getBoolean("has_new_activity")
+            )
+        }
+    }
+
+    /**
+     * Gets auction watchlist entries for a player.
+     */
+    suspend fun getPlayerAuctionWatchlist(playerUuid: UUID): List<WatchlistEntry> = withContext(Dispatchers.IO) {
+        database.query(
+            sql("SELECT * FROM watchlist WHERE player_uuid = ? AND auction_id IS NOT NULL ORDER BY added_at DESC"),
+            playerUuid.toString()
+        ) { rs ->
+            WatchlistEntry(
+                id = rs.getLong("id"),
+                playerUuid = UUID.fromString(rs.getString("player_uuid")),
                 auctionId = UUID.fromString(rs.getString("auction_id")),
+                orderId = null,
+                orderType = null,
+                addedAt = rs.getTimestamp("added_at").toInstant(),
+                lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
+                hasNewActivity = rs.getBoolean("has_new_activity")
+            )
+        }
+    }
+
+    /**
+     * Gets order watchlist entries for a player.
+     */
+    suspend fun getPlayerOrderWatchlist(playerUuid: UUID): List<WatchlistEntry> = withContext(Dispatchers.IO) {
+        database.query(
+            sql("SELECT * FROM watchlist WHERE player_uuid = ? AND order_id IS NOT NULL ORDER BY added_at DESC"),
+            playerUuid.toString()
+        ) { rs ->
+            WatchlistEntry(
+                id = rs.getLong("id"),
+                playerUuid = UUID.fromString(rs.getString("player_uuid")),
+                auctionId = null,
+                orderId = UUID.fromString(rs.getString("order_id")),
+                orderType = OrderType.valueOf(rs.getString("order_type")),
                 addedAt = rs.getTimestamp("added_at").toInstant(),
                 lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
                 hasNewActivity = rs.getBoolean("has_new_activity")
@@ -135,6 +252,19 @@ class WatchlistRepository(private val database: Database) {
     }
 
     /**
+     * Removes all watchlist entries for expired/cancelled orders.
+     */
+    suspend fun removeExpiredOrderEntries(orderIds: List<UUID>) = withContext(Dispatchers.IO) {
+        if (orderIds.isEmpty()) return@withContext
+        
+        val placeholders = orderIds.joinToString(",") { "?" }
+        database.execute(
+            sql("DELETE FROM watchlist WHERE order_id IN ($placeholders)"),
+            *orderIds.map { it.toString() }.toTypedArray()
+        )
+    }
+
+    /**
      * Counts watchlist entries for a player.
      */
     suspend fun count(playerUuid: UUID): Int = withContext(Dispatchers.IO) {
@@ -154,6 +284,19 @@ class WatchlistRepository(private val database: Database) {
             sql("SELECT COUNT(*) as count FROM watchlist WHERE player_uuid = ? AND auction_id = ?"),
             playerUuid.toString(),
             auctionId.toString()
+        ) { rs ->
+            rs.getInt("count") > 0
+        } ?: false
+    }
+
+    /**
+     * Checks if a player is watching an order.
+     */
+    suspend fun isWatchingOrder(playerUuid: UUID, orderId: UUID): Boolean = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT COUNT(*) as count FROM watchlist WHERE player_uuid = ? AND order_id = ?"),
+            playerUuid.toString(),
+            orderId.toString()
         ) { rs ->
             rs.getInt("count") > 0
         } ?: false

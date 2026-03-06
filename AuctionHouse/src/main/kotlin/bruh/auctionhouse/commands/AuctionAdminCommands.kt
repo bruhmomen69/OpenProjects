@@ -160,23 +160,25 @@ class AuctionAdminCommands(
             return
         }
 
-        // Refund highest bidder if any
-        // Return item to seller
-        auctionRepository.updateStatus(uuid, AuctionStatus.CANCELLED)
-
-        // Notify seller if online
-        plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
-            if (reason != null) {
-                seller.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_CANCELLED_REASON) {
-                    unparsed("reason", reason)
-                })
-            } else {
-                seller.sendMessage(translationAPI.getComponentSync(AuctionMessages.AUCTION_CANCELLED))
+        val result = auctionService.cancelAuction(player, uuid)
+        when (result) {
+            is bruh.auctionhouse.service.ServiceResult.Success -> {
+                plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
+                    if (reason != null) {
+                        seller.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_CANCELLED_REASON) {
+                            unparsed("reason", reason)
+                        })
+                    } else {
+                        seller.sendMessage(translationAPI.getComponentSync(AuctionMessages.AUCTION_CANCELLED))
+                    }
+                }
+                actor.reply(translationAPI.getComponentSync(AuctionMessages.AUCTION_CANCELLED))
+                plugin.logger.info("Admin ${player.name} cancelled auction $uuid (seller: ${auction.sellerName})${reason?.let { " - Reason: $it" } ?: ""}")
+            }
+            is bruh.auctionhouse.service.ServiceResult.Failure -> {
+                actor.reply(result.message)
             }
         }
-
-        actor.reply(translationAPI.getComponentSync(AuctionMessages.AUCTION_CANCELLED))
-        plugin.logger.info("Admin ${player.name} cancelled auction $uuid (seller: ${auction.sellerName})${reason?.let { " - Reason: $it" } ?: ""}")
     }
 
     /**

@@ -554,6 +554,26 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                     )
                 """)
             })
+        },
+        migration(7, "Add order_id and order_type columns to watchlist table") {
+            execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist ADD COLUMN order_id VARCHAR(36) NULL,
+                    ALTER TABLE watchlist ADD COLUMN order_type VARCHAR(20) NULL
+                """)
+                postgres("""
+                    ALTER TABLE watchlist ADD COLUMN order_id VARCHAR(36) NULL,
+                    ALTER TABLE watchlist ADD COLUMN order_type VARCHAR(20) NULL
+                """)
+                sqlite("""
+                    ALTER TABLE watchlist ADD COLUMN order_id TEXT NULL
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    ALTER TABLE watchlist ADD COLUMN order_type TEXT NULL
+                """)
+            })
         }
     )
 }

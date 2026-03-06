@@ -306,10 +306,40 @@ class AuctionRepository(private val database: Database) {
             id.toString()
         )
     }
+
+    suspend fun findByShortId(shortId: String): Auction? = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT * FROM auctions WHERE id LIKE ?"),
+            "$shortId%"
+        ) { rs ->
+            Auction(
+                id = UUID.fromString(rs.getString("id")),
+                sellerUuid = UUID.fromString(rs.getString("seller_uuid")),
+                sellerName = rs.getString("seller_name"),
+                itemStack = deserializeItem(rs.getBytes("item_stack")),
+                itemMaterial = rs.getString("item_material"),
+                itemDisplayName = rs.getString("item_display_name"),
+                auctionType = AuctionType.valueOf(rs.getString("auction_type")),
+                startPrice = rs.getDouble("start_price"),
+                buyNowPrice = rs.getDouble("buy_now_price").takeIf { it > 0 },
+                reservePrice = rs.getDouble("reserve_price").takeIf { it > 0 },
+                minIncrement = rs.getDouble("min_increment"),
+                status = AuctionStatus.valueOf(rs.getString("status")),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+                endsAt = rs.getTimestamp("ends_at").toInstant(),
+                soldAt = rs.getTimestamp("sold_at")?.toInstant(),
+                soldToUuid = rs.getString("sold_to_uuid")?.let { UUID.fromString(it) },
+                soldToName = rs.getString("sold_to_name"),
+                finalPrice = rs.getDouble("final_price").takeIf { it > 0 },
+                viewCount = rs.getInt("view_count"),
+                bidCount = rs.getInt("bid_count"),
+                isAnonymous = rs.getBoolean("is_anonymous"),
+                extensionCount = rs.getInt("extension_count"),
+                manualExtensionCount = rs.getInt("manual_extension_count")
+            )
+        }
+    }
     
-    /**
-     * Increments the bid count for an auction.
-     */
     suspend fun incrementBidCount(id: UUID) = withContext(Dispatchers.IO) {
         database.execute(
             sql("UPDATE auctions SET bid_count = bid_count + 1 WHERE id = ?"),

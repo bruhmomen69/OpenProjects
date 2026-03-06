@@ -22,6 +22,7 @@ data class PlayerState(
     val playerId: UUID,
     val auctionFilter: AuctionFilter = AuctionFilter(),
     val auctionPage: Int = 0,
+    val orderFilter: OrderFilter = OrderFilter(),
     val watchlistSort: WatchlistSort = WatchlistSort.ENDING_SOON,
     val transactionFilter: TransactionType? = null,
     val orderCreateState: OrderCreateState? = null,
@@ -60,9 +61,10 @@ data class PlayerState(
         return copy(auctionPage = page)
     }
 
-    /**
-     * Creates a copy with updated watchlist sort preference.
-     */
+    fun withOrderFilter(filter: OrderFilter): PlayerState {
+        return copy(orderFilter = filter)
+    }
+
     fun withWatchlistSort(sort: WatchlistSort): PlayerState {
         return copy(watchlistSort = sort)
     }

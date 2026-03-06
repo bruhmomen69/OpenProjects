@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
+import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.translations.AuctionMessages
@@ -35,6 +36,7 @@ class OrderFulfillMenu(
     private val orderService: OrderService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
+    private val orderRepository: OrderRepository,
     private val watchlistRepository: WatchlistRepository,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
@@ -47,6 +49,7 @@ class OrderFulfillMenu(
     private val inventoryCount = countMatchingItems()
     private val remainingQuantity = order.remainingQuantity()
     private var quantity: Int
+    private var confirmationPending = false
 
     init {
         // Calculate default quantity based on partial fill settings
@@ -145,7 +148,7 @@ class OrderFulfillMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                    OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
                     ClickResult.CLOSE
                 }
             }
@@ -271,9 +274,10 @@ class OrderFulfillMenu(
     private fun createConfirmButton(): VItem {
         val totalPrice = quantity * order.pricePerUnit
         val isBuyOrder = order.orderType == OrderType.BUY_ORDER
+        val isExpensive = totalPrice > config.gui.confirm.expensiveThreshold
 
-        return VItem(XMaterial.EMERALD_BLOCK) {
-            name = mm.deserialize("<green>Confirm Fulfillment")
+        return VItem(if (confirmationPending) XMaterial.GOLD_BLOCK else XMaterial.EMERALD_BLOCK) {
+            name = mm.deserialize(if (confirmationPending) "<yellow>⚠ Click Again to Confirm" else "<green>Confirm Fulfillment")
             val loreList = mutableListOf<Component>()
 
             loreList.add(mm.deserialize("<gray>Quantity: <white>$quantity"))
@@ -286,13 +290,31 @@ class OrderFulfillMenu(
                 loreList.add(mm.deserialize("<red>You will pay: <gold>${MenuUtils.formatPrice(totalPrice, plugin.economy)}"))
             }
 
-            loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to confirm"))
+            if (isExpensive && !confirmationPending) {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<red>⚠ High Value Transaction"))
+                loreList.add(mm.deserialize("<yellow>Click again to confirm"))
+            } else if (confirmationPending) {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<yellow>Click to complete purchase"))
+            } else {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<green>Click to confirm"))
+            }
+
             lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
                 runBlocking {
+                    // Check for expensive confirmation
+                    if (isExpensive && !confirmationPending) {
+                        confirmationPending = true
+                        player.sendMessage(mm.deserialize("<yellow>⚠ Click again to confirm purchase of <gold>${MenuUtils.formatPrice(totalPrice, plugin.economy)}"))
+                        open()
+                        return@runBlocking
+                    }
+
                     // Re-count items immediately before fulfillment to catch inventory changes
                     val currentInventoryCount = countMatchingItems()
                     if (currentInventoryCount < quantity) {
@@ -339,10 +361,23 @@ class OrderFulfillMenu(
             if (remaining <= 0) break
 
             if (item.type == order.itemMaterial) {
-                // Check display name match if specified
                 val itemDisplayName = item.itemMeta?.displayName()?.let { MiniMessage.miniMessage().serialize(it) }
                 if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
                     continue
+                }
+
+                if (order.itemNbtHash != null) {
+                    val itemNbtHash = computeItemNbtHash(item)
+                    if (order.itemNbtHash != itemNbtHash) {
+                        continue
+                    }
+                }
+
+                if (order.itemLoreHash != null) {
+                    val itemLoreHash = computeItemLoreHash(item)
+                    if (order.itemLoreHash != itemLoreHash) {
+                        continue
+                    }
                 }
 
                 val toTake = minOf(remaining, item.amount)
@@ -362,16 +397,54 @@ class OrderFulfillMenu(
     private fun countMatchingItems(): Int {
         return player.inventory.contents.filterNotNull().sumOf { item ->
             if (item.type == order.itemMaterial) {
-                // Check display name match if specified
                 val itemDisplayName = item.itemMeta?.displayName()?.let { mm.serialize(it) }
                 if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
-                    0
-                } else {
-                    item.amount
+                    return@sumOf 0
                 }
+
+                if (order.itemNbtHash != null) {
+                    val itemNbtHash = computeItemNbtHash(item)
+                    if (order.itemNbtHash != itemNbtHash) {
+                        return@sumOf 0
+                    }
+                }
+
+                if (order.itemLoreHash != null) {
+                    val itemLoreHash = computeItemLoreHash(item)
+                    if (order.itemLoreHash != itemLoreHash) {
+                        return@sumOf 0
+                    }
+                }
+
+                item.amount
             } else {
                 0
             }
         }
+    }
+
+    private fun computeItemNbtHash(item: ItemStack): String {
+        val meta = item.itemMeta ?: return ""
+        val sb = StringBuilder()
+        
+        meta.enchants.forEach { (enchant, level) ->
+            sb.append(enchant.key.key).append(":").append(level).append(";")
+        }
+        
+        if (meta.hasCustomModelData()) {
+            sb.append("cmd:").append(meta.customModelData).append(";")
+        }
+        
+        meta.itemFlags.forEach { flag ->
+            sb.append("flag:").append(flag.name).append(";")
+        }
+        
+        return sb.toString().hashCode().toString()
+    }
+
+    private fun computeItemLoreHash(item: ItemStack): String {
+        val meta = item.itemMeta ?: return ""
+        val lore = meta.lore ?: return ""
+        return lore.joinToString("|").hashCode().toString()
     }
 }
