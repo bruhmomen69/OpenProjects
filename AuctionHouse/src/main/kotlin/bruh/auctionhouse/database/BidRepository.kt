@@ -16,7 +16,7 @@ class BidRepository(private val database: Database) {
      * Creates a new bid and returns the generated ID.
      */
     suspend fun create(bid: Bid): Long = withContext(Dispatchers.IO) {
-        database.execute(
+        database.executeInsert(
             sql {
                 mysql("INSERT INTO auction_bids (auction_id, bidder_uuid, bidder_name, bid_amount, bid_time, is_outbid) VALUES (?, ?, ?, ?, ?, ?)")
                 sqlite("INSERT INTO auction_bids (auction_id, bidder_uuid, bidder_name, bid_amount, bid_time, is_outbid) VALUES (?, ?, ?, ?, ?, ?)")
@@ -27,14 +27,7 @@ class BidRepository(private val database: Database) {
             bid.bidAmount,
             bid.bidTime,
             bid.isOutbid
-        )
-        
-        // Get the generated ID
-        database.querySingle(
-            sql("SELECT last_insert_rowid() as id")
-        ) { rs ->
-            rs.getLong("id")
-        } ?: 0L
+        ) ?: 0L
     }
     
     /**

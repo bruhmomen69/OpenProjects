@@ -251,6 +251,45 @@ class Database private constructor(
         sql: String,
         vararg params: Any?
     ): Int = execute(sql(sql), *params)
+
+    /**
+     * Executes an INSERT statement and returns the generated key.
+     * Works cross-platform by using JDBC's RETURN_GENERATED_KEYS.
+     * @param sql The dialect-aware SQL query
+     * @param params Query parameters
+     * @return The generated key, or null if no key was generated
+     */
+    suspend fun executeInsert(
+        sql: DialectQuery,
+        vararg params: Any?
+    ): Long? = withContext(Dispatchers.IO) {
+        ensureInitialized()
+        val sqlString = sql.forDialect(dialect)
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(sqlString, java.sql.Statement.RETURN_GENERATED_KEYS).use { stmt ->
+                setParameters(stmt, params)
+                stmt.executeUpdate()
+                val generatedKeys = stmt.generatedKeys
+                if (generatedKeys.next()) {
+                    generatedKeys.getLong(1)
+                } else {
+                    null
+                }
+            }
+        }
+    }
+
+    /**
+     * Executes an INSERT statement and returns the generated key.
+     * @param sql The SQL query string
+     * @param params Query parameters
+     * @return The generated key, or null if no key was generated
+     */
+    suspend fun executeInsert(
+        sql: String,
+        vararg params: Any?
+    ): Long? = executeInsert(sql(sql), *params)
     
     /**
      * Executes a batch of statements with multiple parameter sets.

@@ -58,5 +58,35 @@ enum class AuctionMessages(
     ADMIN_TOGGLE_ON("admin_toggle_on", "<green>Auction House enabled."),
     ADMIN_TOGGLE_OFF("admin_toggle_off", "<red>Auction House disabled."),
     ADMIN_GIVEN("admin_given", "<green>Gave auction item to {player}."),
-    ADMIN_REFUNDED("admin_refunded", "<green>Refunded auction to {player}.");
+    ADMIN_REFUNDED("admin_refunded", "<green>Refunded auction to {player}."),
+
+    // Bulk Operations
+    BULK_LISTING_CREATED("bulk_listing_created", "<green>Created {count} auctions. Total fees: {fee}"),
+    BULK_LISTING_PARTIAL("bulk_listing_partial", "<yellow>Created {success}/{total} auctions. {failed} failed."),
+    BULK_LISTING_MAX_REACHED("bulk_listing_max_reached", "<red>Cannot create more than {max} auctions at once."),
+    BULK_LISTING_NO_ITEMS("bulk_listing_no_items", "<red>You don't have enough items for bulk listing."),
+    BULK_BUY_PURCHASED("bulk_buy_purchased", "<green>Purchased {count} items for {total}."),
+    BULK_BUY_PARTIAL("bulk_buy_partial", "<yellow>Purchased {success}/{total} items. {failed} failed."),
+    BULK_BUY_MAX_REACHED("bulk_buy_max_reached", "<red>Cannot purchase more than {max} items at once."),
+    BULK_BUY_CART_ADDED("bulk_buy_cart_added", "<green>Added item to bulk buy cart."),
+    BULK_BUY_CART_REMOVED("bulk_buy_cart_removed", "<red>Removed item from cart."),
+
+    // Transaction History
+    TRANSACTION_HISTORY_EXPORTED("transaction_history_exported", "<green>Exported {count} transactions to book."),
+    TRANSACTION_HISTORY_NONE("transaction_history_none", "<gray>No transactions found."),
+
+    // Admin Commands
+    ADMIN_CANCELLED_REASON("admin_cancelled_reason", "<red>Your auction was cancelled by an admin. Reason: {reason}"),
+    ADMIN_DELETED("admin_deleted", "<red>Auction deleted without refund. Reason: {reason}"),
+    ADMIN_FORCE_SOLD("admin_force_sold", "<green>Auction forced sold to {player}."),
+    ADMIN_BANNED("admin_banned", "<red>Player {player} has been banned from the auction house. Reason: {reason}"),
+    ADMIN_UNBANNED("admin_unbanned", "<green>Player {player} has been unbanned."),
+    ADMIN_BLACKLIST_ADDED("admin_blacklist_added", "<green>Added {material} to blacklist."),
+    ADMIN_BLACKLIST_REMOVED("admin_blacklist_removed", "<green>Removed {material} from blacklist."),
+    ADMIN_STATS_TITLE("admin_stats_title", "<green>=== AuctionHouse Statistics ==="),
+    ADMIN_STATS_ACTIVE_AUCTIONS("admin_stats_active_auctions", "<gray>Active Auctions: <white>{count}"),
+    ADMIN_STATS_ACTIVE_ORDERS("admin_stats_active_orders", "<gray>Active Orders: <white>{count}"),
+    ADMIN_STATS_MONEY_CIRCULATION("admin_stats_money_circulation", "<gray>Money in Circulation: <gold>{amount}"),
+    ADMIN_PLAYER_NOT_FOUND("admin_player_not_found", "<red>Player not found."),
+    ADMIN_PLAYER_BANNED("admin_player_banned", "<red>This player is banned from the auction house.");
 }

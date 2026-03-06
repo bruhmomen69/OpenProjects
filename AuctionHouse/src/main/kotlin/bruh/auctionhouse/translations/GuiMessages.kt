@@ -17,7 +17,8 @@ enum class GuiMessages(
     CREATE_AUCTION_TITLE("create_auction_title", "Create Auction"),
     CREATE_ORDER_TITLE("create_order_title", "Create Order"),
     MATERIAL_PICKER_TITLE("material_picker_title", "Select Material"),
-    EXPIRED_ITEMS_TITLE("expired_items_title", "Expired Items"),
+    CLAIMABLE_ITEMS_TITLE("claimable_items_title", "Claimable Items"),
+    EXPIRED_ITEMS_TITLE("expired_items_title", "Claimable Items"),
     
     // Navigation
     PREVIOUS_PAGE("previous_page", "<gray>← Previous Page"),
@@ -47,7 +48,7 @@ enum class GuiMessages(
     BUTTON_FILTER("button_filter", "<yellow>Filter"),
     BUTTON_MY_AUCTIONS("button_my_auctions", "<aqua>My Auctions"),
     BUTTON_MY_ORDERS("button_my_orders", "<aqua>My Orders"),
-    BUTTON_EXPIRED("button_expired", "<red>Expired Items"),
+    BUTTON_EXPIRED("button_expired", "<red>Claimable Items"),
     BUTTON_BUY_ORDERS("button_buy_orders", "<green>Buy Orders"),
     BUTTON_SELL_ORDERS("button_sell_orders", "<green>Sell Orders"),
     BUTTON_SEARCH("button_search", "<yellow>Search"),
@@ -118,7 +119,7 @@ enum class GuiMessages(
     // Empty states
     EMPTY_AUCTIONS("empty_auctions", "<gray>No auctions found."),
     EMPTY_ORDERS("empty_orders", "<gray>No orders found."),
-    EMPTY_EXPIRED("empty_expired", "<gray>No expired items."),
+    EMPTY_EXPIRED("empty_expired", "<gray>No claimable items."),
     EMPTY_MY_AUCTIONS("empty_my_auctions", "<gray>You have no active auctions."),
     EMPTY_MY_ORDERS("empty_my_orders", "<gray>You have no active orders."),
     
@@ -128,5 +129,64 @@ enum class GuiMessages(
     
     // Currency
     CURRENCY_FORMAT("currency_format", "<symbol>{amount}"),
-    CURRENCY_COMPACT("currency_compact", "{amount}");
+    CURRENCY_COMPACT("currency_compact", "{amount}"),
+
+    // Bulk Listing
+    BULK_LISTING_TITLE("bulk_listing_title", "Bulk Listing"),
+    BULK_LISTING_QUANTITY("bulk_listing_quantity", "<yellow>Quantity: <gold>{quantity}"),
+    BULK_LISTING_STACKS("bulk_listing_stacks", "<yellow>Stacks: <gold>{stacks}"),
+    BULK_LISTING_TOTAL_ITEMS("bulk_listing_total_items", "<yellow>Total Items: <gold>{total}"),
+    BULK_LISTING_FEE_PREVIEW("bulk_listing_fee_preview", "<gray>Total Fees: <gold>{fee}"),
+    BULK_LISTING_CONFIRM("bulk_listing_confirm", "<green>Click to create {count} auctions"),
+    BULK_LISTING_WARNING("bulk_listing_warning", "<red>Warning: Creating {count} auctions!"),
+
+    // Bulk Buying Cart
+    BULK_BUY_CART_TITLE("bulk_buy_cart_title", "Bulk Purchase Cart"),
+    BULK_BUY_CART_TOTAL("bulk_buy_cart_total", "<yellow>Total Cost: <gold>{total}"),
+    BULK_BUY_CART_SELLER("bulk_buy_cart_seller", "<gray>Seller: <white>{seller}"),
+    BULK_BUY_CART_ITEMS("bulk_buy_cart_items", "<gray>Items: <white>{count}"),
+    BULK_BUY_CART_CONFIRM("bulk_buy_cart_confirm", "<green>Click to confirm purchase"),
+    BULK_BUY_CART_ADD("bulk_buy_cart_add", "<green>Add to Cart"),
+    BULK_BUY_CART_REMOVE("bulk_buy_cart_remove", "<red>Remove from Cart"),
+    BULK_BUY_CART_EMPTY("bulk_buy_cart_empty", "<gray>Your cart is empty"),
+    BULK_BUY_CART_INSUFFICIENT_FUNDS("bulk_buy_cart_insufficient_funds", "<red>Insufficient funds!"),
+
+    // Transaction History
+    TRANSACTION_HISTORY_TITLE("transaction_history_title", "Transaction History"),
+    TRANSACTION_HISTORY_FILTER_ALL("transaction_history_filter_all", "All Transactions"),
+    TRANSACTION_HISTORY_FILTER_PURCHASES("transaction_history_filter_purchases", "Purchases"),
+    TRANSACTION_HISTORY_FILTER_SALES("transaction_history_filter_sales", "Sales"),
+    TRANSACTION_HISTORY_FILTER_FEES("transaction_history_filter_fees", "Fees"),
+    TRANSACTION_HISTORY_FILTER_REFUNDS("transaction_history_filter_refunds", "Refunds"),
+    TRANSACTION_HISTORY_DATE_RANGE("transaction_history_date_range", "<gray>Date Range: <white>{range}"),
+    TRANSACTION_HISTORY_DETAILS("transaction_history_details", "<gray>Click to view details"),
+    TRANSACTION_HISTORY_EXPORT("transaction_history_export", "<yellow>Export to Book"),
+
+    // Transaction Details
+    TRANSACTION_DETAILS_TITLE("transaction_details_title", "Transaction Details"),
+    TRANSACTION_DETAILS_ID("transaction_details_id", "<gray>Transaction ID: <white>{id}"),
+    TRANSACTION_DETAILS_TYPE("transaction_details_type", "<gray>Type: <white>{type}"),
+    TRANSACTION_DETAILS_DATE("transaction_details_date", "<gray>Date: <white>{date}"),
+    TRANSACTION_DETAILS_PARTIES("transaction_details_parties", "<gray>Parties: <white>{from} → {to}"),
+    TRANSACTION_DETAILS_AMOUNT("transaction_details_amount", "<gray>Amount: <gold>{amount}"),
+    TRANSACTION_DETAILS_FEE("transaction_details_fee", "<gray>Fee: <gold>{fee}"),
+    TRANSACTION_DETAILS_ITEM("transaction_details_item", "<gray>Item: <white>{item}"),
+    TRANSACTION_DETAILS_REFERENCE("transaction_details_reference", "<gray>Reference: <white>{ref}"),
+
+    // Admin Dashboard
+    ADMIN_DASHBOARD_TITLE("admin_dashboard_title", "AuctionHouse Admin Dashboard"),
+    ADMIN_VIEW_PLAYER("admin_view_player", "<yellow>View Player Auctions"),
+    ADMIN_SEARCH_AUCTIONS("admin_search_auctions", "<yellow>Search Auctions"),
+    ADMIN_ACTIVE_AUCTIONS("admin_active_auctions", "<yellow>Active Auctions"),
+    ADMIN_BLACKLIST("admin_blacklist", "<red>Blacklist Management"),
+    ADMIN_BANNED_PLAYERS("admin_banned_players", "<red>Banned Players"),
+    ADMIN_STATISTICS("admin_statistics", "<green>Statistics"),
+    ADMIN_PURGE_DATA("admin_purge_data", "<red>Purge Data"),
+    ADMIN_BACKUP_DATA("admin_backup_data", "<green>Backup Data"),
+    ADMIN_RELOAD_CONFIG("admin_reload_config", "<yellow>Reload Config"),
+    ADMIN_ACTIVITY_LOG("admin_activity_log", "<gray>Recent Activity Log"),
+    ADMIN_PENDING_REPORTS("admin_pending_reports", "<red>Pending Reports: {count}"),
+    ADMIN_PLAYER_STATS("admin_player_stats", "<gray>Player Statistics"),
+    ADMIN_FORCE_SELL("admin_force_sell", "<red>Force Sell Auction"),
+    ADMIN_REFUND_PLAYER("admin_refund_player", "<green>Refund Player");
 }

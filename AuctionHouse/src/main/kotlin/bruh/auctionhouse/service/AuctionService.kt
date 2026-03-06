@@ -28,6 +28,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import java.math.BigDecimal
 import java.time.Duration
+import bruh.zchat.utils.database.Database
 import java.time.Instant
 import java.util.UUID
 
@@ -38,6 +39,7 @@ import java.util.UUID
 class AuctionService(
     private val plugin: AuctionHousePlugin,
     private val config: AuctionHouseConfig,
+    private val database: Database,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
     private val expiredItemRepository: ExpiredItemRepository,
@@ -292,17 +294,17 @@ class AuctionService(
         if (config.auctions.antiSnipe.enabled) {
             val timeRemaining = Duration.between(Instant.now(), auction.endsAt)
             if (timeRemaining.toMinutes() <= config.auctions.antiSnipe.thresholdMinutes) {
-                // Check if max extensions reached
+                // Check if max auto extensions reached (anti-snipe only)
                 val currentExtensions = auctionRepository.getExtensionCount(auctionId)
-                if (currentExtensions < config.auctions.antiSnipe.maxExtensions) {
+                if (currentExtensions < config.auctions.antiSnipe.maxAutoExtensions) {
                     val newEndTime = auction.endsAt.plus(
                         Duration.ofMinutes(config.auctions.antiSnipe.extensionMinutes.toLong())
                     )
                     auctionRepository.updateEndTime(auctionId, newEndTime)
                     auctionRepository.incrementExtensionCount(auctionId)
-                    logger.info("Anti-snipe triggered for auction $auctionId, extending to $newEndTime (extension ${currentExtensions + 1}/${config.auctions.antiSnipe.maxExtensions})")
+                    logger.info("Anti-snipe triggered for auction $auctionId, extending to $newEndTime (auto extension ${currentExtensions + 1}/${config.auctions.antiSnipe.maxAutoExtensions})")
                 } else {
-                    logger.debug("Anti-snipe max extensions reached for auction $auctionId")
+                    logger.debug("Anti-snipe max auto extensions reached for auction $auctionId")
                 }
             }
         }
@@ -357,10 +359,16 @@ class AuctionService(
         }
 
         // Refund highest bidder if any
+        // Re-fetch to ensure we get the current highest bid and check isOutbid to prevent race conditions
         val highestBid = bidRepository.getHighestBid(auctionId)
         highestBid?.let { bid ->
-            val prevBidder = plugin.server.getOfflinePlayer(bid.bidderUuid)
-            economy.deposit(prevBidder, BigDecimal.valueOf(bid.bidAmount))
+            // Double-check that the bid is not already outbid (race condition prevention)
+            if (!bid.isOutbid) {
+                val prevBidder = plugin.server.getOfflinePlayer(bid.bidderUuid)
+                economy.deposit(prevBidder, BigDecimal.valueOf(bid.bidAmount))
+                // Mark as outbid to prevent duplicate refunds
+                bidRepository.markAsOutbid(bid.id)
+            }
         }
 
         // Charge buyer
@@ -457,24 +465,28 @@ class AuctionService(
         // Refund highest bidder
         val highestBid = bidRepository.getHighestBid(auctionId)
         highestBid?.let { bid ->
-            val bidder = plugin.server.getOfflinePlayer(bid.bidderUuid)
-            economy.deposit(bidder, BigDecimal.valueOf(bid.bidAmount))
-            transactionRepository.create(
-                Transaction(
-                    transactionType = TransactionType.AUCTION_BID_RETURN,
-                    fromUuid = null,
-                    fromName = null,
-                    toUuid = bid.bidderUuid,
-                    toName = bid.bidderName,
-                    amount = bid.bidAmount,
-                    taxAmount = 0.0,
-                    itemMaterial = null,
-                    itemQuantity = null,
-                    referenceId = auctionId,
-                    timestamp = Instant.now(),
-                    serverId = serverId
+            // Double-check that the bid is not already outbid (race condition prevention)
+            if (!bid.isOutbid) {
+                val bidder = plugin.server.getOfflinePlayer(bid.bidderUuid)
+                economy.deposit(bidder, BigDecimal.valueOf(bid.bidAmount))
+                bidRepository.markAsOutbid(bid.id)
+                transactionRepository.create(
+                    Transaction(
+                        transactionType = TransactionType.AUCTION_BID_RETURN,
+                        fromUuid = null,
+                        fromName = null,
+                        toUuid = bid.bidderUuid,
+                        toName = bid.bidderName,
+                        amount = bid.bidAmount,
+                        taxAmount = 0.0,
+                        itemMaterial = null,
+                        itemQuantity = null,
+                        referenceId = auctionId,
+                        timestamp = Instant.now(),
+                        serverId = serverId
+                    )
                 )
-            )
+            }
         }
 
         // Return item to seller
@@ -489,6 +501,85 @@ class AuctionService(
 
         // Mark as cancelled
         auctionRepository.updateStatus(auctionId, AuctionStatus.CANCELLED)
+
+        ServiceResult.Success(auction)
+    }
+
+    /**
+     * Edits the price of an auction.
+     * Only allowed if no bids have been placed and auction is still active.
+     *
+     * @param player The player attempting to edit (must be owner)
+     * @param auctionId The ID of the auction to edit
+     * @param newStartPrice New starting price (optional, null to keep current)
+     * @param newBuyNowPrice New buy-it-now price (optional, null to keep current)
+     * @return The result of the edit attempt
+     */
+    suspend fun editAuctionPrice(
+        player: Player,
+        auctionId: UUID,
+        newStartPrice: Double?,
+        newBuyNowPrice: Double?
+    ): ServiceResult<Auction> = withContext(Dispatchers.IO) {
+        val auction = auctionRepository.getById(auctionId)
+            ?: return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_NOT_FOUND)
+            )
+
+        // Check ownership
+        if (auction.sellerUuid != player.uniqueId && !player.hasPermission("auctionhouse.admin.edit")) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_NOT_OWNER)
+            )
+        }
+
+        // Check auction is active
+        if (!auction.isActive()) {
+            return@withContext ServiceResult.Failure(
+                mm.deserialize("<red>Cannot edit prices on an ended auction.")
+            )
+        }
+
+        // Check no bids have been placed
+        val highestBid = bidRepository.getHighestBid(auctionId)
+        if (highestBid != null) {
+            return@withContext ServiceResult.Failure(
+                mm.deserialize("<red>Cannot edit prices after bids have been placed.")
+            )
+        }
+
+        // Validate new start price if provided
+        val finalStartPrice = newStartPrice ?: auction.startPrice
+        if (newStartPrice != null) {
+            if (newStartPrice < config.auctions.minStartPrice) {
+                return@withContext ServiceResult.Failure(
+                    translationAPI.getComponentSync(AuctionMessages.AUCTION_PRICE_TOO_LOW) {
+                        unparsed("min", economy.format(BigDecimal.valueOf(config.auctions.minStartPrice)))
+                    }
+                )
+            }
+            if (newStartPrice > config.auctions.maxStartPrice) {
+                return@withContext ServiceResult.Failure(
+                    translationAPI.getComponentSync(AuctionMessages.AUCTION_PRICE_TOO_HIGH) {
+                        unparsed("max", economy.format(BigDecimal.valueOf(config.auctions.maxStartPrice)))
+                    }
+                )
+            }
+        }
+
+        // Validate new BIN price if provided
+        val finalBuyNowPrice = newBuyNowPrice ?: auction.buyNowPrice
+        if (newBuyNowPrice != null) {
+            val minBin = finalStartPrice * config.auctions.minBinMultiplier
+            if (newBuyNowPrice < minBin) {
+                return@withContext ServiceResult.Failure(
+                    mm.deserialize("<red>BIN price must be at least ${economy.format(BigDecimal.valueOf(minBin))} (${config.auctions.minBinMultiplier}x start price)")
+                )
+            }
+        }
+
+        // Update prices in database
+        auctionRepository.updatePrices(auctionId, newStartPrice, newBuyNowPrice)
 
         ServiceResult.Success(auction)
     }
@@ -552,116 +643,146 @@ class AuctionService(
     }
 
     private suspend fun processExpiredAuction(auction: Auction) {
-        val highestBid = bidRepository.getHighestBid(auction.id)
+        try {
+            val highestBid = bidRepository.getHighestBid(auction.id)
 
-        val reserveMet = auction.reservePrice?.let { reserve ->
-            highestBid != null && highestBid.bidAmount >= reserve
-        } ?: true // No reserve price means any bid wins
+            val reserveMet = auction.reservePrice?.let { reserve ->
+                highestBid != null && highestBid.bidAmount >= reserve
+            } ?: true // No reserve price means any bid wins
 
-        if (highestBid != null && reserveMet) {
-            // Auction sold
-            val saleFee = calculateFee(highestBid.bidAmount, config.auctions.saleFee)
-            val sellerAmount = highestBid.bidAmount - saleFee
+            if (highestBid != null && reserveMet) {
+                // Auction sold - wrap database operations in transaction
+                database.transaction {
+                    try {
+                        val saleFee = calculateFee(highestBid.bidAmount, config.auctions.saleFee)
+                        val sellerAmount = highestBid.bidAmount - saleFee
 
-            val seller = plugin.server.getOfflinePlayer(auction.sellerUuid)
-            economy.deposit(seller, BigDecimal.valueOf(sellerAmount))
+                        val seller = plugin.server.getOfflinePlayer(auction.sellerUuid)
+                        economy.deposit(seller, BigDecimal.valueOf(sellerAmount))
 
-            transactionRepository.create(
-                Transaction(
-                    transactionType = TransactionType.AUCTION_SALE,
-                    fromUuid = highestBid.bidderUuid,
-                    fromName = highestBid.bidderName,
-                    toUuid = auction.sellerUuid,
-                    toName = auction.sellerName,
-                    amount = sellerAmount,
-                    taxAmount = saleFee,
-                    itemMaterial = auction.itemMaterial,
-                    itemQuantity = 1,
-                    referenceId = auction.id,
-                    timestamp = Instant.now(),
-                    serverId = serverId
-                )
-            )
+                        transactionRepository.create(
+                            Transaction(
+                                transactionType = TransactionType.AUCTION_SALE,
+                                fromUuid = highestBid.bidderUuid,
+                                fromName = highestBid.bidderName,
+                                toUuid = auction.sellerUuid,
+                                toName = auction.sellerName,
+                                amount = sellerAmount,
+                                taxAmount = saleFee,
+                                itemMaterial = auction.itemMaterial,
+                                itemQuantity = 1,
+                                referenceId = auction.id,
+                                timestamp = Instant.now(),
+                                serverId = serverId
+                            )
+                        )
 
-            auctionRepository.markAsSold(
-                auction.id,
-                highestBid.bidderUuid,
-                highestBid.bidderName,
-                highestBid.bidAmount
-            )
-
-            // Give item to winner
-            plugin.server.getPlayer(highestBid.bidderUuid)?.let { player ->
-                val itemGiven = giveItemOrStoreExpired(
-                    player,
-                    highestBid.bidderUuid,
-                    highestBid.bidderName,
-                    auction.itemStack,
-                    auction.id,
-                    ExpiredItemType.AUCTION_ITEM,
-                    "AUCTION_WON"
-                )
-                player.sendMessage(
-                    translationAPI.getComponentSync(AuctionMessages.AUCTION_WON) {
-                        unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
-                        unparsed("price", economy.format(BigDecimal.valueOf(highestBid.bidAmount)))
+                        auctionRepository.markAsSold(
+                            auction.id,
+                            highestBid.bidderUuid,
+                            highestBid.bidderName,
+                            highestBid.bidAmount
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Error processing sold auction ${auction.id} - economy/database operations failed", e)
+                        throw e // Re-throw to trigger transaction rollback
                     }
-                )
-                // Play won sound
-                playSound(player, config.notifications.sounds.won)
-            } ?: run {
-                // Player offline - store in expired items
-                expiredItemManager.storeExpiredItem(
-                    ownerUuid = highestBid.bidderUuid,
-                    ownerName = highestBid.bidderName,
-                    itemType = ExpiredItemType.AUCTION_ITEM,
-                    sourceId = auction.id,
-                    item = auction.itemStack,
-                    reason = "WON_AUCTION"
-                )
-            }
+                }
 
-            // Notify seller
-            plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
-                seller.sendMessage(
-                    translationAPI.getComponentSync(AuctionMessages.AUCTION_SOLD) {
-                        unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
-                        unparsed("price", economy.format(BigDecimal.valueOf(highestBid.bidAmount)))
+                // Give item to winner (outside transaction - failure here won't rollback economy)
+                try {
+                    plugin.server.getPlayer(highestBid.bidderUuid)?.let { player ->
+                        giveItemOrStoreExpired(
+                            player,
+                            highestBid.bidderUuid,
+                            highestBid.bidderName,
+                            auction.itemStack,
+                            auction.id,
+                            ExpiredItemType.AUCTION_ITEM,
+                            "AUCTION_WON"
+                        )
+                        player.sendMessage(
+                            translationAPI.getComponentSync(AuctionMessages.AUCTION_WON) {
+                                unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
+                                unparsed("price", economy.format(BigDecimal.valueOf(highestBid.bidAmount)))
+                            }
+                        )
+                        playSound(player, config.notifications.sounds.won)
+                    } ?: run {
+                        // Player offline - store in expired items
+                        expiredItemManager.storeExpiredItem(
+                            ownerUuid = highestBid.bidderUuid,
+                            ownerName = highestBid.bidderName,
+                            itemType = ExpiredItemType.AUCTION_ITEM,
+                            sourceId = auction.id,
+                            item = auction.itemStack,
+                            reason = "WON_AUCTION"
+                        )
                     }
-                )
-                // Play sold sound
-                playSound(seller, config.notifications.sounds.sold)
-            }
-        } else {
-            // Auction expired without sale
-            auctionRepository.updateStatus(auction.id, AuctionStatus.EXPIRED)
 
-            // Return item to seller
-            expiredItemManager.storeExpiredItem(
-                ownerUuid = auction.sellerUuid,
-                ownerName = auction.sellerName,
-                itemType = ExpiredItemType.AUCTION_ITEM,
-                sourceId = auction.id,
-                item = auction.itemStack,
-                reason = "EXPIRED"
-            )
-
-            // Notify seller
-            plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
-                seller.sendMessage(
-                    translationAPI.getComponentSync(AuctionMessages.AUCTION_EXPIRED) {
-                        unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
+                    // Notify seller
+                    plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
+                        seller.sendMessage(
+                            translationAPI.getComponentSync(AuctionMessages.AUCTION_SOLD) {
+                                unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
+                                unparsed("price", economy.format(BigDecimal.valueOf(highestBid.bidAmount)))
+                            }
+                        )
+                        playSound(seller, config.notifications.sounds.sold)
                     }
-                )
-                // Play expired sound
-                playSound(seller, config.notifications.sounds.expired)
-            }
+                } catch (e: Exception) {
+                    logger.error("Error delivering item/notification for auction ${auction.id}", e)
+                    // Item delivery failure logged but doesn't rollback economy
+                }
+            } else {
+                // Auction expired without sale - wrap database operations in transaction
+                database.transaction {
+                    try {
+                        auctionRepository.updateStatus(auction.id, AuctionStatus.EXPIRED)
 
-            // Refund highest bidder if exists but didn't meet reserve
-            highestBid?.let { bid ->
-                val bidder = plugin.server.getOfflinePlayer(bid.bidderUuid)
-                economy.deposit(bidder, BigDecimal.valueOf(bid.bidAmount))
+                        // Return item to seller
+                        expiredItemManager.storeExpiredItem(
+                            ownerUuid = auction.sellerUuid,
+                            ownerName = auction.sellerName,
+                            itemType = ExpiredItemType.AUCTION_ITEM,
+                            sourceId = auction.id,
+                            item = auction.itemStack,
+                            reason = "EXPIRED"
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Error processing expired auction ${auction.id} - database operations failed", e)
+                        throw e
+                    }
+                }
+
+                // Notify seller (outside transaction)
+                try {
+                    plugin.server.getPlayer(auction.sellerUuid)?.let { seller ->
+                        seller.sendMessage(
+                            translationAPI.getComponentSync(AuctionMessages.AUCTION_EXPIRED) {
+                                unparsed("item", auction.itemDisplayName ?: auction.itemMaterial)
+                            }
+                        )
+                        playSound(seller, config.notifications.sounds.expired)
+                    }
+                } catch (e: Exception) {
+                    logger.error("Error notifying seller for expired auction ${auction.id}", e)
+                }
+
+                // Refund highest bidder if exists but didn't meet reserve
+                highestBid?.let { bid ->
+                    try {
+                        val bidder = plugin.server.getOfflinePlayer(bid.bidderUuid)
+                        economy.deposit(bidder, BigDecimal.valueOf(bid.bidAmount))
+                    } catch (e: Exception) {
+                        logger.error("Error refunding bidder ${bid.bidderUuid} for auction ${auction.id}", e)
+                        // Log for manual recovery - economy operation failed
+                    }
+                }
             }
+        } catch (e: Exception) {
+            logger.error("Unexpected error processing expired auction ${auction.id}", e)
+            // Don't re-throw - continue processing other auctions
         }
     }
 
@@ -738,5 +859,241 @@ class AuctionService(
         } catch (e: IllegalArgumentException) {
             logger.warn("Invalid sound configured: $soundName")
         }
+    }
+
+    /**
+     * Creates multiple auctions in bulk.
+     *
+     * @param seller The player creating the auctions
+     * @param item The item stack being auctioned (will be removed from inventory)
+     * @param quantity Number of auctions to create (1 item per auction)
+     * @param type The type of auction (AUCTION, BIN, or BOTH)
+     * @param startPrice The starting bid price for each auction
+     * @param binPrice The buy-it-now price (null if not available)
+     * @param duration How long each auction will run
+     * @param anonymous Whether to hide the seller's identity
+     * @return The result of the bulk creation attempt
+     */
+    suspend fun createBulkAuctions(
+        seller: Player,
+        item: ItemStack,
+        quantity: Int,
+        type: AuctionType,
+        startPrice: Double,
+        binPrice: Double?,
+        duration: Duration,
+        anonymous: Boolean
+    ): BulkListingResult = withContext(Dispatchers.IO) {
+        // Check if bulk listing is enabled
+        if (!config.auctions.bulkListing.enabled) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                mm.deserialize("<red>Bulk listing is currently disabled.")
+            )
+        }
+
+        // Check max quantity
+        if (quantity > config.auctions.bulkListing.maxBulkListings) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_MAX_REACHED) {
+                    unparsed("max", config.auctions.bulkListing.maxBulkListings.toString())
+                }
+            )
+        }
+
+        // Validate item
+        if (item.type.isAir || item.amount == 0) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_INVALID_ITEM)
+            )
+        }
+
+        // Check if player has enough items
+        if (item.amount < quantity) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_NO_ITEMS)
+            )
+        }
+
+        // Check blacklist
+        if (config.restrictions.blacklistedMaterials.contains(item.type.name)) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_BLACKLISTED)
+            )
+        }
+
+        // Check price limits
+        if (startPrice < config.auctions.minStartPrice) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_PRICE_TOO_LOW) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(config.auctions.minStartPrice)))
+                }
+            )
+        }
+
+        if (startPrice > config.auctions.maxStartPrice) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_PRICE_TOO_HIGH) {
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.auctions.maxStartPrice)))
+                }
+            )
+        }
+
+        // Check BIN price
+        if (binPrice != null && type != AuctionType.AUCTION) {
+            val minBin = startPrice * config.auctions.minBinMultiplier
+            if (binPrice < minBin) {
+                return@withContext BulkListingResult(
+                    false, 0, 0, 0.0,
+                    mm.deserialize("<red>BIN price must be at least ${economy.format(BigDecimal.valueOf(minBin))} (${config.auctions.minBinMultiplier}x start price)")
+                )
+            }
+        }
+
+        // Check concurrent auctions
+        val activeCount = auctionRepository.countPlayerAuctions(seller.uniqueId, AuctionStatus.ACTIVE)
+        val maxAuctions = config.auctions.maxConcurrentAuctions
+        if (activeCount + quantity > maxAuctions) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_MAX_REACHED) {
+                    unparsed("max", maxAuctions.toString())
+                }
+            )
+        }
+
+        // Calculate fee per auction with bulk discount
+        val baseFee = calculateFee(startPrice, config.auctions.listingFee)
+        val discount = config.auctions.bulkListing.feeDiscountPercent / 100.0
+        val feePerAuction = (baseFee + if (anonymous && config.auctions.display.allowAnonymous) config.auctions.display.anonymousFee else 0.0) * (1.0 - discount)
+        val totalFee = feePerAuction * quantity
+
+        // Check if seller can afford total fees
+        if (totalFee > 0 && !economy.has(seller, BigDecimal.valueOf(totalFee))) {
+            return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                mm.deserialize("<red>You need ${economy.format(BigDecimal.valueOf(totalFee))} to list $quantity auctions.")
+            )
+        }
+
+        // Charge total fee upfront
+        if (totalFee > 0) {
+            economy.withdraw(seller, BigDecimal.valueOf(totalFee))
+            transactionRepository.create(
+                Transaction(
+                    transactionType = TransactionType.FEE_LISTING,
+                    fromUuid = seller.uniqueId,
+                    fromName = seller.name,
+                    toUuid = null,
+                    toName = null,
+                    amount = totalFee,
+                    taxAmount = 0.0,
+                    itemMaterial = null,
+                    itemQuantity = quantity,
+                    referenceId = null,
+                    timestamp = Instant.now(),
+                    serverId = serverId
+                )
+            )
+        }
+
+        // Remove items from inventory
+        val itemToRemove = item.clone().apply { amount = quantity }
+        withContext(plugin.entityDispatcher(seller)) {
+            seller.inventory.removeItem(itemToRemove)
+        }
+
+        // Create auctions
+        var auctionsCreated = 0
+        var auctionsFailed = 0
+        var feesCharged = 0.0
+
+        for (i in 1..quantity) {
+            try {
+                val auction = Auction(
+                    id = UUID.randomUUID(),
+                    sellerUuid = seller.uniqueId,
+                    sellerName = seller.name,
+                    itemStack = item.clone().apply { amount = 1 },
+                    itemMaterial = item.type.name,
+                    itemDisplayName = run {
+                        val meta = item.itemMeta
+                        if (meta != null && meta.hasDisplayName()) {
+                            meta.displayName()?.let { mm.serialize(it) }
+                        } else {
+                            null
+                        }
+                    },
+                    auctionType = type,
+                    startPrice = startPrice,
+                    buyNowPrice = binPrice,
+                    reservePrice = null,
+                    minIncrement = config.auctions.defaultIncrement,
+                    status = AuctionStatus.ACTIVE,
+                    createdAt = Instant.now(),
+                    endsAt = Instant.now().plus(duration),
+                    isAnonymous = anonymous && config.auctions.display.allowAnonymous
+                )
+
+                auctionRepository.create(auction)
+                auctionsCreated++
+                feesCharged += feePerAuction
+            } catch (e: Exception) {
+                logger.error("Failed to create bulk auction $i/$quantity for ${seller.name}", e)
+                auctionsFailed++
+            }
+        }
+
+        // Handle partial failures - refund fees for failed auctions
+        if (auctionsFailed > 0 && totalFee > 0) {
+            val refundAmount = feePerAuction * auctionsFailed
+            economy.deposit(seller, BigDecimal.valueOf(refundAmount))
+            feesCharged -= refundAmount
+
+            transactionRepository.create(
+                Transaction(
+                    transactionType = TransactionType.REFUND,
+                    fromUuid = null,
+                    fromName = null,
+                    toUuid = seller.uniqueId,
+                    toName = seller.name,
+                    amount = refundAmount,
+                    taxAmount = 0.0,
+                    itemMaterial = null,
+                    itemQuantity = auctionsFailed,
+                    referenceId = null,
+                    timestamp = Instant.now(),
+                    serverId = serverId
+                )
+            )
+        }
+
+        val success = auctionsCreated > 0
+        val message = when {
+            auctionsFailed == 0 -> translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_CREATED) {
+                unparsed("count", auctionsCreated.toString())
+                unparsed("fee", economy.format(BigDecimal.valueOf(feesCharged)))
+            }
+            auctionsCreated > 0 -> translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_PARTIAL) {
+                unparsed("success", auctionsCreated.toString())
+                unparsed("total", quantity.toString())
+                unparsed("failed", auctionsFailed.toString())
+            }
+            else -> mm.deserialize("<red>Failed to create any auctions.")
+        }
+
+        BulkListingResult(
+            success,
+            auctionsCreated,
+            auctionsFailed,
+            feesCharged,
+            message
+        )
     }
 }

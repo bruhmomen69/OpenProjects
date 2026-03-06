@@ -85,7 +85,7 @@ class ExpirationService(
             val orderDays = config.orders.expiredStorageDays
 
             // Delete old expired items
-            val deletedCount = plugin.getExpiredItemRepository().deleteOldItems(min(auctionDays, orderDays))
+            val deletedCount = plugin.expiredItemRepository.deleteOldItems(min(auctionDays, orderDays))
 
             if (deletedCount > 0) {
                 logger.info("Cleaned up {} expired items older than {} days", deletedCount, min(auctionDays, orderDays))

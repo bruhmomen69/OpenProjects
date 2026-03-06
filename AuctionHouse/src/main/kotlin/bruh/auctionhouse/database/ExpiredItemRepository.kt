@@ -27,8 +27,8 @@ class ExpiredItemRepository(private val database: Database) {
     suspend fun create(expiredItem: ExpiredItem) = withContext(Dispatchers.IO) {
         database.execute(
             sql {
-                mysql("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                sqlite("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                mysql("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                sqlite("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             },
             expiredItem.id.toBigInteger(),
             expiredItem.ownerUuid.toBigInteger(),
@@ -39,7 +39,8 @@ class ExpiredItemRepository(private val database: Database) {
             expiredItem.reason,
             expiredItem.expiredAt,
             expiredItem.claimed,
-            expiredItem.claimedAt
+            expiredItem.claimedAt,
+            expiredItem.consolidatedGroupId?.toBigInteger()
         )
     }
     

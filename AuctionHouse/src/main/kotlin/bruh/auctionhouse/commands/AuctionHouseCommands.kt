@@ -178,11 +178,12 @@ class AuctionHouseCommands(
     }
 
     /**
-     * Open expired items menu.
+     * Open claimable items menu (formerly expired items).
      */
     @Subcommand("expired")
     @CommandPermission("auctionhouse.expired")
-    fun expired(player: Player) {
+    @Command("ah", "auctionhouse", "claimable", "claim")
+    fun claimable(player: Player) {
         if (!plugin.isReady) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return

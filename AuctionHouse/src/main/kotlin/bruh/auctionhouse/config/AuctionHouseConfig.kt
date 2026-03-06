@@ -39,24 +39,39 @@ data class AuctionSettings(
     val durationOptions: List<Int> = listOf(1, 6, 12, 24, 48, 72),
     val defaultDuration: Int = 24,
     val maxDuration: Int = 168,
-    
+
     val minStartPrice: Double = 1.0,
     val maxStartPrice: Double = 1000000000.0,
     val minIncrement: Double = 1.0,
     val defaultIncrement: Double = 5.0,
-    
+
     val listingFee: FeeConfig = FeeConfig("PERCENTAGE", 1.0, 10.0, 10000.0),
     val saleFee: FeeConfig = FeeConfig("PERCENTAGE", 5.0, 0.0, 100000.0),
-    
+
     val maxConcurrentAuctions: Int = 10,
     val expiredStorageDays: Int = 30,
-    
+
     @Comment("Allow auctions with both bidding AND BIN")
     val allowCombined: Boolean = true,
     val minBinMultiplier: Double = 1.5,
-    
+
     val antiSnipe: AntiSnipeConfig = AntiSnipeConfig(),
-    val display: AuctionDisplayConfig = AuctionDisplayConfig()
+    val manualExtension: ManualExtensionConfig = ManualExtensionConfig(),
+    val bidWithdrawal: BidWithdrawalConfig = BidWithdrawalConfig(),
+    val display: AuctionDisplayConfig = AuctionDisplayConfig(),
+    
+    @Comment("Bulk listing settings")
+    val bulkListing: BulkListingConfig = BulkListingConfig()
+)
+
+@ConfigSerializable
+data class BulkListingConfig(
+    @Comment("Enable bulk listing feature")
+    val enabled: Boolean = true,
+    @Comment("Maximum number of auctions that can be created in one bulk operation")
+    val maxBulkListings: Int = 100,
+    @Comment("Fee discount for bulk listings (percentage, 0 = no discount)")
+    val feeDiscountPercent: Double = 0.0
 )
 
 @ConfigSerializable
@@ -72,7 +87,23 @@ data class AntiSnipeConfig(
     val enabled: Boolean = true,
     val thresholdMinutes: Int = 5,
     val extensionMinutes: Int = 5,
-    val maxExtensions: Int = 3
+    val maxAutoExtensions: Int = 3
+)
+
+@ConfigSerializable
+data class ManualExtensionConfig(
+    @Comment("Maximum manual extensions allowed per auction (separate from anti-snipe)")
+    val maxManualExtensions: Int = 5,
+    @Comment("Fee for each manual extension")
+    val extensionFee: Double = 100.0,
+    @Comment("Hours added per manual extension")
+    val extensionHours: Int = 24
+)
+
+@ConfigSerializable
+data class BidWithdrawalConfig(
+    @Comment("Prevent bid withdrawals in the last X minutes before auction ends (0 = disabled)")
+    val cutoffMinutes: Int = 5
 )
 
 @ConfigSerializable
@@ -108,7 +139,18 @@ data class OrderSettings(
     @Comment("When enabled, items from fulfilled buy orders will always go to the Expired Items menu\n" +
         "instead of being placed directly in the player's inventory. This prevents item loss\n" +
         "when the player's inventory is full. Default: false")
-    val buyOrdersAlwaysToExpiredItems: Boolean = false
+    val buyOrdersAlwaysToExpiredItems: Boolean = false,
+    
+    @Comment("Bulk buying settings")
+    val bulkBuying: BulkBuyingConfig = BulkBuyingConfig()
+)
+
+@ConfigSerializable
+data class BulkBuyingConfig(
+    @Comment("Enable bulk buying feature")
+    val enabled: Boolean = true,
+    @Comment("Maximum number of items that can be purchased in one bulk operation")
+    val maxBulkPurchases: Int = 50
 )
 
 @ConfigSerializable
@@ -130,10 +172,25 @@ data class GuiSettings(
     val auctionMenuRows: Int = 6,
     val itemsPerPage: Int = 28,
     val updateInterval: Int = 30,
-    
+
     val confirm: ConfirmConfig = ConfirmConfig(),
     val defaultSort: String = "ENDING_SOON",
-    val defaultFilter: String = "ALL"
+    val defaultFilter: String = "ALL",
+    
+    @Comment("Transaction history settings")
+    val transactionHistory: TransactionHistoryConfig = TransactionHistoryConfig()
+)
+
+@ConfigSerializable
+data class TransactionHistoryConfig(
+    @Comment("Enable transaction history feature")
+    val enabled: Boolean = true,
+    @Comment("Number of transactions to show per page")
+    val transactionsPerPage: Int = 21,
+    @Comment("Default number of transactions to retrieve")
+    val defaultLimit: Int = 50,
+    @Comment("Maximum number of transactions to retrieve")
+    val maxLimit: Int = 500
 )
 
 @ConfigSerializable
@@ -157,7 +214,18 @@ data class RestrictionsConfig(
     val blacklistedMaterials: List<String> = listOf("BEDROCK", "BARRIER", "COMMAND_BLOCK"),
     val nbtBlacklist: List<String> = emptyList(),
     val disabledWorlds: List<String> = emptyList(),
-    val blockCreative: Boolean = true
+    val blockCreative: Boolean = true,
+    
+    @Comment("Admin settings for player sanctions")
+    val admin: AdminRestrictionsConfig = AdminRestrictionsConfig()
+)
+
+@ConfigSerializable
+data class AdminRestrictionsConfig(
+    @Comment("What to do with existing auctions when a player is banned (CANCEL or KEEP)")
+    val onBanCancelAuctions: Boolean = true,
+    @Comment("Auto-refund players when their auctions are cancelled by admin")
+    val autoRefundOnAdminCancel: Boolean = true
 )
 
 @ConfigSerializable

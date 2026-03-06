@@ -47,7 +47,7 @@ class ConsolidatedExpiredItemsMenu(
         }
 
         if (consolidatedItems.isEmpty()) {
-            player.sendMessage(mm.deserialize("<gray>You have no expired items to claim."))
+            player.sendMessage(mm.deserialize("<gray>You have no claimable items to retrieve."))
             // Open the main auction house menu instead
             AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
             return
@@ -93,7 +93,7 @@ class ConsolidatedExpiredItemsMenu(
         val loreList = mutableListOf<Component>()
         loreList.add(mm.deserialize("<gray>Available: <green>${item.remainingQuantity()}"))
         loreList.add(mm.deserialize("<gray>Total: <white>${item.totalQuantity}"))
-        loreList.add(mm.deserialize("<gray>Type: <white>${item.itemType}"))
+        loreList.add(mm.deserialize("<gray>Source: <white>${item.itemType}"))
         loreList.add(mm.deserialize("<gray>Reason: <white>${item.reason}"))
         loreList.add(Component.empty())
         loreList.add(mm.deserialize("<yellow>Left-click to claim items"))

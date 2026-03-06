@@ -6,25 +6,31 @@ package bruh.auctionhouse.model
 enum class TransactionType {
     /** Auction sale completed */
     AUCTION_SALE,
-    
+
     /** Bid refund when outbid */
     AUCTION_BID_RETURN,
-    
+
     /** BIN purchase completed */
     BIN_PURCHASE,
-    
+
     /** Order fill completed */
     ORDER_FILL,
-    
+
     /** Order refund when cancelled/expired */
     ORDER_REFUND,
-    
+
     /** Fee charged for listing */
     FEE_LISTING,
-    
+
     /** Fee charged on sale */
     FEE_SALE,
-    
+
     /** Fee charged on order fill */
-    FILL_FEE
+    FILL_FEE,
+
+    /** Admin refund issued */
+    REFUND,
+
+    /** Fee charged for order fill */
+    FEE_ORDER_FILL
 }

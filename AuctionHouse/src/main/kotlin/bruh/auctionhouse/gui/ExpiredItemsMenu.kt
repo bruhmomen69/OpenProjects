@@ -50,7 +50,7 @@ class ExpiredItemsMenu(
         }
 
         if (expiredItems.isEmpty()) {
-            player.sendMessage(mm.deserialize("<gray>You have no expired items to claim."))
+            player.sendMessage(mm.deserialize("<gray>You have no claimable items to retrieve."))
             return
         }
 
@@ -92,13 +92,13 @@ class ExpiredItemsMenu(
         val material = XMaterial.matchXMaterial(expiredItem.itemStack.type.name).orElse(XMaterial.STONE)
 
         val loreList = mutableListOf<Component>()
-        loreList.add(mm.deserialize("<gray>Reason: <white>${expiredItem.reason}"))
-        loreList.add(mm.deserialize("<gray>Expired: <white>${formatExpiredTime(expiredItem.expiredAt)}"))
+        loreList.add(mm.deserialize("<gray>Source: <white>${expiredItem.reason}"))
+        loreList.add(mm.deserialize("<gray>Available: <white>${formatExpiredTime(expiredItem.expiredAt)}"))
         if (expiredItem.itemStack.amount > 1) {
             loreList.add(mm.deserialize("<gray>Quantity: <white>${expiredItem.itemStack.amount}"))
         }
         loreList.add(Component.empty())
-        loreList.add(mm.deserialize("<green>Click to retrieve item"))
+        loreList.add(mm.deserialize("<green>Click to claim item"))
 
         return VItem(material) {
             name = expiredItem.itemStack.itemMeta?.displayName()

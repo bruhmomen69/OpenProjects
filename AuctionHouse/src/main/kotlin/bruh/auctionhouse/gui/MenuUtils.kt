@@ -88,4 +88,11 @@ object MenuUtils {
     fun formatPrice(price: Double, economy: EconomyProvider): String {
         return economy.format(java.math.BigDecimal.valueOf(price))
     }
+
+    /**
+     * Checks if a price exceeds the expensive threshold.
+     */
+    fun isExpensiveAction(price: Double, threshold: Double): Boolean {
+        return price >= threshold
+    }
 }

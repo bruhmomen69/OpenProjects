@@ -24,6 +24,8 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
 import java.math.BigDecimal
+import java.time.Duration
+import java.time.Instant
 
 /**
  * Menu for viewing auction details and placing bids or buying.
@@ -72,6 +74,11 @@ class AuctionDetailsMenu(
             // Cancel button (if owner)
             if (auction.sellerUuid == player.uniqueId || player.hasPermission("auctionhouse.admin.cancel")) {
                 item(31, createCancelButton())
+            }
+
+            // Edit Price button (if owner, auction is active, and no bids)
+            if (auction.sellerUuid == player.uniqueId && auction.isActive() && auction.bidCount == 0) {
+                item(21, createEditPriceButton())
             }
 
             // Extend button (if owner and auction is active)
@@ -156,6 +163,16 @@ class AuctionDetailsMenu(
 
                 val isPlayerBid = bid.bidderUuid == player.uniqueId
                 val isActive = !bid.isOutbid
+                
+                // Check if withdrawal is allowed based on cutoff
+                val canWithdraw = isPlayerBid && isActive && run {
+                    val cutoffMinutes = config.auctions.bidWithdrawal.cutoffMinutes
+                    if (cutoffMinutes <= 0) true
+                    else {
+                        val timeRemaining = java.time.Duration.between(java.time.Instant.now(), auction.endsAt)
+                        timeRemaining.toMinutes() >= cutoffMinutes
+                    }
+                }
 
                 item(slot, VItem(XMaterial.PAPER) {
                     name = mm.deserialize("<gold>Bid: ${MenuUtils.formatPrice(bid.bidAmount, plugin.economy)}")
@@ -165,11 +182,16 @@ class AuctionDetailsMenu(
                     loreList.add(mm.deserialize("<gray>Status: ${if (bid.isOutbid) "<red>Outbid" else "<green>Active"}"))
                     if (isPlayerBid && isActive) {
                         loreList.add(Component.empty())
-                        loreList.add(mm.deserialize("<yellow>Click to withdraw your bid"))
+                        if (canWithdraw) {
+                            loreList.add(mm.deserialize("<green>Click to withdraw your bid"))
+                        } else {
+                            val cutoffMinutes = config.auctions.bidWithdrawal.cutoffMinutes
+                            loreList.add(mm.deserialize("<red>Withdrawal locked (last $cutoffMinutes min)"))
+                        }
                     }
                     lore = loreList
 
-                    if (isPlayerBid && isActive) {
+                    if (canWithdraw) {
                         onClick { _, _ ->
                             withdrawBid(bid)
                             ClickResult.CLOSE
@@ -193,6 +215,18 @@ class AuctionDetailsMenu(
 
     private fun withdrawBid(bid: bruh.auctionhouse.model.Bid) {
         runBlocking {
+            // Check bid withdrawal cutoff
+            val cutoffMinutes = config.auctions.bidWithdrawal.cutoffMinutes
+            if (cutoffMinutes > 0) {
+                val timeRemaining = java.time.Duration.between(java.time.Instant.now(), auction.endsAt)
+                if (timeRemaining.toMinutes() < cutoffMinutes) {
+                    player.sendMessage(
+                        mm.deserialize("<red>Bid withdrawals are not allowed in the last $cutoffMinutes minutes of an auction.")
+                    )
+                    return@runBlocking
+                }
+            }
+
             // Get the bid amount for refund
             val refundAmount = bidRepository.deleteBid(bid.id)
 
@@ -213,8 +247,8 @@ class AuctionDetailsMenu(
     }
 
     private fun createExtendButton(): VItem {
-        val extensionHours = 24 // Default extension: 24 hours
-        val extensionFee = 100.0 // Fixed fee for extension
+        val extensionHours = config.auctions.manualExtension.extensionHours
+        val extensionFee = config.auctions.manualExtension.extensionFee
 
         return VItem(XMaterial.CLOCK) {
             name = mm.deserialize("<yellow>Extend Auction")
@@ -241,10 +275,10 @@ class AuctionDetailsMenu(
                 return@runBlocking
             }
 
-            // Check extension count
-            val currentExtensions = auctionRepository.getExtensionCount(auction.id)
-            if (currentExtensions >= config.auctions.antiSnipe.maxExtensions) {
-                player.sendMessage(mm.deserialize("<red>Maximum extension limit reached."))
+            // Check manual extension count (separate from anti-snipe auto extensions)
+            val currentManualExtensions = auctionRepository.getManualExtensionCount(auction.id)
+            if (currentManualExtensions >= config.auctions.manualExtension.maxManualExtensions) {
+                player.sendMessage(mm.deserialize("<red>Maximum manual extension limit reached (${config.auctions.manualExtension.maxManualExtensions})."))
                 return@runBlocking
             }
 
@@ -254,7 +288,7 @@ class AuctionDetailsMenu(
             // Extend auction
             val newEndTime = auction.endsAt.plus(java.time.Duration.ofHours(hours.toLong()))
             auctionRepository.updateEndTime(auction.id, newEndTime)
-            auctionRepository.incrementExtensionCount(auction.id)
+            auctionRepository.incrementManualExtensionCount(auction.id)
 
             player.sendMessage(
                 mm.deserialize("<green>Auction extended by <white>${hours} hours</white>! New end time: <yellow>$newEndTime")
@@ -274,6 +308,7 @@ class AuctionDetailsMenu(
 
     private fun createAuctionDisplayItem(): VItem {
         val material = XMaterial.matchXMaterial(auction.itemMaterial).orElse(XMaterial.STONE)
+        val hasEnded = auction.hasEnded()
 
         return VItem(material) {
             name = auction.itemDisplayName?.let {
@@ -283,6 +318,10 @@ class AuctionDetailsMenu(
             val loreList = mutableListOf<Component>()
             loreList.add(Component.empty())
             loreList.add(mm.deserialize("<gray>Seller: <white>${if (auction.isAnonymous) "Anonymous" else auction.sellerName}"))
+
+            if (hasEnded) {
+                loreList.add(mm.deserialize("<red>⚠ Auction Ended"))
+            }
 
             if (auction.auctionType == AuctionType.AUCTION || auction.auctionType == AuctionType.BOTH) {
                 // Fetch the actual highest bid
@@ -299,11 +338,26 @@ class AuctionDetailsMenu(
                 loreList.add(mm.deserialize("<green>Buy Now: <gold>${MenuUtils.formatPrice(it, plugin.economy)}"))
             }
 
-            loreList.add(mm.deserialize("<gray>Time Left: <yellow>${MenuUtils.formatTimeRemaining(auction.endsAt)}"))
+            val timeDisplay = if (hasEnded) {
+                mm.deserialize("<red>Ended: ${formatAuctionEndTime(auction.endsAt)}")
+            } else {
+                mm.deserialize("<gray>Time Left: <yellow>${MenuUtils.formatTimeRemaining(auction.endsAt)}")
+            }
+            loreList.add(timeDisplay)
             loreList.add(mm.deserialize("<gray>Bids: <white>${auction.bidCount}"))
             loreList.add(mm.deserialize("<gray>Views: <white>${auction.viewCount}"))
 
             lore = loreList
+        }
+    }
+
+    private fun formatAuctionEndTime(endTime: Instant): String {
+        val duration = Duration.between(endTime, Instant.now())
+        return when {
+            duration.toDays() > 0 -> "${duration.toDays()}d ago"
+            duration.toHours() > 0 -> "${duration.toHours()}h ago"
+            duration.toMinutes() > 0 -> "${duration.toMinutes()}m ago"
+            else -> "Just now"
         }
     }
 
@@ -378,6 +432,142 @@ class AuctionDetailsMenu(
                     }
                 }
                 ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun createEditPriceButton(): VItem {
+        return VItem(XMaterial.ANVIL) {
+            name = mm.deserialize("<yellow>Edit Prices")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>Modify start and BIN prices"))
+            loreList.add(mm.deserialize("<gray>Current start: <gold>${MenuUtils.formatPrice(auction.startPrice, plugin.economy)}"))
+            auction.buyNowPrice?.let { binPrice ->
+                loreList.add(mm.deserialize("<gray>Current BIN: <gold>${MenuUtils.formatPrice(binPrice, plugin.economy)}"))
+            }
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to edit prices"))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                openEditPriceMenu()
+                ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun openEditPriceMenu() {
+        val menu = menuAPI.simple {
+            rows = 5
+            title = mm.deserialize("<yellow>Edit Auction Prices")
+
+            background = MenuUtils.backgroundItem()
+
+            // Current prices display
+            item(13, VItem(XMaterial.PAPER) {
+                name = mm.deserialize("<yellow>Current Prices")
+                val loreList = mutableListOf<Component>()
+                loreList.add(mm.deserialize("<gray>Start Price: <gold>${MenuUtils.formatPrice(auction.startPrice, plugin.economy)}"))
+                auction.buyNowPrice?.let { binPrice ->
+                    loreList.add(mm.deserialize("<gray>BIN Price: <gold>${MenuUtils.formatPrice(binPrice, plugin.economy)}"))
+                }
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<gray>Click buttons below to edit"))
+                lore = loreList
+                hideAllFlags()
+            })
+
+            // Edit start price button
+            item(29, VItem(XMaterial.GOLD_NUGGET) {
+                name = mm.deserialize("<yellow>Edit Start Price")
+                lore = mutableListOf(mm.deserialize("<gray>Current: ${MenuUtils.formatPrice(auction.startPrice, plugin.economy)}"))
+                hideAllFlags()
+
+                onClick { _, _ ->
+                    runBlocking {
+                        val result = menuAPI.promptDouble(
+                            player,
+                            "New Start Price",
+                            auction.startPrice,
+                            config.auctions.minStartPrice,
+                            config.auctions.maxStartPrice
+                        )
+                        when (result) {
+                            is AnvilInputResult.Success -> {
+                                updatePrices(result.value, auction.buyNowPrice)
+                            }
+                            is AnvilInputResult.Cancelled -> {}
+                        }
+                    }
+                    ClickResult.CLOSE
+                }
+            })
+
+            // Edit BIN price button
+            item(31, VItem(XMaterial.EMERALD) {
+                name = mm.deserialize("<yellow>Edit BIN Price")
+                val loreList = mutableListOf<Component>()
+                auction.buyNowPrice?.let { binPrice ->
+                    loreList.add(mm.deserialize("<gray>Current: ${MenuUtils.formatPrice(binPrice, plugin.economy)}"))
+                } ?: run {
+                    loreList.add(mm.deserialize("<gray>Not set"))
+                }
+                loreList.add(mm.deserialize("<gray>Click to set/clear"))
+                lore = loreList
+                hideAllFlags()
+
+                onClick { _, _ ->
+                    runBlocking {
+                        val currentBin = auction.buyNowPrice
+                        if (currentBin != null) {
+                            // Clear BIN price
+                            updatePrices(null, null)
+                            player.sendMessage(mm.deserialize("<green>BIN price removed."))
+                        } else {
+                            // Set BIN price
+                            val result = menuAPI.promptDouble(
+                                player,
+                                "New BIN Price",
+                                auction.startPrice * 1.5,
+                                auction.startPrice * config.auctions.minBinMultiplier,
+                                config.auctions.maxStartPrice
+                            )
+                            when (result) {
+                                is AnvilInputResult.Success -> {
+                                    updatePrices(null, result.value)
+                                }
+                                is AnvilInputResult.Cancelled -> {}
+                            }
+                        }
+                    }
+                    ClickResult.CLOSE
+                }
+            })
+
+            // Back button
+            item(40, MenuUtils.backButton(translationAPI).apply {
+                onClick { _, _ ->
+                    open()
+                    ClickResult.CLOSE
+                }
+            })
+        }
+
+        menuAPI.open(menu, player)
+    }
+
+    private fun updatePrices(newStart: Double?, newBin: Double?) {
+        runBlocking {
+            val result = auctionService.editAuctionPrice(player, auction.id, newStart, newBin)
+            when (result) {
+                is bruh.auctionhouse.service.ServiceResult.Success -> {
+                    player.sendMessage(mm.deserialize("<green>Prices updated successfully!"))
+                    open()
+                }
+                is bruh.auctionhouse.service.ServiceResult.Failure -> {
+                    player.sendMessage(result.message)
+                }
             }
         }
     }

@@ -51,7 +51,8 @@ class AuctionRepository(private val database: Database) {
             auction.viewCount,
             auction.bidCount,
             auction.isAnonymous,
-            auction.extensionCount
+            auction.extensionCount,
+            auction.manualExtensionCount
         )
     }
 
@@ -88,7 +89,8 @@ class AuctionRepository(private val database: Database) {
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
                 isAnonymous = rs.getBoolean("is_anonymous"),
-                extensionCount = rs.getInt("extension_count")
+                extensionCount = rs.getInt("extension_count"),
+                manualExtensionCount = rs.getInt("manual_extension_count")
             )
         }
     }
@@ -180,7 +182,8 @@ class AuctionRepository(private val database: Database) {
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
                 isAnonymous = rs.getBoolean("is_anonymous"),
-                extensionCount = rs.getInt("extension_count")
+                extensionCount = rs.getInt("extension_count"),
+                manualExtensionCount = rs.getInt("manual_extension_count")
             )
         }
     }
@@ -252,7 +255,8 @@ class AuctionRepository(private val database: Database) {
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
                 isAnonymous = rs.getBoolean("is_anonymous"),
-                extensionCount = rs.getInt("extension_count")
+                extensionCount = rs.getInt("extension_count"),
+                manualExtensionCount = rs.getInt("manual_extension_count")
             )
         }
     }
@@ -287,7 +291,8 @@ class AuctionRepository(private val database: Database) {
                 viewCount = rs.getInt("view_count"),
                 bidCount = rs.getInt("bid_count"),
                 isAnonymous = rs.getBoolean("is_anonymous"),
-                extensionCount = rs.getInt("extension_count")
+                extensionCount = rs.getInt("extension_count"),
+                manualExtensionCount = rs.getInt("manual_extension_count")
             )
         }
     }
@@ -369,6 +374,28 @@ class AuctionRepository(private val database: Database) {
     }
 
     /**
+     * Increments the manual extension count for an auction.
+     */
+    suspend fun incrementManualExtensionCount(id: UUID) = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("UPDATE auctions SET manual_extension_count = manual_extension_count + 1 WHERE id = ?"),
+            id.toString()
+        )
+    }
+
+    /**
+     * Gets the manual extension count for an auction.
+     */
+    suspend fun getManualExtensionCount(id: UUID): Int = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT manual_extension_count FROM auctions WHERE id = ?"),
+            id.toString()
+        ) { rs ->
+            rs.getInt("manual_extension_count")
+        } ?: 0
+    }
+
+    /**
      * Counts total active auctions matching filter criteria.
      */
     suspend fun countActiveAuctions(filter: AuctionFilter): Int = withContext(Dispatchers.IO) {
@@ -415,5 +442,53 @@ class AuctionRepository(private val database: Database) {
         database.querySingle(sql(sqlQuery), *params.toTypedArray()) { rs ->
             rs.getInt("count")
         } ?: 0
+    }
+
+    /**
+     * Gets total count of active auctions.
+     */
+    suspend fun getActiveAuctionsCount(): Int = withContext(Dispatchers.IO) {
+        database.querySingle(
+            sql("SELECT COUNT(*) as count FROM auctions WHERE status = 'ACTIVE'")
+        ) { rs ->
+            rs.getInt("count")
+        } ?: 0
+    }
+
+    /**
+     * Deletes an auction by ID.
+     */
+    suspend fun delete(id: UUID) = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("DELETE FROM auctions WHERE id = ?"),
+            id.toString()
+        )
+    }
+
+    /**
+     * Updates the start price and/or buy-now price of an auction.
+     * Only allowed if no bids have been placed.
+     */
+    suspend fun updatePrices(id: UUID, startPrice: Double?, buyNowPrice: Double?) = withContext(Dispatchers.IO) {
+        val params = mutableListOf<Any>()
+        val updates = mutableListOf<String>()
+
+        startPrice?.let {
+            updates.add("start_price = ?")
+            params.add(it)
+        }
+
+        buyNowPrice?.let {
+            updates.add("buy_now_price = ?")
+            params.add(it)
+        }
+
+        if (updates.isNotEmpty()) {
+            params.add(id.toString())
+            database.execute(
+                sql("UPDATE auctions SET ${updates.joinToString(", ")} WHERE id = ?"),
+                *params.toTypedArray()
+            )
+        }
     }
 }

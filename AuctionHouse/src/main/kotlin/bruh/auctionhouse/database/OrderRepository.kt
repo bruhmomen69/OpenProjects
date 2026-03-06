@@ -18,9 +18,23 @@ import java.util.UUID
  * Repository for order CRUD operations and queries.
  */
 class OrderRepository(private val database: Database) {
-    
+
     private fun serializeItem(item: ItemStack?): ByteArray? = item?.serializeAsBytes()
     private fun deserializeItem(bytes: ByteArray?): ItemStack? = bytes?.let { ItemStack.deserializeBytes(it) }
+
+    /**
+     * Safely converts a string to Material, returning AIR if the material is not found.
+     * This prevents IllegalArgumentException when database contains outdated/invalid material names.
+     */
+    private fun safeMaterialValueOf(name: String): Material {
+        return try {
+            Material.valueOf(name)
+        } catch (e: IllegalArgumentException) {
+            // Log warning for debugging
+            println("[OrderRepository] Unknown material '$name', defaulting to AIR")
+            Material.AIR
+        }
+    }
     
     /**
      * Creates a new order.
@@ -66,7 +80,7 @@ class OrderRepository(private val database: Database) {
                 creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
                 creatorName = rs.getString("creator_name"),
                 orderType = OrderType.valueOf(rs.getString("order_type")),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
                 itemDisplayName = rs.getString("item_display_name"),
                 itemLoreHash = rs.getString("item_lore_hash"),
                 itemNbtHash = rs.getString("item_nbt_hash"),
@@ -158,7 +172,7 @@ class OrderRepository(private val database: Database) {
                 creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
                 creatorName = rs.getString("creator_name"),
                 orderType = OrderType.valueOf(rs.getString("order_type")),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
                 itemDisplayName = rs.getString("item_display_name"),
                 itemLoreHash = rs.getString("item_lore_hash"),
                 itemNbtHash = rs.getString("item_nbt_hash"),
@@ -199,7 +213,7 @@ class OrderRepository(private val database: Database) {
                 creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
                 creatorName = rs.getString("creator_name"),
                 orderType = OrderType.valueOf(rs.getString("order_type")),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
                 itemDisplayName = rs.getString("item_display_name"),
                 itemLoreHash = rs.getString("item_lore_hash"),
                 itemNbtHash = rs.getString("item_nbt_hash"),
@@ -231,7 +245,7 @@ class OrderRepository(private val database: Database) {
                 creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
                 creatorName = rs.getString("creator_name"),
                 orderType = OrderType.valueOf(rs.getString("order_type")),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
                 itemDisplayName = rs.getString("item_display_name"),
                 itemLoreHash = rs.getString("item_lore_hash"),
                 itemNbtHash = rs.getString("item_nbt_hash"),
@@ -265,9 +279,10 @@ class OrderRepository(private val database: Database) {
 
     /**
      * Counts total active orders matching filter criteria.
+     * Note: Includes both PENDING and PARTIAL statuses to match getActiveOrders().
      */
     suspend fun countActiveOrders(filter: OrderFilter): Int = withContext(Dispatchers.IO) {
-        var sqlQuery = "SELECT COUNT(*) as count FROM orders WHERE status = 'PENDING'"
+        var sqlQuery = "SELECT COUNT(*) as count FROM orders WHERE status IN ('PENDING', 'PARTIAL')"
         val params = mutableListOf<Any>()
 
         filter.searchQuery?.let {
@@ -304,7 +319,7 @@ class OrderRepository(private val database: Database) {
                 creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
                 creatorName = rs.getString("creator_name"),
                 orderType = OrderType.valueOf(rs.getString("order_type")),
-                itemMaterial = rs.getString("item_material").let { Material.valueOf(it) },
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
                 itemDisplayName = rs.getString("item_display_name"),
                 itemLoreHash = rs.getString("item_lore_hash"),
                 itemNbtHash = rs.getString("item_nbt_hash"),

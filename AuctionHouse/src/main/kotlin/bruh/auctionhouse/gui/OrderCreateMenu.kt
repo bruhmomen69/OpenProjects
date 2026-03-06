@@ -95,6 +95,10 @@ class OrderCreateMenu(
                 item(27, createItemIncrement())
 
                 item(32, createPartialToggle())
+                
+                // NBT/Lore matching options (row 4)
+                item(38, createNbtMatchToggle())
+                item(41, createLoreMatchToggle())
             }
 
             item(30, createPriceButton())
@@ -449,6 +453,52 @@ class OrderCreateMenu(
         }
     }
 
+    private fun createNbtMatchToggle(): VItem {
+        return VItem(if (state.requireExactNbt) XMaterial.COMMAND_BLOCK else XMaterial.CRAFTING_TABLE) {
+            name = mm.deserialize("<yellow>Match NBT: <white>${if (state.requireExactNbt) "Yes" else "No"}")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>Require exact NBT data match"))
+            loreList.add(mm.deserialize("<gray>Enchants, custom model data, etc."))
+            if (state.requireExactNbt) {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<green>Only matching NBT will fulfill"))
+            }
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to toggle"))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                state = state.copy(requireExactNbt = !state.requireExactNbt)
+                refreshMenu()
+                ClickResult.ALLOW
+            }
+        }
+    }
+
+    private fun createLoreMatchToggle(): VItem {
+        return VItem(if (state.requireExactLore) XMaterial.WRITABLE_BOOK else XMaterial.BOOK) {
+            name = mm.deserialize("<yellow>Match Lore: <white>${if (state.requireExactLore) "Yes" else "No"}")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>Require exact lore match"))
+            loreList.add(mm.deserialize("<gray>All lore lines must match"))
+            if (state.requireExactLore) {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<green>Only matching lore will fulfill"))
+            }
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to toggle"))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                state = state.copy(requireExactLore = !state.requireExactLore)
+                refreshMenu()
+                ClickResult.ALLOW
+            }
+        }
+    }
+
     private fun createConfirmButton(): VItem {
         val isBuyOrder = orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER
         val canConfirm = if (isBuyOrder) state.isValid() else state.selectedMaterial != null && state.totalQuantity > 0
@@ -508,16 +558,18 @@ class OrderCreateMenu(
             val material = state.selectedMaterial ?: return@runBlocking
 
             val result = if (orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER) {
-                // Create buy order
+                // Create buy order with NBT/lore matching options
                 orderService.createBuyOrder(
                     creator = player,
                     material = material,
-                    displayName = null,
+                    displayName = state.itemDisplayName,
                     quantity = state.totalQuantity,
                     pricePerUnit = state.pricePerUnit,
                     allowPartial = state.allowPartial,
                     minFillQuantity = state.minFillQuantity,
-                    duration = state.duration
+                    duration = state.duration,
+                    requireExactNbt = state.requireExactNbt,
+                    requireExactLore = state.requireExactLore
                 )
             } else {
                 // Create sell order - need item from inventory

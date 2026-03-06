@@ -14,6 +14,9 @@ import java.time.Duration
  * @property duration Order duration
  * @property allowPartial Whether partial fills are allowed
  * @property minFillQuantity Minimum quantity for partial fills
+ * @property requireExactNbt Whether to require exact NBT match (buy orders only)
+ * @property requireExactLore Whether to require exact lore match (buy orders only)
+ * @property itemDisplayName Optional display name filter for matching
  */
 data class OrderCreateState(
     val selectedMaterial: Material? = null,
@@ -22,7 +25,10 @@ data class OrderCreateState(
     val pricePerUnit: Double = 1.0,
     val duration: Duration = Duration.ofHours(72),
     val allowPartial: Boolean = true,
-    val minFillQuantity: Int? = null
+    val minFillQuantity: Int? = null,
+    val requireExactNbt: Boolean = false,
+    val requireExactLore: Boolean = false,
+    val itemDisplayName: String? = null
 ) {
     /**
      * Total quantity in items.

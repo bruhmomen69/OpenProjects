@@ -16,7 +16,7 @@ class OrderFillRepository(private val database: Database) {
      * Creates a new order fill record and returns the generated ID.
      */
     suspend fun create(fill: OrderFill): Long = withContext(Dispatchers.IO) {
-        database.execute(
+        database.executeInsert(
             sql {
                 mysql("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
                 sqlite("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -28,13 +28,7 @@ class OrderFillRepository(private val database: Database) {
             fill.pricePerUnit,
             fill.totalPrice,
             fill.filledAt
-        )
-        
-        database.querySingle(
-            sql("SELECT last_insert_rowid() as id")
-        ) { rs ->
-            rs.getLong("id")
-        } ?: 0L
+        ) ?: 0L
     }
     
     /**

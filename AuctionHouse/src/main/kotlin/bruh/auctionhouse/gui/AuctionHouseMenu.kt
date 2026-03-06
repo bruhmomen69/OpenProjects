@@ -19,10 +19,15 @@ import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.entity.Player
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Main auction house browser menu with pagination, filters, and sorting.
@@ -41,16 +46,43 @@ class AuctionHouseMenu(
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
-    private var currentFilter = AuctionFilter()
-    private var currentPage = 0
+    
+    companion object {
+        // Persist filter and page state per player
+        private val playerFilters = ConcurrentHashMap<UUID, AuctionFilter>()
+        private val playerPages = ConcurrentHashMap<UUID, Int>()
+    }
+    
+    private var currentFilter: AuctionFilter
+    private var currentPage: Int
+
+    init {
+        // Load persisted filter state or use defaults
+        currentFilter = playerFilters[player.uniqueId] ?: AuctionFilter()
+        currentPage = playerPages[player.uniqueId] ?: 0
+    }
+
+    private fun saveFilterState() {
+        playerFilters[player.uniqueId] = currentFilter
+        playerPages[player.uniqueId] = currentPage
+    }
 
     fun open(page: Int = 0) {
         currentPage = page
+        saveFilterState()
 
-        // Load auctions first
-        val result = runBlocking {
-            auctionService.getActiveAuctions(currentFilter, currentFilter.sortBy, page, 28)
+        // Load auctions asynchronously to avoid blocking the main thread
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = auctionService.getActiveAuctions(currentFilter, currentFilter.sortBy, page, 28)
+            
+            // Open menu on main thread
+            org.bukkit.Bukkit.getScheduler().runTask(plugin as org.bukkit.plugin.Plugin, Runnable {
+                openMenu(result)
+            })
         }
+    }
+
+    private fun openMenu(result: bruh.auctionhouse.service.PagedResult<bruh.auctionhouse.model.Auction>) {
 
         val menu = menuAPI.paginated<Auction> {
             rows = 6
@@ -82,14 +114,14 @@ class AuctionHouseMenu(
             }
 
             // Static control items
+            staticItems[45] = createWatchlistButton()
             staticItems[46] = createFilterButton()
             staticItems[47] = createQuickSortButton()
             staticItems[48] = createSearchButton()
-            staticItems[49] = createCreateOrderButton()
+            staticItems[49] = createBulkListButton()
             staticItems[50] = createMyAuctionsButton()
-            staticItems[51] = createCreateAuctionButton()
+            staticItems[51] = createTransactionHistoryButton()
             staticItems[52] = createOrdersButton()
-            staticItems[45] = createWatchlistButton()
         }
 
         menuAPI.open(menu, player)
@@ -97,6 +129,7 @@ class AuctionHouseMenu(
 
     private fun createAuctionItem(auction: Auction): VItem {
         val material = XMaterial.matchXMaterial(auction.itemMaterial).orElse(XMaterial.STONE)
+        val hasEnded = auction.hasEnded()
 
         val loreList = mutableListOf<Component>()
 
@@ -104,6 +137,11 @@ class AuctionHouseMenu(
         loreList.add(translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_SELLER) {
             unparsed("seller", if (auction.isAnonymous) "Anonymous" else auction.sellerName)
         })
+
+        // Show ended status if auction has ended
+        if (hasEnded) {
+            loreList.add(mm.deserialize("<red>⚠ Auction Ended"))
+        }
 
         // Price info based on auction type
         when (auction.auctionType) {
@@ -136,10 +174,15 @@ class AuctionHouseMenu(
             })
         }
 
-        // Time left
-        loreList.add(translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_TIME_LEFT) {
-            unparsed("time", MenuUtils.formatTimeRemaining(auction.endsAt))
-        })
+        // Time left - show ended status if auction has ended
+        val timeDisplay = if (hasEnded) {
+            mm.deserialize("<red>Ended")
+        } else {
+            translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_TIME_LEFT) {
+                unparsed("time", MenuUtils.formatTimeRemaining(auction.endsAt))
+            }
+        }
+        loreList.add(timeDisplay)
 
         // Click instructions
         loreList.add(Component.empty())
@@ -185,6 +228,7 @@ class AuctionHouseMenu(
                     AuctionType.BIN -> currentFilter.copy(auctionType = AuctionType.BOTH)
                     AuctionType.BOTH -> currentFilter.copy(auctionType = null)
                 }
+                saveFilterState()
                 // Refresh menu
                 open(currentPage)
                 ClickResult.ALLOW
@@ -223,6 +267,7 @@ class AuctionHouseMenu(
                         AuctionSort.RECENTLY_UPDATED -> AuctionSort.ENDING_SOON
                     }
                 )
+                saveFilterState()
                 // Refresh menu
                 open(currentPage)
                 ClickResult.ALLOW
@@ -343,6 +388,46 @@ class AuctionHouseMenu(
 
             onClick { _, _ ->
                 WatchlistMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+                ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun createBulkListButton(): VItem {
+        return VItem(XMaterial.HOPPER) {
+            name = mm.deserialize("<yellow>Bulk Listing")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>List multiple items at once"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<gray>Max: ${config.auctions.bulkListing.maxBulkListings} auctions"))
+            if (config.auctions.bulkListing.feeDiscountPercent > 0) {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<green>Bulk Discount: ${config.auctions.bulkListing.feeDiscountPercent}%"))
+            }
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Click to open bulk listing"))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                BulkListMenu(menuAPI, auctionService, config, translationAPI, plugin, player).open()
+                ClickResult.CLOSE
+            }
+        }
+    }
+
+    private fun createTransactionHistoryButton(): VItem {
+        return VItem(XMaterial.BOOK) {
+            name = mm.deserialize("<yellow>Transaction History")
+            val loreList = mutableListOf<Component>()
+            loreList.add(mm.deserialize("<gray>View your transaction history"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<gray>Click to view transactions"))
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, _ ->
+                TransactionHistoryMenu(menuAPI, plugin.transactionRepository, config, translationAPI, plugin, player).open()
                 ClickResult.CLOSE
             }
         }

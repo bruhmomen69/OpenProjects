@@ -60,23 +60,23 @@ class OrderService(
             return ItemMatchResult.MaterialMismatch
         }
 
-        // Check display name if required
-        if (config.orders.matching.requireExactName) {
+        // Check display name if order has display name filter
+        if (order.itemDisplayName != null) {
             val itemDisplayName = item.itemMeta?.displayName()?.let { mm.serialize(it) }
-            if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
+            if (order.itemDisplayName != itemDisplayName) {
                 return ItemMatchResult.NameMismatch
             }
         }
 
-        // Check NBT if required
-        if (config.orders.matching.requireExactNbt) {
+        // Check NBT if order has NBT hash (user specified exact NBT matching)
+        if (order.itemNbtHash != null) {
             val itemNbtHash = computeItemNbtHash(item)
-            if (order.itemNbtHash != null && order.itemNbtHash != itemNbtHash) {
+            if (order.itemNbtHash != itemNbtHash) {
                 return ItemMatchResult.NbtMismatch
             }
         }
 
-        // Check lore if order has lore hash
+        // Check lore if order has lore hash (user specified exact lore matching)
         if (order.itemLoreHash != null) {
             val itemLoreHash = computeItemLoreHash(item)
             if (order.itemLoreHash != itemLoreHash) {
@@ -133,6 +133,8 @@ class OrderService(
      * @param allowPartial Whether partial fills are allowed
      * @param minFillQuantity Minimum quantity for partial fills
      * @param duration How long the order will be active
+     * @param requireExactNbt Whether to require exact NBT match
+     * @param requireExactLore Whether to require exact lore match
      * @return The result of the creation attempt
      */
     suspend fun createBuyOrder(
@@ -143,7 +145,9 @@ class OrderService(
         pricePerUnit: Double,
         allowPartial: Boolean,
         minFillQuantity: Int?,
-        duration: Duration
+        duration: Duration,
+        requireExactNbt: Boolean = false,
+        requireExactLore: Boolean = false
     ): CreateOrderResult = withContext(Dispatchers.IO) {
         if (!config.orders.enabled) {
             return@withContext CreateOrderResult(
@@ -201,6 +205,28 @@ class OrderService(
         // Charge fees
         economy.withdraw(creator, BigDecimal.valueOf(totalRequired))
 
+        // For buy orders with NBT/lore matching, we need a sample item to compute hashes
+        // The user should hold a sample item if they want exact matching
+        var itemLoreHash: String? = null
+        var itemNbtHash: String? = null
+        var itemStack: ItemStack? = null
+        
+        if (requireExactNbt || requireExactLore) {
+            // Get sample item from player's hand for hash computation
+            val sampleItem = creator.inventory.itemInMainHand
+            if (sampleItem.type == material && !sampleItem.type.isAir) {
+                if (requireExactNbt) {
+                    itemNbtHash = computeItemNbtHash(sampleItem)
+                }
+                if (requireExactLore) {
+                    itemLoreHash = computeItemLoreHash(sampleItem)
+                }
+                // Store a copy of the item for reference
+                itemStack = sampleItem.clone()
+                itemStack.amount = 1
+            }
+        }
+
         // Create order
         val order = Order(
             id = UUID.randomUUID(),
@@ -209,9 +235,9 @@ class OrderService(
             orderType = OrderType.BUY_ORDER,
             itemMaterial = material,
             itemDisplayName = displayName,
-            itemLoreHash = null,
-            itemNbtHash = null,
-            itemStack = null,
+            itemLoreHash = itemLoreHash,
+            itemNbtHash = itemNbtHash,
+            itemStack = itemStack,
             quantityRequested = quantity,
             quantityFilled = 0,
             pricePerUnit = pricePerUnit,
@@ -477,6 +503,14 @@ class OrderService(
                         reason = "ORDER_FILL"
                     )
                 }
+
+                // Remove items from filler AFTER successfully giving to creator
+                // This prevents item loss if any operation fails
+                withContext(plugin.entityDispatcher(filler)) {
+                    items.forEach { item ->
+                        filler.inventory.removeItemAnySlot(item)
+                    }
+                }
             }
 
             OrderType.SELL_ORDER -> {
@@ -502,15 +536,8 @@ class OrderService(
                     ExpiredItemType.ORDER_ITEM,
                     "ORDER_FILL"
                 )
-            }
-        }
-
-        // Remove items from filler (for buy orders)
-        if (order.orderType == OrderType.BUY_ORDER) {
-            withContext(plugin.entityDispatcher(filler)) {
-                items.forEach { item ->
-                    filler.inventory.removeItemAnySlot(item)
-                }
+                // Note: Items are already removed from filler via giveItemsOrStoreExpired
+                // since filler is receiving items, not providing them for sell orders
             }
         }
 

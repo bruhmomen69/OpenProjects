@@ -504,6 +504,20 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                     )
                 """)
             })
+        },
+        migration(5, "Add manual_extension_count column to auctions table") {
+            // Add manual_extension_count column to auctions table for tracking manual extensions separately from anti-snipe
+            execute(sql {
+                mysql("""
+                    ALTER TABLE auctions ADD COLUMN manual_extension_count INT NOT NULL DEFAULT 0
+                """)
+                postgres("""
+                    ALTER TABLE auctions ADD COLUMN manual_extension_count INT NOT NULL DEFAULT 0
+                """)
+                sqlite("""
+                    ALTER TABLE auctions ADD COLUMN manual_extension_count INTEGER NOT NULL DEFAULT 0
+                """)
+            })
         }
     )
 }

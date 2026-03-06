@@ -77,3 +77,14 @@ data class PagedResult<T>(
     val totalPages: Int,
     val totalItems: Int
 )
+
+/**
+ * Result of creating bulk auctions.
+ */
+data class BulkListingResult(
+    val success: Boolean,
+    val auctionsCreated: Int,
+    val auctionsFailed: Int,
+    val totalFeesCharged: Double,
+    val message: Component
+)

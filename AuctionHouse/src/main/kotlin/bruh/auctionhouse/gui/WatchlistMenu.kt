@@ -37,6 +37,14 @@ class WatchlistMenu(
     private val player: Player
 ) {
     private val mm = MiniMessage.miniMessage()
+    private var currentSort = WatchlistSort.ENDING_SOON
+
+    enum class WatchlistSort {
+        ENDING_SOON,
+        PRICE_LOW,
+        PRICE_HIGH,
+        RECENTLY_ADDED
+    }
 
     fun open() {
         val watchlistEntries = runBlocking {
@@ -55,6 +63,21 @@ class WatchlistMenu(
             }
         }
 
+        // Sort the watched auctions based on current sort order
+        val sortedAuctions = when (currentSort) {
+            WatchlistSort.ENDING_SOON -> watchedAuctions.sortedBy { it.first.endsAt }
+            WatchlistSort.PRICE_LOW -> watchedAuctions.sortedBy { 
+                it.first.buyNowPrice ?: it.first.startPrice 
+            }
+            WatchlistSort.PRICE_HIGH -> watchedAuctions.sortedByDescending { 
+                it.first.buyNowPrice ?: it.first.startPrice 
+            }
+            WatchlistSort.RECENTLY_ADDED -> watchedAuctions.sortedByDescending {
+                watchlistEntries.find { entry -> entry.auctionId == it.first.id }?.addedAt
+                    ?: java.time.Instant.MIN
+            }
+        }
+
         val menu = menuAPI.simple {
             rows = 6
             title = mm.deserialize("<yellow>My Watchlist <gray>(${watchedAuctions.size})")
@@ -65,7 +88,7 @@ class WatchlistMenu(
             item(8, createClearAllButton(watchedAuctions.size))
 
             // Display watched auctions
-            watchedAuctions.forEachIndexed { index, (auction, hasActivity) ->
+            sortedAuctions.forEachIndexed { index, (auction, hasActivity) ->
                 if (index < 42) { // Max 42 items (rows 1-4)
                     val slot = when {
                         index < 9 -> 9 + index
@@ -143,13 +166,17 @@ class WatchlistMenu(
                     }
                 }
                 bruh.auctionhouse.model.AuctionType.BIN -> {
-                    loreList.add(mm.deserialize("<green>BIN: <gold>${MenuUtils.formatPrice(auction.buyNowPrice!!, economy)}"))
+                    auction.buyNowPrice?.let { price ->
+                        loreList.add(mm.deserialize("<green>BIN: <gold>${MenuUtils.formatPrice(price, economy)}"))
+                    }
                 }
                 bruh.auctionhouse.model.AuctionType.BOTH -> {
                     val highestBid = runBlocking { bidRepository.getHighestBid(auction.id) }
                     val currentBid = highestBid?.bidAmount ?: auction.startPrice
                     loreList.add(mm.deserialize("<yellow>Current Bid: <gold>${MenuUtils.formatPrice(currentBid, economy)}"))
-                    loreList.add(mm.deserialize("<green>BIN: <gold>${MenuUtils.formatPrice(auction.buyNowPrice!!, economy)}"))
+                    auction.buyNowPrice?.let { price ->
+                        loreList.add(mm.deserialize("<green>BIN: <gold>${MenuUtils.formatPrice(price, economy)}"))
+                    }
                 }
             }
 
@@ -217,10 +244,20 @@ class WatchlistMenu(
     }
 
     private fun createSortButton(): VItem {
+        val (displayName, description) = when (currentSort) {
+            WatchlistSort.ENDING_SOON -> "Ending Soon" to "Sort by auctions ending first"
+            WatchlistSort.PRICE_LOW -> "Price: Low to High" to "Sort by lowest price first"
+            WatchlistSort.PRICE_HIGH -> "Price: High to Low" to "Sort by highest price first"
+            WatchlistSort.RECENTLY_ADDED -> "Recently Added" to "Sort by most recently added"
+        }
+
         return VItem(XMaterial.COMPASS) {
             name = mm.deserialize("<yellow>Sort Options")
             val loreList = mutableListOf<Component>()
             loreList.add(mm.deserialize("<gray>Sort your watchlist"))
+            loreList.add(Component.empty())
+            loreList.add(mm.deserialize("<green>Current: <white>$displayName"))
+            loreList.add(mm.deserialize("<gray>$description"))
             loreList.add(Component.empty())
             loreList.add(mm.deserialize("<white>• Ending Soon</white>"))
             loreList.add(mm.deserialize("<white>• Price Low/High</white>"))
@@ -231,9 +268,15 @@ class WatchlistMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                // For now, just show a message - sorting can be implemented
-                player.sendMessage(mm.deserialize("<yellow>Sort feature coming soon!"))
-                ClickResult.ALLOW
+                // Cycle through sort options
+                currentSort = when (currentSort) {
+                    WatchlistSort.ENDING_SOON -> WatchlistSort.PRICE_LOW
+                    WatchlistSort.PRICE_LOW -> WatchlistSort.PRICE_HIGH
+                    WatchlistSort.PRICE_HIGH -> WatchlistSort.RECENTLY_ADDED
+                    WatchlistSort.RECENTLY_ADDED -> WatchlistSort.ENDING_SOON
+                }
+                open()
+                ClickResult.CLOSE
             }
         }
     }

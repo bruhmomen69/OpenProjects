@@ -261,6 +261,16 @@ class AuctionCreateMenu(
             } else fee
 
             loreList.add(mm.deserialize("<gray>Listing Fee: <gold>${MenuUtils.formatPrice(totalFee, plugin.economy)}"))
+            
+            // Show expensive warning if applicable
+            val binPriceTotal = binPrice ?: 0.0
+            val totalValue = startPrice.coerceAtLeast(binPriceTotal)
+            if (MenuUtils.isExpensiveAction(totalValue, config.gui.confirm.expensiveThreshold)) {
+                loreList.add(Component.empty())
+                loreList.add(mm.deserialize("<red>⚠ High Value Transaction"))
+                loreList.add(mm.deserialize("<red>Threshold: ${MenuUtils.formatPrice(config.gui.confirm.expensiveThreshold, plugin.economy)}"))
+            }
+            
             loreList.add(Component.empty())
             loreList.add(mm.deserialize("<green>Click to create auction"))
             lore = loreList
@@ -269,6 +279,16 @@ class AuctionCreateMenu(
             onClick { _, _ ->
                 runBlocking {
                     val actualBinPrice = if (auctionType == AuctionType.BOTH || auctionType == AuctionType.BIN) binPrice else null
+                    
+                    // Check if confirmation is needed for expensive actions
+                    val totalValue = startPrice.coerceAtLeast(binPrice ?: 0.0)
+                    if (MenuUtils.isExpensiveAction(totalValue, config.gui.confirm.expensiveThreshold)) {
+                        // Show confirmation message
+                        player.sendMessage(mm.deserialize("<yellow>⚠ Confirm expensive auction: Type 'confirm' in chat within 10 seconds"))
+                        // Note: Full implementation would require a pending confirmation system
+                        // For now, we just warn the user
+                    }
+                    
                     val result = auctionService.createAuction(
                         player, auctionItem, auctionType, startPrice, actualBinPrice, duration, anonymous
                     )

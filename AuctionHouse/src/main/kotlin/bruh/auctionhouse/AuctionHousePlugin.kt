@@ -74,17 +74,28 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
     internal lateinit var database: Database
         private set
-    private lateinit var auctionRepository: AuctionRepository
-    private lateinit var bidRepository: BidRepository
-    private lateinit var orderRepository: OrderRepository
-    private lateinit var orderFillRepository: OrderFillRepository
-    private lateinit var expiredItemRepository: ExpiredItemRepository
-    private lateinit var consolidatedExpiredItemRepository: ConsolidatedExpiredItemRepository
-    private lateinit var consolidatedExpiredItemService: ConsolidatedExpiredItemService
-    private lateinit var transactionRepository: TransactionRepository
-    private lateinit var watchlistRepository: WatchlistRepository
-    private lateinit var notificationRepository: NotificationRepository
-    private lateinit var expirationService: ExpirationService
+    lateinit var auctionRepository: AuctionRepository
+        private set
+    lateinit var bidRepository: BidRepository
+        private set
+    lateinit var orderRepository: OrderRepository
+        private set
+    lateinit var orderFillRepository: OrderFillRepository
+        private set
+    lateinit var expiredItemRepository: ExpiredItemRepository
+        private set
+    lateinit var consolidatedExpiredItemRepository: ConsolidatedExpiredItemRepository
+        private set
+    lateinit var consolidatedExpiredItemService: ConsolidatedExpiredItemService
+        private set
+    lateinit var transactionRepository: TransactionRepository
+        private set
+    lateinit var watchlistRepository: WatchlistRepository
+        private set
+    lateinit var notificationRepository: NotificationRepository
+        private set
+    lateinit var expirationService: ExpirationService
+        private set
 
     /**
      * Tracks whether the plugin is fully enabled and ready.
@@ -173,7 +184,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         )
 
         auctionService = AuctionService(
-            this, config, auctionRepository, bidRepository, expiredItemRepository,
+            this, config, database, auctionRepository, bidRepository, expiredItemRepository,
             expiredItemManager, transactionRepository, economy, translations, serverId
         )
 
@@ -204,7 +215,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         val lamp = BukkitLamp.builder(this).build()
         lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI, economy))
         lamp.register(OrderCommands(this, config, orderService, translations, menuAPI))
-        lamp.register(AuctionAdminCommands(this, auctionService, translations))
+        lamp.register(AuctionAdminCommands(this, config, auctionService, auctionRepository, transactionRepository, economy, translations, menuAPI))
         slF4JLogger.info("Commands registered")
 
         // Step 10: Register PlaceholderAPI hook if available
@@ -269,9 +280,4 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
      * Gets the plugin logger.
      */
     fun getSlf4jLogger(): Logger = slF4JLogger
-
-    /**
-     * Gets the expired item repository for external access.
-     */
-    fun getExpiredItemRepository(): ExpiredItemRepository = expiredItemRepository
 }
