@@ -3,6 +3,7 @@ plugins {
     id("buildsrc.convention.kotlin-jvm")
     alias(libs.plugins.shadow) apply false
     alias(libs.plugins.paperweightUserdev) apply false
+    alias(libs.plugins.runPaper) apply false
 }
 
 java {

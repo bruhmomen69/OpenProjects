@@ -86,6 +86,9 @@ tasks.runServer {
         // Vault for economy support
         url("https://github.com/MilkBowl/Vault/releases/download/1.7.3/Vault.jar")
         url("https://github.com/EssentialsX/Essentials/releases/download/2.21.2/EssentialsX-2.21.2.jar")
+
+        hangar("ViaVersion", "5.7.2")
+        hangar("ViaBackwards", "5.7.2")
     }
 }
 
