@@ -6,6 +6,7 @@ import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.minimessage.MiniMessage
 import java.time.Duration
 import java.time.Instant
@@ -60,11 +61,59 @@ object MenuUtils {
      * Creates a back button to return to the parent menu.
      */
     fun backButton(translationAPI: TranslationAPI): VItem {
-        return VItem(XMaterial.OAK_DOOR) {
+        return VItem(XMaterial.BARRIER) {
             name = translationAPI.getComponentSync(GuiMessages.BACK)
             hideAllFlags()
         }
     }
+
+    // -- AuctionHouse-specific placeholders --
+
+    /**
+     * Loading placeholder for auction data.
+     */
+    fun loadingAuctionItem(): VItem = VItem(XMaterial.CLOCK) {
+        name = Component.text("Loading auctions...", NamedTextColor.YELLOW)
+        enchantGlint = true
+    }
+
+    /**
+     * Empty state for when no auctions are found.
+     */
+    fun emptyAuctionsItem(): VItem = VItem(XMaterial.LIGHT_GRAY_STAINED_GLASS_PANE) {
+        name = Component.text("No auctions found", NamedTextColor.GRAY)
+    }
+
+    /**
+     * Loading placeholder for order data.
+     */
+    fun loadingOrderItem(): VItem = VItem(XMaterial.CLOCK) {
+        name = Component.text("Loading orders...", NamedTextColor.YELLOW)
+        enchantGlint = true
+    }
+
+    /**
+     * Empty state for when no orders are found.
+     */
+    fun emptyOrdersItem(): VItem = VItem(XMaterial.LIGHT_GRAY_STAINED_GLASS_PANE) {
+        name = Component.text("No orders found", NamedTextColor.GRAY)
+    }
+
+    /**
+     * Processing placeholder for async actions (buy, bid, cancel, etc.).
+     */
+    fun processingItem(): VItem = VItem(XMaterial.CLOCK) {
+        name = Component.text("Processing...", NamedTextColor.GOLD)
+        enchantGlint = true
+    }
+
+    /**
+     * Error placeholder when data loading fails.
+     */
+    fun errorItem(message: Component = Component.text("An error occurred", NamedTextColor.RED)): VItem =
+        VItem(XMaterial.BARRIER) {
+            name = message
+        }
 
     /**
      * Formats time remaining until the given end time.

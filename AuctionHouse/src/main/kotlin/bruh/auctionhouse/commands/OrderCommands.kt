@@ -1,19 +1,10 @@
 package bruh.auctionhouse.commands
 
 import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.config.AuctionHouseConfig
-import bruh.auctionhouse.database.AuctionRepository
-import bruh.auctionhouse.database.BidRepository
-import bruh.auctionhouse.database.OrderRepository
-import bruh.auctionhouse.database.WatchlistRepository
+import bruh.auctionhouse.gui.AuctionMenuContext
 import bruh.auctionhouse.gui.MyOrdersMenu
 import bruh.auctionhouse.gui.OrderBrowserMenu
-import bruh.auctionhouse.service.AuctionService
-import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.OrderMessages
-import bruh.auctionhouse.economy.EconomyProvider
-import bruh.zchat.utils.menuapi.MenuAPI
-import bruh.zchat.utils.translations.TranslationAPI
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Command
@@ -27,17 +18,13 @@ import java.util.UUID
 @Command("order", "orders")
 class OrderCommands(
     private val plugin: AuctionHousePlugin,
-    private val config: AuctionHouseConfig,
-    private val orderService: OrderService,
-    private val auctionService: AuctionService,
-    private val translationAPI: TranslationAPI,
-    private val menuAPI: MenuAPI,
-    private val economy: EconomyProvider
+    private val ctx: AuctionMenuContext
 ) {
-    private val auctionRepository = AuctionRepository(plugin.database)
-    private val bidRepository = BidRepository(plugin.database)
-    private val orderRepository = OrderRepository(plugin.database)
-    private val watchlistRepository = WatchlistRepository(plugin.database)
+    private val config get() = ctx.config
+    private val orderService get() = ctx.orderService
+    private val auctionService get() = ctx.auctionService
+    private val translationAPI get() = ctx.translationAPI
+    private val menuAPI get() = ctx.menuAPI
 
     @Subcommand("list")
     @CommandPermission("order.list")
@@ -50,14 +37,14 @@ class OrderCommands(
             menuAPI,
             auctionService,
             orderService,
-            auctionRepository,
-            bidRepository,
-            orderRepository,
-            watchlistRepository,
+            ctx.auctionRepository,
+            ctx.bidRepository,
+            ctx.orderRepository,
+            ctx.watchlistRepository,
             config,
             translationAPI,
             plugin,
-            economy,
+            ctx.economy,
             player
         ).createMenuOrNull()?.let { menuAPI.open(it, player) }
     }
@@ -193,14 +180,14 @@ class OrderCommands(
             menuAPI,
             auctionService,
             orderService,
-            auctionRepository,
-            bidRepository,
-            orderRepository,
-            watchlistRepository,
+            ctx.auctionRepository,
+            ctx.bidRepository,
+            ctx.orderRepository,
+            ctx.watchlistRepository,
             config,
             translationAPI,
             plugin,
-            economy,
+            ctx.economy,
             player
         ).createMenu()
         menuAPI.open(menu, player)

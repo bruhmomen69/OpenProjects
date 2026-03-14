@@ -1,23 +1,13 @@
 package bruh.auctionhouse.commands
 
 import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.economy.EconomyProvider
-import bruh.auctionhouse.config.AuctionHouseConfig
-import bruh.auctionhouse.database.AuctionRepository
-import bruh.auctionhouse.database.BidRepository
-import bruh.auctionhouse.database.OrderRepository
-import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.gui.AuctionCreateMenu
 import bruh.auctionhouse.gui.AuctionHouseMenu
+import bruh.auctionhouse.gui.AuctionMenuContext
 import bruh.auctionhouse.gui.ConsolidatedExpiredItemsMenu
 import bruh.auctionhouse.gui.MyAuctionsMenu
 import bruh.auctionhouse.model.AuctionType
-import bruh.auctionhouse.service.AuctionService
-import bruh.auctionhouse.service.ConsolidatedExpiredItemService
-import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.AuctionMessages
-import bruh.zchat.utils.menuapi.MenuAPI
-import bruh.zchat.utils.translations.TranslationAPI
 import org.bukkit.entity.Player
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Optional
@@ -29,24 +19,19 @@ import java.util.UUID
 
 /**
  * Main AuctionHouse commands (/ah, /auctionhouse).
- * Provides access to the auction house system with subcommands for selling,
- * bidding, buying, and managing auctions.
  */
 @Command("ah", "auctionhouse")
 class AuctionHouseCommands(
     private val plugin: AuctionHousePlugin,
-    private val config: AuctionHouseConfig,
-    private val auctionService: AuctionService,
-    private val orderService: OrderService,
-    private val consolidatedExpiredItemService: ConsolidatedExpiredItemService,
-    private val translationAPI: TranslationAPI,
-    private val menuAPI: MenuAPI,
-    private val economy: EconomyProvider
+    private val ctx: AuctionMenuContext
 ) {
-    private val auctionRepository = AuctionRepository(plugin.database)
-    private val bidRepository = BidRepository(plugin.database)
-    private val orderRepository = OrderRepository(plugin.database)
-    private val watchlistRepository = WatchlistRepository(plugin.database)
+    // Convenience aliases from context
+    private val config get() = ctx.config
+    private val auctionService get() = ctx.auctionService
+    private val orderService get() = ctx.orderService
+    private val translationAPI get() = ctx.translationAPI
+    private val menuAPI get() = ctx.menuAPI
+    private val economy get() = ctx.economy
 
     /**
      * Default command - opens the main auction house menu.
@@ -61,10 +46,10 @@ class AuctionHouseCommands(
             menuAPI,
             auctionService,
             orderService,
-            auctionRepository,
-            bidRepository,
-            orderRepository,
-            watchlistRepository,
+            ctx.auctionRepository,
+            ctx.bidRepository,
+            ctx.orderRepository,
+            ctx.watchlistRepository,
             config,
             translationAPI,
             plugin,
@@ -208,8 +193,8 @@ class AuctionHouseCommands(
             return
         }
         val menu = ConsolidatedExpiredItemsMenu(
-            menuAPI, consolidatedExpiredItemService, auctionService, orderService, auctionRepository, bidRepository, orderRepository,
-            watchlistRepository, config, translationAPI, plugin, economy, player
+            menuAPI, ctx.consolidatedExpiredItemService, auctionService, orderService, ctx.auctionRepository, ctx.bidRepository, ctx.orderRepository,
+            ctx.watchlistRepository, config, translationAPI, plugin, economy, player
         ).createMenu()
         menuAPI.open(menu, player)
     }
@@ -224,10 +209,10 @@ class AuctionHouseCommands(
             menuAPI,
             auctionService,
             orderService,
-            auctionRepository,
-            bidRepository,
-            orderRepository,
-            watchlistRepository,
+            ctx.auctionRepository,
+            ctx.bidRepository,
+            ctx.orderRepository,
+            ctx.watchlistRepository,
             config,
             translationAPI,
             plugin,

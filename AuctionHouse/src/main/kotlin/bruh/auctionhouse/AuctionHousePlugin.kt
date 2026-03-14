@@ -19,6 +19,7 @@ import bruh.auctionhouse.database.WatchlistRepository
 import bruh.auctionhouse.util.PlayerStateManager
 import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.economy.VaultEconomyProvider
+import bruh.auctionhouse.gui.AuctionMenuContext
 import bruh.auctionhouse.hooks.PlaceholderAPIHook
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
@@ -99,6 +100,9 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
     lateinit var playerBanRepository: PlayerBanRepository
         private set
     lateinit var expirationService: ExpirationService
+        private set
+
+    lateinit var menuContext: AuctionMenuContext
         private set
 
     /**
@@ -203,6 +207,27 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         // Step 7: Initialize MenuAPI
         menuAPI = MenuAPI(this)
 
+        // Step 7.5: Create shared menu context
+        menuContext = AuctionMenuContext(
+            menuAPI = menuAPI,
+            auctionService = auctionService,
+            orderService = orderService,
+            consolidatedExpiredItemService = consolidatedExpiredItemService,
+            auctionRepository = auctionRepository,
+            bidRepository = bidRepository,
+            orderRepository = orderRepository,
+            orderFillRepository = orderFillRepository,
+            watchlistRepository = watchlistRepository,
+            expiredItemRepository = expiredItemRepository,
+            consolidatedExpiredItemRepository = consolidatedExpiredItemRepository,
+            transactionRepository = transactionRepository,
+            playerBanRepository = playerBanRepository,
+            config = config,
+            translationAPI = translations,
+            plugin = this,
+            economy = economy
+        )
+
         // Step 8: Initialize and start expiration service
         expirationService = ExpirationService(
             this, auctionService, orderService, config, slF4JLogger
@@ -218,9 +243,9 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
         // Step 9: Register commands
         val lamp = BukkitLamp.builder(this).build()
-        lamp.register(AuctionHouseCommands(this, config, auctionService, orderService, consolidatedExpiredItemService, translations, menuAPI, economy))
-        lamp.register(OrderCommands(this, config, orderService, auctionService, translations, menuAPI, economy))
-        lamp.register(AuctionAdminCommands(this, config, auctionService, auctionRepository, transactionRepository, economy, translations, menuAPI))
+        lamp.register(AuctionHouseCommands(this, menuContext))
+        lamp.register(OrderCommands(this, menuContext))
+        lamp.register(AuctionAdminCommands(this, menuContext))
         slF4JLogger.info("Commands registered")
 
         // Step 10: Register PlaceholderAPI hook if available

@@ -1,11 +1,8 @@
 package bruh.auctionhouse.commands
 
 import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.config.AuctionHouseConfig
-import bruh.auctionhouse.database.AuctionRepository
-import bruh.auctionhouse.database.TransactionRepository
-import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.gui.AdminDashboardMenu
+import bruh.auctionhouse.gui.AuctionMenuContext
 import bruh.auctionhouse.model.Auction
 import bruh.auctionhouse.model.AuctionStatus
 import bruh.auctionhouse.model.Transaction
@@ -13,7 +10,6 @@ import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
-import bruh.zchat.utils.translations.TranslationAPI
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
@@ -37,16 +33,17 @@ import java.util.UUID
 @CommandPermission("auctionhouse.admin")
 class AuctionAdminCommands(
     private val plugin: AuctionHousePlugin,
-    private val config: AuctionHouseConfig,
-    private val auctionService: AuctionService,
-    private val auctionRepository: AuctionRepository,
-    private val transactionRepository: TransactionRepository,
-    private val economy: EconomyProvider,
-    private val translationAPI: TranslationAPI,
-    private val menuAPI: bruh.zchat.utils.menuapi.MenuAPI
+    private val ctx: AuctionMenuContext
 ) {
 
-    private val mm = MiniMessage.miniMessage()
+    private val config get() = ctx.config
+    private val auctionService get() = ctx.auctionService
+    private val auctionRepository get() = ctx.auctionRepository
+    private val transactionRepository get() = ctx.transactionRepository
+    private val economy get() = ctx.economy
+    private val translationAPI get() = ctx.translationAPI
+    private val menuAPI get() = ctx.menuAPI
+    private val mm get() = ctx.mm
 
     /**
      * Toggle AuctionHouse on/off.

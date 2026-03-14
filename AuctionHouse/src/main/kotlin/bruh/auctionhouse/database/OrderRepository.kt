@@ -98,6 +98,41 @@ class OrderRepository(private val database: Database) {
             )
         }
     }
+
+    /**
+     * Batch-loads orders by a list of IDs.
+     * Used to avoid N+1 queries (e.g. in WatchlistMenu).
+     */
+    suspend fun getByIds(ids: List<UUID>): List<Order> {
+        if (ids.isEmpty()) return emptyList()
+        val placeholders = ids.joinToString(",") { "?" }
+        return database.query(
+            sql("SELECT * FROM orders WHERE id IN ($placeholders)"),
+            *ids.map { it.toString() }.toTypedArray()
+        ) { rs ->
+            Order(
+                id = UUID.fromString(rs.getString("id")),
+                creatorUuid = UUID.fromString(rs.getString("creator_uuid")),
+                creatorName = rs.getString("creator_name"),
+                orderType = OrderType.valueOf(rs.getString("order_type")),
+                itemMaterial = safeMaterialValueOf(rs.getString("item_material")),
+                itemDisplayName = rs.getString("item_display_name"),
+                itemLoreHash = rs.getString("item_lore_hash"),
+                itemNbtHash = rs.getString("item_nbt_hash"),
+                itemStack = deserializeItem(rs.getBytes("item_stack")),
+                quantityRequested = rs.getInt("quantity_requested"),
+                quantityFilled = rs.getInt("quantity_filled"),
+                pricePerUnit = rs.getDouble("price_per_unit"),
+                totalPrice = rs.getDouble("total_price"),
+                status = OrderStatus.valueOf(rs.getString("status")),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+                expiresAt = rs.getTimestamp("expires_at").toInstant(),
+                filledAt = rs.getTimestamp("filled_at")?.toInstant(),
+                allowPartial = rs.getBoolean("allow_partial"),
+                minFillQuantity = rs.getInt("min_fill_quantity").takeIf { it > 0 }
+            )
+        }
+    }
     
     /**
      * Updates the fill status and quantity of an order.
