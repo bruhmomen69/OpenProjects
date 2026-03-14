@@ -40,7 +40,10 @@ class OrderBrowserMenu(
         }
         pageIndicatorRenderer = { current, total ->
             VItem(XMaterial.PAPER) {
-                name = Component.text("Page $current/$total")
+                name = pctx.translationAPI.getComponentSync(GuiMessages.PAGE_INDICATOR) {
+                    unparsed("current", current.toString())
+                    unparsed("total", total.toString())
+                }
             }
         }
 
@@ -60,14 +63,20 @@ class OrderBrowserMenu(
         items[46] = createFilterButton()
         items[47] = createSortButton()
         items[48] = createSearchButton()
-        items[49] = createBackButton()
-        items[50] = createSellOrderButton()
-        items[51] = createBuyOrderButton()
+        items[49] = createSellOrderButton()
+        items[50] = createBuyOrderButton()
+        items[52] = createAuctionHouseButton()
+        items[53] = createCloseButton()
     }
 
     private fun createMyOrdersButton(): VItem {
         return VItem(XMaterial.CHEST) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.MY_ORDERS_TITLE)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_MY_ORDERS_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_VIEW)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -84,11 +93,11 @@ class OrderBrowserMenu(
         return VItem(XMaterial.OAK_SIGN) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SEARCH)
             val loreList = mutableListOf<Component>()
-            loreList.add(pctx.mm.deserialize("<gray>Click to search orders"))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SEARCH_DESC))
             loreList.add(Component.empty())
             
             if (hasActiveFilters) {
-                loreList.add(pctx.mm.deserialize("<yellow>Active filters:"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.FILTER_ACTIVE))
                 currentFilter.searchQuery?.let {
                     loreList.add(pctx.mm.deserialize("  <gray>• Search: <white>$it"))
                 }
@@ -99,8 +108,10 @@ class OrderBrowserMenu(
                     loreList.add(pctx.mm.deserialize("  <gray>• Max Price: <white>${MenuUtils.formatPrice(it, pctx.economy)}"))
                 }
             } else {
-                loreList.add(pctx.mm.deserialize("<gray>Current: <white>No filters"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.FILTER_NO_FILTERS))
             }
+            loreList.add(Component.empty())
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_SEARCH))
             lore = loreList
             hideAllFlags()
 
@@ -128,7 +139,11 @@ class OrderBrowserMenu(
     private fun createBuyOrderButton(): VItem {
         return VItem(XMaterial.DIAMOND) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_ORDER)
-            lore = mutableListOf(pctx.mm.deserialize("<gray>Click to create a buy order"))
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_ORDER_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CREATE)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -139,11 +154,14 @@ class OrderBrowserMenu(
 
     private fun createSellOrderButton(): VItem {
         return VItem(XMaterial.GOLD_INGOT) {
-            name = pctx.mm.deserialize("<yellow>Create Sell Order")
-            val loreList = mutableListOf<Component>()
-            loreList.add(pctx.mm.deserialize("<gray>Click to create a sell order"))
-            loreList.add(pctx.mm.deserialize("<red>You must hold an item to sell!"))
-            lore = loreList
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_SELL_ORDER)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_SELL_ORDER_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.STATUS_HOLD_ITEM_TO_SELL),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CREATE)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -164,7 +182,9 @@ class OrderBrowserMenu(
 
         val loreList = mutableListOf<Component>()
 
-        loreList.add(pctx.mm.deserialize("<gray>ID: <white>${order.shortId}"))
+        loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ITEM_ID) {
+            unparsed("id", order.shortId)
+        })
         loreList.add(Component.empty())
 
         loreList.add(pctx.translationAPI.getComponentSync(
@@ -200,11 +220,11 @@ class OrderBrowserMenu(
 
         loreList.add(Component.empty())
         if (isOwnOrder) {
-            loreList.add(pctx.mm.deserialize("<yellow><bold>Your Order</bold></yellow>"))
-            loreList.add(pctx.mm.deserialize("<gray>Click to manage or cancel"))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.STATUS_YOUR_ORDER))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_CLICK_MANAGE))
         } else {
             loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_CLICK_FILL))
-            loreList.add(pctx.mm.deserialize("<yellow>Right-click to add to watchlist"))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_RIGHT_CLICK_WATCHLIST))
         }
 
         return VItem(material) {
@@ -253,12 +273,21 @@ class OrderBrowserMenu(
     }
 
     private fun createFilterButton(): VItem {
+        val filterNameComponent = when (currentFilter.orderType) {
+            null -> pctx.translationAPI.getComponentSync(GuiMessages.FILTER_ORDER_TYPE_ALL)
+            OrderType.BUY_ORDER -> pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_BUY_ORDERS)
+            OrderType.SELL_ORDER -> pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SELL_ORDERS)
+        }
+
         return VItem(XMaterial.HOPPER) {
-            name = when (currentFilter.orderType) {
-                null -> pctx.mm.deserialize("<yellow>Filter: <white>All")
-                OrderType.BUY_ORDER -> pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_BUY_ORDERS)
-                OrderType.SELL_ORDER -> pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SELL_ORDERS)
+            name = pctx.translationAPI.getComponentSync(GuiMessages.FILTER_LABEL) {
+                placeholder("type", filterNameComponent)
             }
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_FILTER_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CYCLE)
+            )
             hideAllFlags()
 
             onClick { _, controls ->
@@ -274,19 +303,25 @@ class OrderBrowserMenu(
     }
 
     private fun createSortButton(): VItem {
-        val (material, displayName) = when (currentSort) {
-            OrderSort.NEWEST -> XMaterial.ANVIL to "Newest First"
-            OrderSort.PRICE_LOW -> XMaterial.GOLD_NUGGET to "Price: Low to High"
-            OrderSort.PRICE_HIGH -> XMaterial.GOLD_BLOCK to "Price: High to Low"
-            OrderSort.MOST_FILLED -> XMaterial.EXPERIENCE_BOTTLE to "Most Filled"
+        val (material, sortKey) = when (currentSort) {
+            OrderSort.NEWEST -> XMaterial.ANVIL to GuiMessages.SORT_DISPLAY_NEWEST
+            OrderSort.PRICE_LOW -> XMaterial.GOLD_NUGGET to GuiMessages.SORT_DISPLAY_PRICE_LOW
+            OrderSort.PRICE_HIGH -> XMaterial.GOLD_BLOCK to GuiMessages.SORT_DISPLAY_PRICE_HIGH
+            OrderSort.MOST_FILLED -> XMaterial.EXPERIENCE_BOTTLE to GuiMessages.SORT_DISPLAY_MOST_FILLED
         }
+
+        val displayName = pctx.translationAPI.getComponentSync(sortKey)
 
         return VItem(material) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.SORT_TITLE)
             lore = mutableListOf(
-                pctx.mm.deserialize("<gray>Current: <white>$displayName"),
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SORT_DESC),
                 Component.empty(),
-                pctx.mm.deserialize("<green>Click to cycle")
+                pctx.translationAPI.getComponentSync(GuiMessages.SORT_CURRENT) {
+                    placeholder("sort", displayName)
+                },
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CYCLE)
             )
             hideAllFlags()
 
@@ -303,10 +338,34 @@ class OrderBrowserMenu(
         }
     }
 
-    private fun createBackButton(): VItem {
-        return MenuUtils.backButton(pctx.translationAPI).apply {
+    private fun createAuctionHouseButton(): VItem {
+        return VItem(XMaterial.GOLD_BLOCK) {
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_AUCTION_HOUSE)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_AUCTION_HOUSE_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_BROWSE)
+            )
+            hideAllFlags()
+
             onClick { _, _ ->
                 ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
+            }
+        }
+    }
+
+    private fun createCloseButton(): VItem {
+        return VItem(XMaterial.BARRIER) {
+            name = pctx.translationAPI.getComponentSync(GuiMessages.CLOSE)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CLOSE_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CLOSE)
+            )
+            hideAllFlags()
+
+            onClick { _, _ ->
+                ClickResult.Close
             }
         }
     }

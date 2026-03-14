@@ -42,16 +42,41 @@ enum class GuiMessages(
     
     // Buttons
     BUTTON_CREATE_AUCTION("button_create_auction", "<green>Create Auction"),
+    BUTTON_CREATE_AUCTION_DESC("button_create_auction_desc", "<gray>List an item for sale"),
     BUTTON_CREATE_ORDER("button_create_order", "<green>Create Order"),
+    BUTTON_CREATE_ORDER_DESC("button_create_order_desc", "<gray>Create a buy order"),
     BUTTON_REFRESH("button_refresh", "<yellow>Refresh"),
+    BUTTON_REFRESH_DESC("button_refresh_desc", "<gray>Reload the current view"),
     BUTTON_SORT("button_sort", "<yellow>Sort"),
+    BUTTON_SORT_DESC("button_sort_desc", "<gray>Change sorting order"),
     BUTTON_FILTER("button_filter", "<yellow>Filter"),
+    BUTTON_FILTER_DESC("button_filter_desc", "<gray>Filter visible items"),
     BUTTON_MY_AUCTIONS("button_my_auctions", "<aqua>My Auctions"),
+    BUTTON_MY_AUCTIONS_DESC("button_my_auctions_desc", "<gray>View your active auctions"),
     BUTTON_MY_ORDERS("button_my_orders", "<aqua>My Orders"),
+    BUTTON_MY_ORDERS_DESC("button_my_orders_desc", "<gray>View your active orders"),
     BUTTON_EXPIRED("button_expired", "<red>Claimable Items"),
+    BUTTON_EXPIRED_DESC("button_expired_desc", "<gray>View items ready to claim"),
     BUTTON_BUY_ORDERS("button_buy_orders", "<green>Buy Orders"),
+    BUTTON_BUY_ORDERS_DESC("button_buy_orders_desc", "<gray>Filter to buy orders"),
     BUTTON_SELL_ORDERS("button_sell_orders", "<green>Sell Orders"),
+    BUTTON_SELL_ORDERS_DESC("button_sell_orders_desc", "<gray>Filter to sell orders"),
     BUTTON_SEARCH("button_search", "<yellow>Search"),
+    BUTTON_SEARCH_DESC("button_search_desc", "<gray>Search and filter results"),
+    BUTTON_AUCTION_HOUSE("button_auction_house", "<gold>Auction House"),
+    BUTTON_AUCTION_HOUSE_DESC("button_auction_house_desc", "<gray>Browse all auctions"),
+    BUTTON_BACK_DESC("button_back_desc", "<gray>Return to previous menu"),
+    BUTTON_CLOSE_DESC("button_close_desc", "<gray>Close this menu"),
+    BUTTON_WATCHLIST("button_watchlist", "<yellow>My Watchlist"),
+    BUTTON_WATCHLIST_DESC("button_watchlist_desc", "<gray>View your watched auctions"),
+    BUTTON_QUICK_SELL("button_quick_sell", "<green>Quick Sell"),
+    BUTTON_QUICK_SELL_DESC("button_quick_sell_desc", "<gray>Sell items to buy orders"),
+    BUTTON_TRANSACTION_HISTORY("button_transaction_history", "<yellow>Transaction History"),
+    BUTTON_TRANSACTION_HISTORY_DESC("button_transaction_history_desc", "<gray>View your transaction history"),
+    BUTTON_ORDERS("button_orders", "<light_purple>Orders"),
+    BUTTON_ORDERS_DESC("button_orders_desc", "<gray>Browse buy and sell orders"),
+    BUTTON_CREATE_SELL_ORDER("button_create_sell_order", "<yellow>Create Sell Order"),
+    BUTTON_CREATE_SELL_ORDER_DESC("button_create_sell_order_desc", "<gray>Create a sell order"),
     
     // Auction item display
     AUCTION_ITEM_NAME("auction_item_name", "<gold><item>"),
@@ -279,5 +304,66 @@ enum class GuiMessages(
     EXPENSIVE_TRANSACTION_WARNING("expensive_transaction_warning", "<red>⚠ High Value Transaction"),
     EXPENSIVE_TRANSACTION_THRESHOLD("expensive_transaction_threshold", "<red>Threshold: <threshold>"),
     CONFIRM_EXPENSIVE_AUCTION("confirm_expensive_auction", "<yellow>⚠ Confirm expensive auction: Type 'confirm' in chat within 10 seconds"),
-    BULK_LISTING_CONFIRMATION("bulk_listing_confirmation", "<yellow>Creating <count> auctions. Confirm by clicking again.");
+    BULK_LISTING_CONFIRMATION("bulk_listing_confirmation", "<yellow>Creating <count> auctions. Confirm by clicking again."),
+
+    // Action labels
+    ACTION_CLICK_TO_VIEW("action_click_to_view", "<green>Click to view"),
+    ACTION_CLICK_TO_CREATE("action_click_to_create", "<green>Click to create"),
+    ACTION_CLICK_TO_BROWSE("action_click_to_browse", "<green>Click to browse"),
+    ACTION_CLICK_TO_CLOSE("action_click_to_close", "<red>Click to close"),
+    ACTION_CLICK_TO_OPEN("action_click_to_open", "<green>Click to open"),
+    ACTION_CLICK_TO_CYCLE("action_click_to_cycle", "<green>Click to cycle"),
+    ACTION_CLICK_TO_SEARCH("action_click_to_search", "<green>Click to search"),
+    ACTION_CLICK_TO_GO_BACK("action_click_to_go_back", "<green>Click to go back"),
+    ACTION_CLICK_TO_QUICK_SELL("action_click_to_quick_sell", "<green>Click to quick sell"),
+
+    // Filter labels
+    FILTER_TYPE_ALL("filter_type_all", "All Types"),
+    FILTER_TYPE_AUCTION_ONLY("filter_type_auction_only", "Auction Only"),
+    FILTER_TYPE_BIN_ONLY("filter_type_bin_only", "BIN Only"),
+    FILTER_TYPE_BOTH("filter_type_both", "Auction + BIN"),
+    FILTER_ORDER_TYPE_ALL("filter_order_type_all", "All"),
+    FILTER_LABEL("filter_label", "<yellow>Filter: <white><type>"),
+    FILTER_CURRENT("filter_current", "<gray>Current: <white><filter>"),
+    FILTER_NO_FILTERS("filter_no_filters", "<gray>Current: <white>No filters"),
+    FILTER_ACTIVE("filter_active", "<yellow>Active filters:"),
+    FILTER_FOR_ADVANCED("filter_for_advanced", "<gray>For advanced filters,"),
+    FILTER_USE_SEARCH("filter_use_search", "<gray>use the Search button"),
+
+    // Sort labels
+    SORT_DISPLAY_ENDING_SOON("sort_display_ending_soon", "Ending Soon"),
+    SORT_DISPLAY_NEWEST("sort_display_newest", "Newest First"),
+    SORT_DISPLAY_PRICE_LOW("sort_display_price_low", "Price: Low to High"),
+    SORT_DISPLAY_PRICE_HIGH("sort_display_price_high", "Price: High to Low"),
+    SORT_DISPLAY_MOST_BIDS("sort_display_most_bids", "Most Bids"),
+    SORT_DISPLAY_RECENTLY_UPDATED("sort_display_recently_updated", "Recently Updated"),
+    SORT_DISPLAY_MOST_FILLED("sort_display_most_filled", "Most Filled"),
+    SORT_CURRENT("sort_current", "<gray>Current: <white><sort>"),
+
+    // Item info labels
+    ITEM_ID("item_id", "<gray>ID: <white><id>"),
+    ITEM_WATCHING("item_watching", "<gray>Watching: <white><count>"),
+    ITEM_LABEL("item_label", "<yellow>Item: <white><item>"),
+    ITEM_AMOUNT("item_amount", "<yellow>Amount: <white><amount>"),
+
+    // Status messages
+    STATUS_AUCTION_ENDED("status_auction_ended", "<red>⚠ Auction Ended"),
+    STATUS_ENDED("status_ended", "<red>Ended"),
+    STATUS_YOUR_ORDER("status_your_order", "<yellow><bold>Your Order</bold></yellow>"),
+    STATUS_HOLD_ITEM_TO_SELL("status_hold_item_to_sell", "<red>Hold an item to sell!"),
+    STATUS_HOLD_ITEM_TO_QUICK_SELL("status_hold_item_to_quick_sell", "<red>Hold an item to quick sell"),
+
+    // Order item info
+    ORDER_CLICK_MANAGE("order_click_manage", "<gray>Click to manage or cancel"),
+    ORDER_RIGHT_CLICK_WATCHLIST("order_right_click_watchlist", "<yellow>Right-click to add to watchlist"),
+
+    // Page indicator
+    PAGE_INDICATOR("page_indicator", "Page <current>/<total>"),
+
+    // Quick Sell
+    QUICK_SELL_NO_ITEM("quick_sell_no_item", "<red>Hold an item to use Quick Sell!"),
+
+    // Search prompt
+    SEARCH_PROMPT_ORDERS("search_prompt_orders", "Search Orders"),
+    ;
 }

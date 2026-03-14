@@ -38,7 +38,10 @@ class AuctionHouseMenu(
         }
         pageIndicatorRenderer = { current, total ->
             VItem(XMaterial.PAPER) {
-                name = Component.text("Page $current/$total")
+                name = pctx.translationAPI.getComponentSync(GuiMessages.PAGE_INDICATOR) {
+                    unparsed("current", current.toString())
+                    unparsed("total", total.toString())
+                }
             }
         }
 
@@ -68,6 +71,7 @@ class AuctionHouseMenu(
         items[50] = createMyAuctionsButton()
         items[51] = createTransactionHistoryButton()
         items[52] = createOrdersButton()
+        items[53] = createCloseButton()
     }
 
     private fun createAuctionItem(auction: Auction): VItem {
@@ -76,7 +80,9 @@ class AuctionHouseMenu(
 
         val loreList = mutableListOf<Component>()
 
-        loreList.add(pctx.mm.deserialize("<gray>ID: <white>${auction.shortId}"))
+        loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ITEM_ID) {
+            unparsed("id", auction.shortId)
+        })
         loreList.add(Component.empty())
 
         loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_SELLER) {
@@ -84,7 +90,7 @@ class AuctionHouseMenu(
         })
 
         if (hasEnded) {
-            loreList.add(pctx.mm.deserialize("<red>⚠ Auction Ended"))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.STATUS_AUCTION_ENDED))
         }
 
         when (auction.auctionType) {
@@ -117,7 +123,7 @@ class AuctionHouseMenu(
         }
 
         val timeDisplay = if (hasEnded) {
-            pctx.mm.deserialize("<red>Ended")
+            pctx.translationAPI.getComponentSync(GuiMessages.STATUS_ENDED)
         } else {
             pctx.translationAPI.getComponentSync(GuiMessages.AUCTION_ITEM_TIME_LEFT) {
                 unparsed("time", MenuUtils.formatTimeRemaining(auction.endsAt))
@@ -141,21 +147,27 @@ class AuctionHouseMenu(
     }
 
     private fun createFilterButton(): VItem {
-        val (material, displayName) = when (currentFilter.auctionType) {
-            null -> XMaterial.HOPPER to "All Types"
-            AuctionType.AUCTION -> XMaterial.GOLD_INGOT to "Auction Only"
-            AuctionType.BIN -> XMaterial.EMERALD to "BIN Only"
-            AuctionType.BOTH -> XMaterial.DIAMOND to "Auction + BIN"
+        val (material, displayKey) = when (currentFilter.auctionType) {
+            null -> XMaterial.HOPPER to GuiMessages.FILTER_TYPE_ALL
+            AuctionType.AUCTION -> XMaterial.GOLD_INGOT to GuiMessages.FILTER_TYPE_AUCTION_ONLY
+            AuctionType.BIN -> XMaterial.EMERALD to GuiMessages.FILTER_TYPE_BIN_ONLY
+            AuctionType.BOTH -> XMaterial.DIAMOND to GuiMessages.FILTER_TYPE_BOTH
         }
 
+        val displayName = pctx.translationAPI.getComponentSync(displayKey)
+
         return VItem(material) {
-            name = pctx.mm.deserialize("<yellow>Filter: <white>$displayName")
+            name = pctx.translationAPI.getComponentSync(GuiMessages.FILTER_LABEL) {
+                placeholder("type", displayName)
+            }
             lore = mutableListOf(
-                pctx.mm.deserialize("<gray>Click to change filter"),
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_FILTER_DESC),
                 Component.empty(),
-                pctx.mm.deserialize("<gray>For advanced filters,")
+                pctx.translationAPI.getComponentSync(GuiMessages.FILTER_FOR_ADVANCED),
+                pctx.translationAPI.getComponentSync(GuiMessages.FILTER_USE_SEARCH),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CYCLE)
             )
-            lore.add(pctx.mm.deserialize("<gray>use the Search button"))
             hideAllFlags()
 
             onClick { _, controls ->
@@ -173,21 +185,27 @@ class AuctionHouseMenu(
     }
 
     private fun createQuickSortButton(): VItem {
-        val (material, displayName) = when (currentFilter.sortBy) {
-            AuctionSort.ENDING_SOON -> XMaterial.CLOCK to "Ending Soon"
-            AuctionSort.NEWEST -> XMaterial.ANVIL to "Newest First"
-            AuctionSort.PRICE_LOW -> XMaterial.GOLD_NUGGET to "Price: Low to High"
-            AuctionSort.PRICE_HIGH -> XMaterial.GOLD_BLOCK to "Price: High to Low"
-            AuctionSort.MOST_BIDS -> XMaterial.EXPERIENCE_BOTTLE to "Most Bids"
-            AuctionSort.RECENTLY_UPDATED -> XMaterial.BOOK to "Recently Updated"
+        val (material, sortKey) = when (currentFilter.sortBy) {
+            AuctionSort.ENDING_SOON -> XMaterial.CLOCK to GuiMessages.SORT_DISPLAY_ENDING_SOON
+            AuctionSort.NEWEST -> XMaterial.ANVIL to GuiMessages.SORT_DISPLAY_NEWEST
+            AuctionSort.PRICE_LOW -> XMaterial.GOLD_NUGGET to GuiMessages.SORT_DISPLAY_PRICE_LOW
+            AuctionSort.PRICE_HIGH -> XMaterial.GOLD_BLOCK to GuiMessages.SORT_DISPLAY_PRICE_HIGH
+            AuctionSort.MOST_BIDS -> XMaterial.EXPERIENCE_BOTTLE to GuiMessages.SORT_DISPLAY_MOST_BIDS
+            AuctionSort.RECENTLY_UPDATED -> XMaterial.BOOK to GuiMessages.SORT_DISPLAY_RECENTLY_UPDATED
         }
+
+        val displayName = pctx.translationAPI.getComponentSync(sortKey)
 
         return VItem(material) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.SORT_TITLE)
             lore = mutableListOf(
-                pctx.mm.deserialize("<gray>Current: <white>$displayName"),
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SORT_DESC),
                 Component.empty(),
-                pctx.mm.deserialize("<green>Click to cycle")
+                pctx.translationAPI.getComponentSync(GuiMessages.SORT_CURRENT) {
+                    placeholder("sort", displayName)
+                },
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CYCLE)
             )
             hideAllFlags()
 
@@ -213,18 +231,16 @@ class AuctionHouseMenu(
         return VItem(XMaterial.OAK_SIGN) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SEARCH)
             lore = mutableListOf(
-                pctx.mm.deserialize("<gray>Click for advanced search"),
-                pctx.mm.deserialize("<gray>Filter by name, price, seller,"),
-                pctx.mm.deserialize("<gray>material, time, and more!"),
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_SEARCH_DESC),
                 Component.empty(),
                 if (currentFilter.searchQuery.isNullOrBlank() &&
                     currentFilter.sellerName.isNullOrBlank() &&
                     currentFilter.material == null &&
                     currentFilter.minPrice == null &&
                     currentFilter.maxPrice == null) {
-                    pctx.mm.deserialize("<gray>Current: <white>No filters")
+                    pctx.translationAPI.getComponentSync(GuiMessages.FILTER_NO_FILTERS)
                 } else {
-                    pctx.mm.deserialize("<yellow>Active filters:")
+                    pctx.translationAPI.getComponentSync(GuiMessages.FILTER_ACTIVE)
                 }
             )
             if (!currentFilter.searchQuery.isNullOrBlank()) {
@@ -242,6 +258,8 @@ class AuctionHouseMenu(
             if (currentFilter.maxPrice != null) {
                 lore.add(pctx.mm.deserialize("  <gray>• Max Price: <white>${MenuUtils.formatPrice(currentFilter.maxPrice!!, pctx.economy)}"))
             }
+            lore.add(Component.empty())
+            lore.add(pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_SEARCH))
             hideAllFlags()
 
             onClick { _, _ ->
@@ -253,6 +271,11 @@ class AuctionHouseMenu(
     private fun createMyAuctionsButton(): VItem {
         return VItem(XMaterial.CHEST) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.MY_AUCTIONS_TITLE)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_MY_AUCTIONS_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_VIEW)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -264,6 +287,11 @@ class AuctionHouseMenu(
     private fun createCreateAuctionButton(): VItem {
         return VItem(XMaterial.EMERALD) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_AUCTION)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_AUCTION_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CREATE)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -274,7 +302,12 @@ class AuctionHouseMenu(
 
     private fun createOrdersButton(): VItem {
         return VItem(XMaterial.BOOK) {
-            name = pctx.translationAPI.getComponentSync(GuiMessages.ORDERS_TITLE)
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_ORDERS)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_ORDERS_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_BROWSE)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -286,6 +319,11 @@ class AuctionHouseMenu(
     private fun createCreateOrderButton(): VItem {
         return VItem(XMaterial.DIAMOND) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_ORDER)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CREATE_ORDER_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CREATE)
+            )
             hideAllFlags()
 
             onClick { _, _ ->
@@ -294,15 +332,33 @@ class AuctionHouseMenu(
         }
     }
 
+    private fun createCloseButton(): VItem {
+        return VItem(XMaterial.BARRIER) {
+            name = pctx.translationAPI.getComponentSync(GuiMessages.CLOSE)
+            lore = mutableListOf(
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_CLOSE_DESC),
+                Component.empty(),
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_CLOSE)
+            )
+            hideAllFlags()
+
+            onClick { _, _ ->
+                ClickResult.Close
+            }
+        }
+    }
+
     private fun createWatchlistButton(): VItem {
         return VItem(XMaterial.COMPASS) {
-            name = pctx.mm.deserialize("<yellow>My Watchlist")
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_WATCHLIST)
             lore = mutableListOf(
-                pctx.mm.deserialize("<gray>View your watched auctions"),
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_WATCHLIST_DESC),
                 Component.empty(),
-                pctx.mm.deserialize("<gray>Watching: <white>$watchlistCount"),
+                pctx.translationAPI.getComponentSync(GuiMessages.ITEM_WATCHING) {
+                    unparsed("count", watchlistCount.toString())
+                },
                 Component.empty(),
-                pctx.mm.deserialize("<green>Click to open watchlist")
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_OPEN)
             )
             hideAllFlags()
 
@@ -336,11 +392,11 @@ class AuctionHouseMenu(
 
     private fun createTransactionHistoryButton(): VItem {
         return VItem(XMaterial.BOOK) {
-            name = pctx.mm.deserialize("<yellow>Transaction History")
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_TRANSACTION_HISTORY)
             lore = mutableListOf(
-                pctx.mm.deserialize("<gray>View your transaction history"),
+                pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_TRANSACTION_HISTORY_DESC),
                 Component.empty(),
-                pctx.mm.deserialize("<gray>Click to view transactions")
+                pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_VIEW)
             )
             hideAllFlags()
 
@@ -355,29 +411,31 @@ class AuctionHouseMenu(
         val hasHeldItem = !heldItem.type.isAir
 
         return VItem(if (hasHeldItem) XMaterial.EMERALD else XMaterial.GRAY_DYE) {
-            name = pctx.mm.deserialize("<green>Quick Sell")
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_QUICK_SELL)
             val loreList = mutableListOf<Component>()
 
             if (hasHeldItem) {
-                loreList.add(pctx.mm.deserialize("<gray>Sell your held item to the"))
-                loreList.add(pctx.mm.deserialize("<gray>highest buy order instantly!"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_QUICK_SELL_DESC))
                 loreList.add(Component.empty())
-                loreList.add(pctx.mm.deserialize("<yellow>Item: <white>${heldItem.type.name.replace("_", " ")}"))
-                loreList.add(pctx.mm.deserialize("<yellow>Amount: <white>${heldItem.amount}"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ITEM_LABEL) {
+                    unparsed("item", heldItem.type.name.replace("_", " "))
+                })
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ITEM_AMOUNT) {
+                    unparsed("amount", heldItem.amount.toString())
+                })
                 loreList.add(Component.empty())
-                loreList.add(pctx.mm.deserialize("<green>Click to quick sell"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ACTION_CLICK_TO_QUICK_SELL))
             } else {
-                loreList.add(pctx.mm.deserialize("<gray>Sell items to buy orders"))
-                loreList.add(pctx.mm.deserialize("<gray>for instant payment!"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.BUTTON_QUICK_SELL_DESC))
                 loreList.add(Component.empty())
-                loreList.add(pctx.mm.deserialize("<red>Hold an item to quick sell"))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.STATUS_HOLD_ITEM_TO_QUICK_SELL))
             }
             lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
                 if (!hasHeldItem) {
-                    pctx.player.sendMessage(pctx.mm.deserialize("<red>Hold an item to use Quick Sell!"))
+                    pctx.player.sendMessage(pctx.translationAPI.getComponentSync(GuiMessages.QUICK_SELL_NO_ITEM))
                     ClickResult.Close
                 } else {
                     ClickResult.SwitchMenu(QuickSellMenu(pctx, heldItem))
