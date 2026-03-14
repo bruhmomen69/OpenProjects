@@ -16,6 +16,7 @@ import bruh.auctionhouse.service.ServiceResult
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -38,15 +39,16 @@ class MyOrdersMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<Order>() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenu(): Menu {
         val orders = runBlocking {
             orderService.getPlayerOrders(player.uniqueId, null)
         }
 
-        val menu = menuAPI.paginated<Order> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.MY_ORDERS_TITLE)
 
@@ -69,14 +71,24 @@ class MyOrdersMenu(
 
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    OrderBrowserMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ).createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
                 }
             }
-            staticItems[49] = backItem
+            items[49] = backItem
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createMyOrderItem(order: Order): VItem {
@@ -148,19 +160,19 @@ class MyOrdersMenu(
                 when (order.status) {
                     OrderStatus.PENDING, OrderStatus.PARTIAL -> {
                         val manageMenu = OrderManageMenu(menuAPI, orderService, config, translationAPI, plugin, player, order)
-                        manageMenu.open { open() }
+                        return@onClick ClickResult.SwitchMenu(manageMenu.createMenu { createMenu() })
                     }
                     OrderStatus.FILLED, OrderStatus.EXPIRED, OrderStatus.CANCELLED -> {
-                        openOrderDetails(order)
+                        return@onClick ClickResult.SwitchMenu(createOrderDetailsMenu(order))
                     }
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }
 
-    private fun openOrderDetails(order: Order) {
-        val menu = menuAPI.simple {
+    private fun createOrderDetailsMenu(order: Order): Menu {
+        return bruh.zchat.utils.menuapi.SimpleMenu().apply {
             rows = 5
             title = mm.deserialize("<yellow>Order Details - ${order.shortId}")
 
@@ -170,21 +182,18 @@ class MyOrdersMenu(
 
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             }
             item(36, backItem)
 
             val closeItem = MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
             item(44, closeItem)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createOrderDetailDisplayItem(order: Order): VItem {

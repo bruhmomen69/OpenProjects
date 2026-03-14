@@ -9,6 +9,7 @@ import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
@@ -30,15 +31,16 @@ class AdminBannedPlayersMenu(
     private val plugin: AuctionHousePlugin,
     private val player: Player,
     private val playerBanRepository: PlayerBanRepository
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenu(): Menu {
         val bannedPlayers = runBlocking {
             playerBanRepository.getAllBans()
         }
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.ADMIN_BANNED_PLAYERS)
 
@@ -111,8 +113,7 @@ class AdminBannedPlayersMenu(
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -147,8 +148,7 @@ class AdminBannedPlayersMenu(
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -174,8 +174,7 @@ class AdminBannedPlayersMenu(
                             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_UNBAN_SUCCESS) {
                                 unparsed("player", ban.playerName)
                             })
-                            open()
-                            ClickResult.CLOSE
+                            ClickResult.SwitchMenu(createMenu())
                         }
                     })
                 }
@@ -184,17 +183,16 @@ class AdminBannedPlayersMenu(
             // Back button
             item(49, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AdminDashboardMenu(menuAPI, null, null, config, translationAPI, plugin, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AdminDashboardMenu(menuAPI, null, null, config, translationAPI, plugin, player).createMenu()
+                    )
                 }
             })
 
             // Close button
             item(53, MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+                onClick { _, _ -> ClickResult.Close }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 }

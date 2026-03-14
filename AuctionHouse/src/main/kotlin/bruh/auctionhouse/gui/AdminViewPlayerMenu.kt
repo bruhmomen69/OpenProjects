@@ -10,6 +10,7 @@ import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
@@ -32,11 +33,12 @@ class AdminViewPlayerMenu(
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 5
             title = mm.deserialize("<red>Select Player")
 
@@ -52,6 +54,7 @@ class AdminViewPlayerMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
+                    var nextMenu: Menu? = null
                     runBlocking {
                         val result = menuAPI.promptText(player, "Enter player name")
                         when (result) {
@@ -59,7 +62,7 @@ class AdminViewPlayerMenu(
                                 val offlinePlayer = Bukkit.getOfflinePlayer(result.value)
                                 if (offlinePlayer.uniqueId != null) {
                                     PlayerStateManager.setAdminTarget(player.uniqueId, offlinePlayer.uniqueId, offlinePlayer.name ?: result.value)
-                                    openAuctionsMenu(offlinePlayer.name ?: result.value)
+                                    nextMenu = createAuctionsMenu(offlinePlayer.name ?: result.value)
                                 } else {
                                     player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_PLAYER_NOT_FOUND) {
                                         unparsed("player", result.value)
@@ -69,26 +72,25 @@ class AdminViewPlayerMenu(
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    ClickResult.CLOSE
+                    nextMenu?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
                 }
             })
 
             item(40, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AdminDashboardMenu(menuAPI, auctionRepository, null, config, translationAPI, plugin, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AdminDashboardMenu(menuAPI, auctionRepository, null, config, translationAPI, plugin, player).createMenu()
+                    )
                 }
             })
 
             item(44, MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+                onClick { _, _ -> ClickResult.Close }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 
-    private fun openAuctionsMenu(playerName: String) {
+    private fun createAuctionsMenu(playerName: String): Menu {
         val adminTarget = PlayerStateManager.getAdminTarget(player.uniqueId)
         val currentFilter = PlayerStateManager.getAdminAuctionStatusFilter(player.uniqueId)
 
@@ -100,17 +102,17 @@ class AdminViewPlayerMenu(
             }
         } ?: emptyList()
 
-        val menu = menuAPI.simple {
+        return bruh.zchat.utils.menuapi.SimpleMenu().apply {
             rows = 6
             title = mm.deserialize("<red>$playerName's Auctions")
 
             background = MenuUtils.backgroundItem()
 
             // Filter buttons
-            item(10, createFilterButton(AuctionStatus.ACTIVE, XMaterial.LIME_WOOL, "Active"))
-            item(12, createFilterButton(AuctionStatus.SOLD, XMaterial.GOLD_INGOT, "Sold"))
-            item(14, createFilterButton(AuctionStatus.EXPIRED, XMaterial.GRAY_WOOL, "Expired"))
-            item(16, createFilterButton(null, XMaterial.COMPASS, "All"))
+            item(10, createFilterButton(playerName, AuctionStatus.ACTIVE, XMaterial.LIME_WOOL, "Active"))
+            item(12, createFilterButton(playerName, AuctionStatus.SOLD, XMaterial.GOLD_INGOT, "Sold"))
+            item(14, createFilterButton(playerName, AuctionStatus.EXPIRED, XMaterial.GRAY_WOOL, "Expired"))
+            item(16, createFilterButton(playerName, null, XMaterial.COMPASS, "All"))
 
             // Auction display area
             if (auctions.isEmpty()) {
@@ -123,7 +125,7 @@ class AdminViewPlayerMenu(
                 auctions.take(14).forEachIndexed { index, auction ->
                     val slot = 19 + index
                     if (slot < 53) {
-                        item(slot, createAuctionItem(auction))
+                        item(slot, createAuctionItem(playerName, auction))
                     }
                 }
             }
@@ -131,21 +133,18 @@ class AdminViewPlayerMenu(
             // Back button
             item(49, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
             // Close button
             item(53, MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+                onClick { _, _ -> ClickResult.Close }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 
-    private fun createFilterButton(status: AuctionStatus?, material: XMaterial, label: String): VItem {
+    private fun createFilterButton(playerName: String, status: AuctionStatus?, material: XMaterial, label: String): VItem {
         val currentFilter = PlayerStateManager.getAdminAuctionStatusFilter(player.uniqueId)
         val isSelected = currentFilter == status
         return VItem(material) {
@@ -157,16 +156,12 @@ class AdminViewPlayerMenu(
 
             onClick { _, _ ->
                 PlayerStateManager.setAdminAuctionStatusFilter(player.uniqueId, status)
-                val adminTarget = PlayerStateManager.getAdminTarget(player.uniqueId)
-                adminTarget?.let { (_, name) ->
-                    openAuctionsMenu(name)
-                }
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createAuctionsMenu(playerName))
             }
         }
     }
 
-    private fun createAuctionItem(auction: Auction): VItem {
+    private fun createAuctionItem(playerName: String, auction: Auction): VItem {
         val material = XMaterial.matchXMaterial(auction.itemMaterial).orElse(XMaterial.STONE)
         return VItem(material) {
             name = mm.deserialize("<yellow>${auction.itemMaterial}")
@@ -184,8 +179,7 @@ class AdminViewPlayerMenu(
 
             onClick { _, _ ->
                 player.performCommand("ahadmin cancel ${auction.id}")
-                openAuctionsMenu(auction.sellerName)
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createAuctionsMenu(playerName))
             }
         }
     }

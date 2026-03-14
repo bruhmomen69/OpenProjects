@@ -8,6 +8,7 @@ import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -30,18 +31,18 @@ class TransactionHistoryMenu(
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<Transaction>() {
     private val mm = MiniMessage.miniMessage()
     private var currentFilter: TransactionType? = null
     private var currentPage = 0
     private val pageSize = config.gui.transactionHistory.transactionsPerPage
 
-    fun open(page: Int = 0) {
+    fun createMenuOrNull(page: Int = 0): Menu? {
         currentPage = page
 
         if (!config.gui.transactionHistory.enabled) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.TRANSACTION_HISTORY_DISABLED))
-            return
+            return null
         }
 
         val transactions = runBlocking {
@@ -56,7 +57,8 @@ class TransactionHistoryMenu(
             )
         }
 
-        val menu = menuAPI.paginated<Transaction> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.TRANSACTION_HISTORY_TITLE)
 
@@ -85,15 +87,13 @@ class TransactionHistoryMenu(
             }
 
             // Static control items
-            staticItems[46] = createFilterButton()
-            staticItems[48] = createBackButton()
-            staticItems[50] = createDateRangeButton()
-            staticItems[53] = MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+            items[46] = createFilterButton()
+            items[48] = createBackButton()
+            items[50] = createDateRangeButton()
+            items[53] = MenuUtils.closeButton(translationAPI).apply {
+                onClick { _, _ -> ClickResult.Close }
             }
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createTransactionItem(transaction: Transaction): VItem {
@@ -152,8 +152,9 @@ class TransactionHistoryMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                TransactionDetailsMenu(menuAPI, transactionRepository, config, translationAPI, plugin, player, transaction).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    TransactionDetailsMenu(menuAPI, transactionRepository, config, translationAPI, plugin, player, transaction).createMenu()
+                )
             }
         }
     }
@@ -185,8 +186,7 @@ class TransactionHistoryMenu(
                     TransactionType.REFUND, TransactionType.AUCTION_BID_RETURN, TransactionType.ORDER_REFUND -> null
                     else -> null
                 }
-                open(0)
-                ClickResult.ALLOW
+                createMenuOrNull(0)?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -204,7 +204,7 @@ class TransactionHistoryMenu(
 
             onClick { _, _ ->
                 player.sendMessage(translationAPI.getComponentSync(AuctionMessages.DATE_RANGE_FILTERING_SOON))
-                ClickResult.ALLOW
+                ClickResult.Deny
             }
         }
     }
@@ -212,8 +212,22 @@ class TransactionHistoryMenu(
     private fun createBackButton(): VItem {
         return MenuUtils.backButton(translationAPI).apply {
             onClick { _, _ ->
-                player.performCommand("ah")
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    AuctionHouseMenu(
+                        menuAPI,
+                        plugin.auctionService,
+                        plugin.orderService,
+                        plugin.auctionRepository,
+                        plugin.bidRepository,
+                        plugin.orderRepository,
+                        plugin.watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        plugin.economy,
+                        player
+                    ).createMenu()
+                )
             }
         }
     }
@@ -230,11 +244,12 @@ class TransactionDetailsMenu(
     private val plugin: AuctionHousePlugin,
     private val player: Player,
     private val transaction: Transaction
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 5
             title = translationAPI.getComponentSync(GuiMessages.TRANSACTION_DETAILS_TITLE)
 
@@ -328,17 +343,17 @@ class TransactionDetailsMenu(
             // Back button
             item(40, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    TransactionHistoryMenu(menuAPI, transactionRepository, config, translationAPI, plugin, player).open()
-                    ClickResult.CLOSE
+                    TransactionHistoryMenu(menuAPI, transactionRepository, config, translationAPI, plugin, player)
+                        .createMenuOrNull()
+                        ?.let { ClickResult.SwitchMenu(it) }
+                        ?: ClickResult.Close
                 }
             })
 
             // Close button
             item(44, MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+                onClick { _, _ -> ClickResult.Close }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 }

@@ -14,6 +14,7 @@ import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDouble
@@ -45,15 +46,16 @@ class AuctionDetailsMenu(
     private val economy: EconomyProvider,
     private val player: Player,
     private val auction: Auction
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenu(): Menu {
         runBlocking {
             auctionRepository.incrementViewCount(auction.id)
         }
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 5
             title = mm.deserialize("<yellow>Auction ${auction.shortId}")
 
@@ -98,8 +100,22 @@ class AuctionDetailsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             }
             item(36, backItem)
@@ -107,13 +123,11 @@ class AuctionDetailsMenu(
             // Close button
             val closeItem = MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
             item(44, closeItem)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createBidHistoryButton(): VItem {
@@ -126,20 +140,19 @@ class AuctionDetailsMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                openBidHistoryMenu()
-                ClickResult.CLOSE
+                createBidHistoryMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
 
-    private fun openBidHistoryMenu() {
+    private fun createBidHistoryMenuOrNull(): Menu? {
         val bidHistory = runBlocking {
             bidRepository.getBidHistory(auction.id, config.auctions.display.maxBidHistory)
         }
 
         if (bidHistory.isEmpty()) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_BID_HISTORY))
-            return
+            return null
         }
 
         // Check if player has an active bid on this auction
@@ -147,7 +160,7 @@ class AuctionDetailsMenu(
             bidRepository.getPlayerActiveBid(player.uniqueId, auction.id)
         }
 
-        val menu = menuAPI.simple {
+        return bruh.zchat.utils.menuapi.SimpleMenu().apply {
             rows = 6
             title = mm.deserialize("<yellow>Bid History - ${auction.itemDisplayName ?: auction.itemMaterial}")
 
@@ -195,7 +208,7 @@ class AuctionDetailsMenu(
                     if (canWithdraw) {
                         onClick { _, _ ->
                             withdrawBid(bid)
-                            ClickResult.CLOSE
+                            ClickResult.Close
                         }
                     }
                 })
@@ -204,14 +217,11 @@ class AuctionDetailsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             }
             item(49, backItem)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun withdrawBid(bid: bruh.auctionhouse.model.Bid) {
@@ -270,18 +280,21 @@ class AuctionDetailsMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                extendAuction(extensionHours, extensionFee)
-                ClickResult.CLOSE
+                if (extendAuction(extensionHours, extensionFee)) {
+                    ClickResult.SwitchMenu(createMenu())
+                } else {
+                    ClickResult.Close
+                }
             }
         }
     }
 
-    private fun extendAuction(hours: Int, fee: Double) {
-        runBlocking {
+    private fun extendAuction(hours: Int, fee: Double): Boolean {
+        return runBlocking {
             // Check if player can afford the fee
             if (!economy.has(player, java.math.BigDecimal.valueOf(fee))) {
                 player.sendMessage(translationAPI.getComponentSync(AuctionMessages.INSUFFICIENT_FUNDS_EXTENSION))
-                return@runBlocking
+                return@runBlocking false
             }
 
             // Check manual extension count (separate from anti-snipe auto extensions)
@@ -290,7 +303,7 @@ class AuctionDetailsMenu(
                 player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MAX_EXTENSION_REACHED) {
                     unparsed("max", config.auctions.manualExtension.maxManualExtensions.toString())
                 })
-                return@runBlocking
+                return@runBlocking false
             }
 
             // Charge fee
@@ -304,6 +317,7 @@ class AuctionDetailsMenu(
             player.sendMessage(
                 mm.deserialize("<green>Auction extended by <white>${hours} hours</white>! New end time: <yellow>$newEndTime")
             )
+            true
         }
     }
 
@@ -401,7 +415,7 @@ class AuctionDetailsMenu(
                         }
                     }
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }
@@ -421,7 +435,7 @@ class AuctionDetailsMenu(
                     val result = auctionService.buyNow(player, auction.id)
                     player.sendMessage(result.message)
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }
@@ -443,7 +457,7 @@ class AuctionDetailsMenu(
                         }
                     }
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }
@@ -463,14 +477,13 @@ class AuctionDetailsMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                openEditPriceMenu()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createEditPriceMenu())
             }
         }
     }
 
-    private fun openEditPriceMenu() {
-        val menu = menuAPI.simple {
+    private fun createEditPriceMenu(): Menu {
+        return bruh.zchat.utils.menuapi.SimpleMenu().apply {
             rows = 5
             title = mm.deserialize("<yellow>Edit Auction Prices")
 
@@ -497,22 +510,23 @@ class AuctionDetailsMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
+                    var clickResult: ClickResult = ClickResult.Close
                     runBlocking {
-                        val result = menuAPI.promptDouble(
+                        val inputResult = menuAPI.promptDouble(
                             player,
                             "New Start Price",
                             auction.startPrice,
                             config.auctions.minStartPrice,
                             config.auctions.maxStartPrice
                         )
-                        when (result) {
+                        when (inputResult) {
                             is AnvilInputResult.Success -> {
-                                updatePrices(result.value, auction.buyNowPrice)
+                                clickResult = this@AuctionDetailsMenu.updatePrices(inputResult.value, auction.buyNowPrice)
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    ClickResult.CLOSE
+                    clickResult
                 }
             })
 
@@ -530,58 +544,58 @@ class AuctionDetailsMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
+                    var resultClick: ClickResult = ClickResult.Close
                     runBlocking {
                         val currentBin = auction.buyNowPrice
                         if (currentBin != null) {
                             // Clear BIN price
-                            updatePrices(null, null)
+                            resultClick = updatePrices(null, null)
                             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BIN_PRICE_REMOVED))
                         } else {
                             // Set BIN price
-                            val result = menuAPI.promptDouble(
+                            val inputResult = menuAPI.promptDouble(
                                 player,
                                 "New BIN Price",
                                 auction.startPrice * 1.5,
                                 auction.startPrice * config.auctions.minBinMultiplier,
                                 config.auctions.maxStartPrice
                             )
-                            when (result) {
+                            when (inputResult) {
                                 is AnvilInputResult.Success -> {
-                                    updatePrices(null, result.value)
+                                    resultClick = updatePrices(null, inputResult.value)
                                 }
                                 is AnvilInputResult.Cancelled -> {}
                             }
                         }
                     }
-                    ClickResult.CLOSE
+                    resultClick
                 }
             })
 
             // Back button
             item(40, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 
-    private fun updatePrices(newStart: Double?, newBin: Double?) {
-        runBlocking {
+    private fun updatePrices(newStart: Double?, newBin: Double?): ClickResult {
+        val wasSuccessful = runBlocking {
             val result = auctionService.editAuctionPrice(player, auction.id, newStart, newBin)
             when (result) {
                 is bruh.auctionhouse.service.ServiceResult.Success -> {
                     player.sendMessage(translationAPI.getComponentSync(AuctionMessages.PRICES_UPDATED))
-                    open()
+                    true
                 }
                 is bruh.auctionhouse.service.ServiceResult.Failure -> {
                     player.sendMessage(result.message)
+                    false
                 }
             }
         }
+        return if (wasSuccessful) ClickResult.SwitchMenu(createMenu()) else ClickResult.Close
     }
 
     private fun createWatchlistButton(): VItem {
@@ -618,8 +632,7 @@ class AuctionDetailsMenu(
                         player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_ADDED))
                     }
                 }
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }

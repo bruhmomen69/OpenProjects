@@ -10,6 +10,7 @@ import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDouble
@@ -28,14 +29,15 @@ class OrderManageMenu(
     private val plugin: AuctionHousePlugin,
     private val player: Player,
     private val order: Order
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private var currentOrder = order
 
-    fun open(onCloseCallback: () -> Unit) {
+    fun createMenu(parentMenu: () -> Menu): Menu {
         val canEditPrice = currentOrder.isActive() && currentOrder.quantityFilled == 0
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = if (canEditPrice) 5 else 4
             title = mm.deserialize("<yellow>Order ${currentOrder.shortId}")
 
@@ -44,14 +46,12 @@ class OrderManageMenu(
             item(13, createOrderDisplayItem())
             
             if (canEditPrice) {
-                item(29, createEditPriceButton(onCloseCallback))
+                item(29, createEditPriceButton(parentMenu))
             }
             
-            item(if (canEditPrice) 31 else 29, createCancelButton(onCloseCallback))
-            item(if (canEditPrice) 33 else 33, createBackButton(onCloseCallback))
+            item(if (canEditPrice) 31 else 29, createCancelButton(parentMenu))
+            item(33, createBackButton(parentMenu))
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createOrderDisplayItem(): VItem {
@@ -100,7 +100,7 @@ class OrderManageMenu(
         }
     }
 
-    private fun createEditPriceButton(onCloseCallback: () -> Unit): VItem {
+    private fun createEditPriceButton(parentMenu: () -> Menu): VItem {
         return VItem(XMaterial.ANVIL) {
             name = mm.deserialize("<yellow>Edit Price")
             val loreList = mutableListOf<Component>()
@@ -111,6 +111,7 @@ class OrderManageMenu(
             hideAllFlags()
 
             onClick { _, _ ->
+                var updated = false
                 runBlocking {
                     val result = menuAPI.promptDouble(
                         player,
@@ -125,10 +126,10 @@ class OrderManageMenu(
                             when (editResult) {
                                 is ServiceResult.Success -> {
                                     currentOrder = editResult.data
+                                    updated = true
                                     player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_PRICE_UPDATED) {
                                         unparsed("price", MenuUtils.formatPrice(result.value, plugin.economy))
                                     })
-                                    open(onCloseCallback)
                                 }
                                 is ServiceResult.Failure -> {
                                     player.sendMessage(editResult.message)
@@ -138,12 +139,16 @@ class OrderManageMenu(
                         is AnvilInputResult.Cancelled -> {}
                     }
                 }
-                ClickResult.CLOSE
+                if (updated) {
+                    ClickResult.SwitchMenu(createMenu(parentMenu))
+                } else {
+                    ClickResult.Close
+                }
             }
         }
     }
 
-    private fun createCancelButton(onCloseCallback: () -> Unit): VItem {
+    private fun createCancelButton(parentMenu: () -> Menu): VItem {
         return VItem(XMaterial.BARRIER) {
             name = mm.deserialize("<red>Cancel Order")
             val loreList = mutableListOf<Component>()
@@ -164,10 +169,12 @@ class OrderManageMenu(
             hideAllFlags()
 
             onClick { _, _ ->
+                var wasSuccessful = false
                 runBlocking {
                     val result = orderService.cancelOrder(player, currentOrder.id)
                     when (result) {
                         is ServiceResult.Success -> {
+                            wasSuccessful = true
                             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_CANCELLED))
                         }
                         is ServiceResult.Failure -> {
@@ -175,20 +182,22 @@ class OrderManageMenu(
                         }
                     }
                 }
-                onCloseCallback()
-                ClickResult.CLOSE
+                if (wasSuccessful) {
+                    ClickResult.SwitchMenu(parentMenu())
+                } else {
+                    ClickResult.Close
+                }
             }
         }
     }
 
-    private fun createBackButton(onCloseCallback: () -> Unit): VItem {
+    private fun createBackButton(parentMenu: () -> Menu): VItem {
         return VItem(XMaterial.OAK_DOOR) {
             name = translationAPI.getComponentSync(GuiMessages.BACK)
             hideAllFlags()
 
             onClick { _, _ ->
-                onCloseCallback()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(parentMenu())
             }
         }
     }

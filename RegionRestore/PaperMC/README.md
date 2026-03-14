@@ -10,6 +10,7 @@ Core implementation of the RegionRestore plugin for Paper/Folia servers.
 - **Restore Scheduling**: Timer-based and event-driven restore triggers
 - **Notifications**: Configurable notifications for restore events
 - **Entity Killer**: Kill entities within a region before restore (whitelist/blacklist mode)
+- **Selection Wand**: Tracked ItemAPI wand uses deny-by-default use handling (`onUseDeny`) for region corner selection
 
 ## Architecture
 

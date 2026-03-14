@@ -11,8 +11,10 @@ import bruh.auctionhouse.model.AuctionType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
+import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDouble
@@ -40,22 +42,22 @@ class AdvancedSearchMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player,
-    private val parentMenu: () -> Unit
-) {
+    private val parentMenuFactory: () -> Menu
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     
-    // Current filter state
-    private var searchQuery: String? = null
-    private var sellerName: String? = null
-    private var material: XMaterial? = null
-    private var minPrice: Double? = null
-    private var maxPrice: Double? = null
-    private var auctionType: AuctionType? = null
-    private var endingWithin: Duration? = null
-    private var sortBy: AuctionSort = AuctionSort.ENDING_SOON
+    private var searchQuery: String? = PlayerStateManager.getAuctionFilter(player.uniqueId).searchQuery
+    private var sellerName: String? = PlayerStateManager.getAuctionFilter(player.uniqueId).sellerName
+    private var material: XMaterial? = PlayerStateManager.getAuctionFilter(player.uniqueId).material?.let { XMaterial.matchXMaterial(it).orElse(null) }
+    private var minPrice: Double? = PlayerStateManager.getAuctionFilter(player.uniqueId).minPrice
+    private var maxPrice: Double? = PlayerStateManager.getAuctionFilter(player.uniqueId).maxPrice
+    private var auctionType: AuctionType? = PlayerStateManager.getAuctionFilter(player.uniqueId).auctionType
+    private var endingWithin: Duration? = PlayerStateManager.getAuctionFilter(player.uniqueId).endingWithin
+    private var sortBy: AuctionSort = PlayerStateManager.getAuctionFilter(player.uniqueId).sortBy
 
-    fun open() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 6
             title = mm.deserialize("<yellow>Advanced Search")
 
@@ -85,8 +87,6 @@ class AdvancedSearchMenu(
             item(49, createApplySearchButton())
             item(53, createCloseButton())
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createSearchQueryItem(): VItem {
@@ -107,7 +107,7 @@ class AdvancedSearchMenu(
             onClick { click, _ ->
                 if (click.isRightClick) {
                     searchQuery = null
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
                     runBlocking {
                         val result = menuAPI.promptText(
@@ -118,13 +118,12 @@ class AdvancedSearchMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 searchQuery = result.value.takeIf { it.isNotBlank() }
-                                open()
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
+                    ClickResult.SwitchMenu(createMenu())
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -146,7 +145,7 @@ class AdvancedSearchMenu(
             onClick { click, _ ->
                 if (click.isRightClick) {
                     sellerName = null
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
                     runBlocking {
                         val result = menuAPI.promptText(
@@ -157,13 +156,12 @@ class AdvancedSearchMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 sellerName = result.value.takeIf { it.isNotBlank() }
-                                open()
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
+                    ClickResult.SwitchMenu(createMenu())
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -187,14 +185,15 @@ class AdvancedSearchMenu(
             onClick { click, _ ->
                 if (click.isRightClick) {
                     this@AdvancedSearchMenu.material = null
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
-                    MaterialPickerMenu(menuAPI, config, translationAPI) { selectedMaterial ->
-                        this@AdvancedSearchMenu.material = selectedMaterial
-                        open()
-                    }.openForPlayer(player)
+                    ClickResult.SwitchMenu(
+                        MaterialPickerMenu(menuAPI, config, translationAPI) { selectedMaterial ->
+                            this@AdvancedSearchMenu.material = selectedMaterial
+                            createMenu()
+                        }.createMenu(player)
+                    )
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -216,7 +215,7 @@ class AdvancedSearchMenu(
             onClick { click, _ ->
                 if (click.isRightClick) {
                     minPrice = null
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
                     runBlocking {
                         val result = menuAPI.promptDouble(
@@ -229,13 +228,12 @@ class AdvancedSearchMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 minPrice = result.value.takeIf { it > 0 }
-                                open()
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
+                    ClickResult.SwitchMenu(createMenu())
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -261,7 +259,7 @@ class AdvancedSearchMenu(
             onClick { click, _ ->
                 if (click.isRightClick) {
                     maxPrice = null
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
                     runBlocking {
                         val result = menuAPI.promptDouble(
@@ -274,13 +272,12 @@ class AdvancedSearchMenu(
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 maxPrice = result.value.takeIf { it > 0 }
-                                open()
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
+                    ClickResult.SwitchMenu(createMenu())
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -301,8 +298,7 @@ class AdvancedSearchMenu(
 
             onClick { _, _ ->
                 cyclePricePreset()
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -378,8 +374,7 @@ class AdvancedSearchMenu(
                     AuctionType.BIN -> AuctionType.BOTH
                     AuctionType.BOTH -> null
                 }
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -401,8 +396,7 @@ class AdvancedSearchMenu(
 
             onClick { _, _ ->
                 cycleEndingSoon()
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -445,8 +439,7 @@ class AdvancedSearchMenu(
 
             onClick { _, _ ->
                 cycleSortOption()
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -535,8 +528,7 @@ class AdvancedSearchMenu(
                 this@AdvancedSearchMenu.auctionType = null
                 this@AdvancedSearchMenu.endingWithin = null
                 this@AdvancedSearchMenu.sortBy = AuctionSort.ENDING_SOON
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -556,13 +548,11 @@ class AdvancedSearchMenu(
 
             onClick { _, _ ->
                 applySearch()
-                ClickResult.CLOSE
             }
         }
     }
 
-    private fun applySearch() {
-        // Build the filter from current settings
+    private fun applySearch(): ClickResult {
         val filter = AuctionFilter(
             searchQuery = searchQuery,
             sellerName = sellerName,
@@ -575,29 +565,18 @@ class AdvancedSearchMenu(
         )
 
         val activeCount = getActiveFiltersList().size
-
-        // Open main auction house menu with the new filter
-        // We need to pass the filter to the AuctionHouseMenu
-        // For now, we'll just open the main menu and it will use its own filter
-        // A better approach would be to have a callback
         player.sendMessage(translationAPI.getComponentSync(AuctionMessages.SEARCH_APPLYING) {
             unparsed("count", activeCount.toString())
         })
-
-        // Open the main auction house with the filter
-        // This requires modifying AuctionHouseMenu to accept a filter
-        // For now, we'll just show a message
-        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.SEARCH_FEATURE_INTEGRATED))
-
-        // Call parent menu to refresh
-        parentMenu()
+        PlayerStateManager.setAuctionFilter(player.uniqueId, filter)
+        PlayerStateManager.setAuctionPage(player.uniqueId, 0)
+        return ClickResult.SwitchMenu(parentMenuFactory())
     }
 
     private fun createBackButton(): VItem {
         return MenuUtils.backButton(translationAPI).apply {
             onClick { _, _ ->
-                parentMenu()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(parentMenuFactory())
             }
         }
     }
@@ -605,7 +584,7 @@ class AdvancedSearchMenu(
     private fun createCloseButton(): VItem {
         return MenuUtils.closeButton(translationAPI).apply {
             onClick { _, _ ->
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }

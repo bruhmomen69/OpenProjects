@@ -14,6 +14,7 @@ import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
 import bruh.auctionhouse.service.OrderService
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -41,22 +42,34 @@ class ConsolidatedExpiredItemsMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<ConsolidatedExpiredItem>() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenu(): Menu {
         val consolidatedItems = runBlocking {
             consolidatedService.getPlayerConsolidatedItems(player.uniqueId)
         }
 
         if (consolidatedItems.isEmpty()) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_CLAIMABLE_ITEMS))
-            // Open the main auction house menu instead
-            AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-            return
+            return AuctionHouseMenu(
+                menuAPI,
+                auctionService,
+                orderService,
+                auctionRepository,
+                bidRepository,
+                orderRepository,
+                watchlistRepository,
+                config,
+                translationAPI,
+                plugin,
+                economy,
+                player
+            ).createMenu()
         }
 
-        val menu = menuAPI.paginated<ConsolidatedExpiredItem> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.EXPIRED_ITEMS_TITLE)
 
@@ -80,17 +93,29 @@ class ConsolidatedExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             }
-            staticItems[49] = backItem
+            items[49] = backItem
 
             // Claim All button
-            staticItems[45] = createClaimAllButton(consolidatedItems)
+            items[45] = createClaimAllButton(consolidatedItems)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createClaimAllButton(items: List<ConsolidatedExpiredItem>): VItem {
@@ -110,7 +135,7 @@ class ConsolidatedExpiredItemsMenu(
                 runBlocking {
                     claimAllItems(items)
                 }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -150,8 +175,6 @@ class ConsolidatedExpiredItemsMenu(
             player.sendMessage(mm.deserialize("<red>Inventory full! <yellow>$totalRemaining <yellow>items remaining."))
         }
 
-        // Refresh the menu
-        open()
     }
 
     private fun createConsolidatedItemDisplay(item: ConsolidatedExpiredItem): VItem {
@@ -173,23 +196,20 @@ class ConsolidatedExpiredItemsMenu(
             hideAllFlags()
 
             onClick { clickType, _ ->
-                runBlocking {
-                    if (clickType.isShiftClick) {
-                        // Try to claim max available
-                        openClaimMenu(item, item.remainingQuantity())
-                    } else {
-                        // Open quantity selector with smart default
-                        val defaultQuantity = minOf(64, item.remainingQuantity())
-                        openClaimMenu(item, defaultQuantity)
-                    }
+                if (clickType.isShiftClick) {
+                    // Try to claim max available
+                    ClickResult.SwitchMenu(openClaimMenu(item, item.remainingQuantity()))
+                } else {
+                    // Open quantity selector with smart default
+                    val defaultQuantity = minOf(64, item.remainingQuantity())
+                    ClickResult.SwitchMenu(openClaimMenu(item, defaultQuantity))
                 }
-                ClickResult.CLOSE
             }
         }
     }
 
-    private fun openClaimMenu(item: ConsolidatedExpiredItem, initialQuantity: Int) {
-        ClaimQuantityMenu(
+    private fun openClaimMenu(item: ConsolidatedExpiredItem, initialQuantity: Int): Menu {
+        return ClaimQuantityMenu(
             menuAPI = menuAPI,
             consolidatedService = consolidatedService,
             auctionService = auctionService,
@@ -205,6 +225,6 @@ class ConsolidatedExpiredItemsMenu(
             player = player,
             consolidatedItem = item,
             initialQuantity = initialQuantity
-        ).open()
+        ).createMenu()
     }
 }

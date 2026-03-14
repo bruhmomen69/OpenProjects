@@ -2,6 +2,8 @@ package bruh.zchat.utils.itemapi
 
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.DropResult
+import bruh.zchat.utils.menuapi.Menu
+import bruh.zchat.utils.menuapi.MenuAPI
 import com.github.benmanes.caffeine.cache.AsyncCache
 import com.github.benmanes.caffeine.cache.Caffeine
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +52,7 @@ import java.util.concurrent.TimeUnit
  *     }
  *     onClick { ctx, controls ->
  *         ctx.player.sendMessage("Wand activated!")
- *         ClickResult.DENY
+ *         ClickResult.Deny
  *     }
  *     soulbound = true
  * }
@@ -64,7 +66,8 @@ import java.util.concurrent.TimeUnit
  */
 class ItemAPI(
     val plugin: JavaPlugin,
-    private val dataStore: ItemDataStore
+    private val dataStore: ItemDataStore,
+    private val menuApi: MenuAPI? = null
 ) : Closeable {
 
     private val logger = LoggerFactory.getLogger(ItemAPI::class.java)
@@ -279,6 +282,54 @@ class ItemAPI(
         return dataStore.delete(instanceId)
     }
 
+    private fun applyClickResult(
+        result: ClickResult,
+        player: Player,
+        sourceTopHolder: Any?,
+        cancelEvent: () -> Unit
+    ) {
+        when (result) {
+            ClickResult.Allow -> {}
+            ClickResult.Deny -> cancelEvent()
+            ClickResult.Close -> {
+                cancelEvent()
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    if (sourceTopHolder == null || player.openInventory.topInventory.holder === sourceTopHolder) {
+                        player.closeInventory()
+                    }
+                })
+            }
+            ClickResult.Refresh -> {
+                cancelEvent()
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    val controls = menuApi?.getControls<Menu>(player)
+                    if (controls != null && controls.isOpen()) {
+                        controls.refresh()
+                    } else {
+                        player.updateInventory()
+                    }
+                })
+            }
+            is ClickResult.SwitchMenu -> {
+                cancelEvent()
+                val menuApi = menuApi
+                if (menuApi == null) {
+                    logger.warn(
+                        "SwitchMenu result returned for tracked item interaction, but ItemAPI was created without MenuAPI; ignoring switch for {}",
+                        player.name
+                    )
+                    return
+                }
+
+                if (Bukkit.isPrimaryThread()) {
+                    menuApi.open(result.menu, player)
+                } else {
+                    Bukkit.getScheduler().runTask(plugin, Runnable { menuApi.open(result.menu, player) })
+                }
+            }
+        }
+    }
+
     override fun close() {
         HandlerList.unregisterAll(listener)
         instanceCache.synchronous().invalidateAll()
@@ -361,17 +412,9 @@ class ItemAPI(
 
                 instance.touch()
                 val controls = ItemControls(this@ItemAPI, instance, definition, player)
+                val sourceTopHolder = player.openInventory.topInventory.holder
                 val result = definition.clickHandler!!.invoke(context, controls)
-
-                when (result) {
-                    ClickResult.ALLOW -> {}
-                    ClickResult.DENY -> event.isCancelled = true
-                    ClickResult.CLOSE -> {
-                        event.isCancelled = true
-                        Bukkit.getScheduler().runTask(plugin, Runnable { player.closeInventory() })
-                    }
-                    ClickResult.REFRESH -> event.isCancelled = true
-                }
+                applyClickResult(result, player, sourceTopHolder) { event.isCancelled = true }
 
                 // Save if dirty
                 if (instance.isDirty) {
@@ -501,17 +544,9 @@ class ItemAPI(
 
                 instance.touch()
                 val controls = ItemControls(this@ItemAPI, instance, definition, player)
+                val sourceTopHolder = player.openInventory.topInventory.holder
                 val result = definition.useHandler!!.invoke(context, controls)
-
-                when (result) {
-                    ClickResult.ALLOW -> {}
-                    ClickResult.DENY -> event.isCancelled = true
-                    ClickResult.CLOSE -> {
-                        event.isCancelled = true
-                        player.closeInventory()
-                    }
-                    ClickResult.REFRESH -> event.isCancelled = true
-                }
+                applyClickResult(result, player, sourceTopHolder) { event.isCancelled = true }
 
                 if (instance.isDirty) {
                     scope.launch { saveInstance(instance) }

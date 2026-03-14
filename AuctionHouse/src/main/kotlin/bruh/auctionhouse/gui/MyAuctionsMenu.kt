@@ -14,6 +14,7 @@ import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -39,15 +40,16 @@ class MyAuctionsMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<Auction>() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenu(): Menu {
         val auctions = runBlocking {
             auctionService.getPlayerAuctions(player.uniqueId, null)
         }
 
-        val menu = menuAPI.paginated<Auction> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.MY_AUCTIONS_TITLE)
 
@@ -71,14 +73,26 @@ class MyAuctionsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             }
-            staticItems[49] = backItem
+            items[49] = backItem
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createMyAuctionItem(auction: Auction): VItem {
@@ -133,21 +147,19 @@ class MyAuctionsMenu(
                                 }
                             }
                         }
-                        // Refresh menu
-                        open()
+                        return@onClick ClickResult.SwitchMenu(createMenu())
                     }
                     AuctionStatus.SOLD, AuctionStatus.EXPIRED, AuctionStatus.CANCELLED -> {
-                        // Open details view for ended auctions
-                        openAuctionDetails(auction)
+                        return@onClick ClickResult.SwitchMenu(createAuctionDetailsMenu(auction))
                     }
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }
 
-    private fun openAuctionDetails(auction: Auction) {
-        val menu = menuAPI.simple {
+    private fun createAuctionDetailsMenu(auction: Auction): Menu {
+        return bruh.zchat.utils.menuapi.SimpleMenu().apply {
             rows = 5
             title = mm.deserialize("<yellow>Auction Details")
 
@@ -177,14 +189,11 @@ class MyAuctionsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             }
             item(49, backItem)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun getStatusColor(status: AuctionStatus): String {

@@ -13,6 +13,7 @@ import bruh.auctionhouse.service.ConsolidatedExpiredItemService
 import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -41,12 +42,13 @@ class ClaimQuantityMenu(
     private val player: Player,
     private val consolidatedItem: ConsolidatedExpiredItem,
     private val initialQuantity: Int
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private var quantity: Int = initialQuantity.coerceIn(1, consolidatedItem.remainingQuantity())
 
-    fun open() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 5
             title = mm.deserialize("<gold>Claim Items</gold>")
 
@@ -69,8 +71,6 @@ class ClaimQuantityMenu(
             item(42, createConfirmButton())
             item(43, createCancelButton())
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createItemDisplay(): VItem {
@@ -106,8 +106,7 @@ class ClaimQuantityMenu(
 
             onClick { _, _ ->
                 quantity = (quantity - amount).coerceAtLeast(1)
-                open() // Refresh menu
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -126,8 +125,7 @@ class ClaimQuantityMenu(
 
             onClick { _, _ ->
                 quantity = (quantity + amount).coerceAtMost(consolidatedItem.remainingQuantity())
-                open() // Refresh menu
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -156,8 +154,7 @@ class ClaimQuantityMenu(
 
             onClick { _, _ ->
                 quantity = amount.coerceAtMost(consolidatedItem.remainingQuantity()).coerceAtLeast(1)
-                open() // Refresh menu
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -171,8 +168,7 @@ class ClaimQuantityMenu(
 
             onClick { _, _ ->
                 quantity = consolidatedItem.remainingQuantity()
-                open() // Refresh menu
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -188,22 +184,25 @@ class ClaimQuantityMenu(
             )
 
             onClick { _, _ ->
+                var success = false
                 runBlocking {
                     val result = consolidatedService.claimItems(player, consolidatedItem, quantity)
+                    success = result.success
                     player.sendMessage(mm.deserialize(
                         if (result.success) "<green>${result.message}"
                         else "<red>${result.message}"
                     ))
-
-                    // Return to consolidated expired items menu
-                    if (result.success) {
+                }
+                if (success) {
+                    ClickResult.SwitchMenu(
                         ConsolidatedExpiredItemsMenu(
                             menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config,
                             translationAPI, plugin, economy, player
-                        ).open()
-                    }
+                        ).createMenu()
+                    )
+                } else {
+                    ClickResult.Close
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -216,12 +215,12 @@ class ClaimQuantityMenu(
             )
 
             onClick { _, _ ->
-                // Return to consolidated expired items menu
-                ConsolidatedExpiredItemsMenu(
-                    menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config,
-                    translationAPI, plugin, economy, player
-                ).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    ConsolidatedExpiredItemsMenu(
+                        menuAPI, consolidatedService, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config,
+                        translationAPI, plugin, economy, player
+                    ).createMenu()
+                )
             }
         }
     }

@@ -6,14 +6,22 @@ import org.bukkit.entity.Player
 
 /**
  * A paginated menu for displaying large collections of items.
+ *
+ * Extends [SimpleMenu] — chrome/static items go in [items] (via [item]).
+ * Content items come from [dataSource] + [itemRenderer] and are rendered
+ * into [contentSlots], overlaying anything in those slots from [items].
+ *
+ * All [SimpleMenu] features are inherited: [populateItems], [asyncData],
+ * [menuState], [onOpen], [onClose], etc.
  */
-class PaginatedMenu<T> : Menu {
-    override var title: Component = Component.empty()
-    var rows: Int = 6
-    override var background: VItem? = null
+open class PaginatedMenu<T> : SimpleMenu() {
+    init {
+        rows = 6
+    }
 
     /**
-     * Title provider - receives current page number and total pages.
+     * Title provider - receives current page number (1-based) and total pages.
+     * If set, overrides [title] and is recalculated on each refresh.
      */
     var titleProvider: ((Int, Int) -> Component)? = null
 
@@ -29,45 +37,33 @@ class PaginatedMenu<T> : Menu {
 
     /**
      * Slots where paginated items will be placed.
+     * Content from [dataSource] is rendered into these slots, overlaying
+     * any items placed here via [item].
      */
     var contentSlots: List<Int> = (10..16) + (19..25) + (28..34) + (37..43)
 
     /**
-     * Static items (navigation, decorations).
+     * Shown in ALL content slots while [isAsyncLoading] is true and [dataSource] is empty.
      */
-    val staticItems: MutableMap<Int, VItem> = mutableMapOf()
+    var loadingPlaceholder: VItem? = null
 
     /**
-     * Previous page button slot and item.
+     * Shown centered in content slots when [dataSource] is empty after loading completes.
      */
+    var emptyPlaceholder: VItem? = null
+
+    // Navigation
+    var autoNavigation: Boolean = true
     var previousPageSlot: Int = 45
     var previousPageItem: VItem = VItem(XMaterial.ARROW) {
         name = Component.text("Previous Page")
     }
-
-    /**
-     * Next page button slot and item.
-     */
     var nextPageSlot: Int = 53
     var nextPageItem: VItem = VItem(XMaterial.ARROW) {
         name = Component.text("Next Page")
     }
-
-    /**
-     * Page indicator slot and item renderer.
-     */
     var pageIndicatorSlot: Int = 49
     var pageIndicatorRenderer: ((Int, Int) -> VItem)? = null
-
-    var onOpen: ((Player, MenuControls<PaginatedMenu<T>>) -> Unit)? = null
-    var onClose: ((Player, MenuControls<PaginatedMenu<T>>) -> Unit)? = null
-
-    /**
-     * Add a static item.
-     */
-    inline fun staticItem(slot: Int, material: XMaterial, builder: VItem.() -> Unit = {}) {
-        staticItems[slot] = VItem(material).apply(builder)
-    }
 
     /**
      * Set the data source and item renderer.
@@ -115,8 +111,6 @@ class PaginatedMenu<T> : Menu {
 
         return result
     }
-
-    val size: Int get() = rows * 9
 
     companion object {
         inline operator fun <T> invoke(builder: PaginatedMenu<T>.() -> Unit): PaginatedMenu<T> {

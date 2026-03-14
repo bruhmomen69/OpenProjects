@@ -417,7 +417,16 @@ class AuctionAdminCommands(
             return
         }
 
-        AdminDashboardMenu(menuAPI, auctionRepository, transactionRepository, config, translationAPI, plugin, player).open()
+        val menu = AdminDashboardMenu(
+            menuAPI,
+            auctionRepository,
+            transactionRepository,
+            config,
+            translationAPI,
+            plugin,
+            player
+        ).createMenu()
+        menuAPI.open(menu, player)
     }
 
     /**

@@ -106,6 +106,7 @@ The test server will:
 - **Own Order Indicator**: Your own orders are now highlighted with a glow effect and show management options instead of fulfillment
 
 **Improvements:**
+- **Menu Transition Safety**: AuctionHouse GUI click handlers now use `ClickResult.SwitchMenu` menu transitions instead of direct `open()` + `ClickResult.Close`, preventing close/open race issues and preserving back-navigation flows.
 - **Search Feature**: The search button in `/ah` menu is functional! Click it to search for auctions by item name or material type
 - **GUI Security Fix**: Fixed search button in `/ah` menu allowing players to move items out of the GUI
 - **Item Retrieval Safety**:

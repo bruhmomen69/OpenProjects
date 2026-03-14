@@ -1,9 +1,11 @@
 package bruh.zchat.utils.menuapi
 
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
+import java.util.concurrent.CompletableFuture
 
 /**
  * InventoryHolder implementation that tracks menu state.
@@ -11,7 +13,8 @@ import org.bukkit.inventory.ItemStack
 internal class MenuHolder<T : Menu>(
     val menuApi: MenuAPI,
     val menu: T,
-    val player: Player
+    val player: Player,
+    val generation: Long
 ) : InventoryHolder {
     private lateinit var _inventory: Inventory
     var currentPage: Int = 0
@@ -22,6 +25,9 @@ internal class MenuHolder<T : Menu>(
 
     // Track drag slots for ItemMenu
     val dragSlots: MutableMap<Int, DragItem> = mutableMapOf()
+
+    // Async data handles for reloadData()
+    val asyncHandles: MutableList<AsyncMenuDataHandle<*>> = mutableListOf()
 
     // Controls instance
     val controls: MenuControlsImpl<T> by lazy { MenuControlsImpl(this) }
@@ -37,13 +43,16 @@ internal class MenuHolder<T : Menu>(
  * Implementation of MenuControls.
  */
 internal class MenuControlsImpl<T : Menu>(
-    private val holder: MenuHolder<T>
+    internal val holder: MenuHolder<T>
 ) : MenuControls<T> {
 
     override val menu: T get() = holder.menu
     override val player: Player get() = holder.player
+    override val generation: Long get() = holder.generation
 
     override fun bukkit(): Inventory = holder.inventory
+
+    override fun isOpen(): Boolean = holder.menuApi.isHolderOpen(holder)
 
     override fun itemStackAt(slot: Int): ItemStack? = holder.inventory.getItem(slot)
 
@@ -102,4 +111,41 @@ internal class MenuControlsImpl<T : Menu>(
 
     override val totalPages: Int
         get() = (menu as? PaginatedMenu<*>)?.pageCount ?: 1
+
+    override fun reloadData() {
+        val simpleMenu = menu as? SimpleMenu ?: return
+        simpleMenu.isAsyncLoading = true
+        for (handle in holder.asyncHandles) {
+            handle.refresh()
+        }
+        refresh()
+    }
+
+    override fun <R> runAsync(
+        processingSlot: Int?,
+        action: suspend () -> R,
+        onSuccess: (R) -> Unit,
+        onError: ((Throwable) -> Unit)?
+    ) {
+        processingSlot?.let { setVItemAt(it, MenuPlaceholders.processing()) }
+
+        CompletableFuture.supplyAsync {
+            @Suppress("BlockingMethodInNonBlockingContext")
+            kotlinx.coroutines.runBlocking { action() }
+        }.thenAccept { result ->
+            Bukkit.getScheduler().runTask(holder.menuApi.plugin, Runnable {
+                if (isOpen()) onSuccess(result)
+            })
+        }.exceptionally { error ->
+            Bukkit.getScheduler().runTask(holder.menuApi.plugin, Runnable {
+                if (isOpen()) {
+                    onError?.invoke(error.cause ?: error)
+                        ?: holder.menuApi.plugin.slF4JLogger.warn(
+                            "Async action failed for ${player.name}", error
+                        )
+                }
+            })
+            null
+        }
+    }
 }

@@ -168,7 +168,7 @@ class VItem(
     fun onClickDeny(action: (ClickContext, MenuControls<*>) -> Unit) {
         clickHandler = { ctx, controls ->
             action(ctx, controls)
-            ClickResult.DENY
+            ClickResult.Deny
         }
     }
 
@@ -192,7 +192,7 @@ class VItem(
     fun onClickClose(action: (ClickContext, MenuControls<*>) -> Unit = { _, _ -> }) {
         clickHandler = { ctx, controls ->
             action(ctx, controls)
-            ClickResult.CLOSE
+            ClickResult.Close
         }
     }
 
@@ -202,8 +202,16 @@ class VItem(
     fun onClickRefresh(action: (ClickContext, MenuControls<*>) -> Unit) {
         clickHandler = { ctx, controls ->
             action(ctx, controls)
-            ClickResult.REFRESH
+            ClickResult.Refresh
         }
+    }
+
+    /**
+     * Click handler that switches to another menu.
+     * Use for actual menu-to-menu transitions (not state changes within the same menu).
+     */
+    fun onClickSwitch(menuFactory: (ClickContext, MenuControls<*>) -> Menu) {
+        clickHandler = { ctx, controls -> ClickResult.SwitchMenu(menuFactory(ctx, controls)) }
     }
 
     /**

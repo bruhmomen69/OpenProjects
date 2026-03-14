@@ -167,6 +167,15 @@ when (result) {
 
 All builders are created off `MenuAPI`, and opened via `menuAPI.open(menu, player)`.
 
+- **ClickResult model**: `ClickResult` is a sealed action model with:
+  - `ClickResult.Allow`
+  - `ClickResult.Deny`
+  - `ClickResult.Close`
+  - `ClickResult.Refresh`
+  - `ClickResult.SwitchMenu(menu)`
+
+Use `SwitchMenu` for menu-to-menu transitions to avoid close/open race issues from manual `open()` + `Close` chains. MenuAPI applies close/refresh with holder guards, so transitions cannot accidentally close the destination menu.
+
 - **SimpleMenu**: fixed slots.
 ```kotlin
 val menu = menuAPI.simple {
@@ -180,6 +189,49 @@ val menu = menuAPI.simple {
 }
 menuAPI.open(menu, player)
 ```
+
+### Async stale-data menu loading
+
+MenuAPI now includes reusable async data binding primitives for stale-prone menus:
+
+- `AsyncMenuState<T>` (`Idle`, `Loading`, `Ready`, `Error`)
+- `AsyncDataPolicy` (`staleAfter`, `eagerLoadOnBind`)
+- `AsyncMenuDataSource<T>`
+- `MenuAPI.bindAsyncData(...)`
+
+`bindAsyncData()` uses both request generations and open-menu guards (`MenuControls.isOpen()` + menu generation) so stale completions and late async responses never overwrite a newer menu session.
+
+Example:
+
+```kotlin
+val controls = menuAPI.open(menu, player)
+
+val handle = menuAPI.bindAsyncData(
+    controls = controls,
+    source = AsyncMenuDataSource { p ->
+        CompletableFuture.supplyAsync { repository.loadRowsFor(p.uniqueId) }
+    },
+    policy = AsyncDataPolicy(staleAfter = Duration.ofSeconds(10)),
+    onStateChange = { state, c ->
+        if (state is AsyncMenuState.Loading) c.refresh()
+    }
+) { rows, c ->
+    // mutate menu backing data here, then refresh UI
+    menu.dataSource = rows
+    c.refresh()
+}
+
+handle.refreshIfStale()
+```
+
+If you use `ClickResult.SwitchMenu` from `itemapi` handlers, create `ItemAPI` with a `MenuAPI` instance:
+
+```kotlin
+val menuAPI = MenuAPI(plugin)
+val itemAPI = ItemAPI(plugin, dataStore, menuAPI)
+```
+
+Without a `MenuAPI`, `SwitchMenu` results are ignored with a warning.
 
 - **DynamicMenu**: auto-centers and evenly spaces items; just add items, it computes `rows` and slots.
 ```kotlin
@@ -222,7 +274,7 @@ val menu = menuAPI.paginated<String> {
     itemRenderer = { name, _ ->
         VItem(XMaterial.PLAYER_HEAD) {
             this.name = Component.text(name)
-            onClickDeny { _, controls -> /* open details */ ClickResult.DENY }
+            onClickDeny { _, controls -> /* open details */ }
         }
     }
     pageIndicatorRenderer = { cur, total -> VItem(XMaterial.PAPER) { name = Component.text("Page $cur/$total") } }
@@ -294,15 +346,15 @@ class ShopMenu(menuApi: ConfigurableMenuAPI) : ConfigurableMenu<ShopActions>(
     override val actionHandlers = mapOf(
         ShopActions.BUY to { ctx, instance ->
             ctx.player.sendMessage("Buying!")
-            ClickResult.DENY
+            ClickResult.Deny
         },
         ShopActions.SELL to { ctx, instance ->
             ctx.player.sendMessage("Selling!")
-            ClickResult.DENY
+            ClickResult.Deny
         },
         ShopActions.CLOSE to { _, instance ->
             instance.close()
-            ClickResult.CLOSE
+            ClickResult.Close
         }
     )
 }
@@ -325,11 +377,11 @@ class TradeMenu(menuApi: ConfigurableMenuAPI) : ConfigurableItemMenu<TradeAction
             val myItem = instance.getItem(TradeSlots.MY_ITEM)
             val theirItem = instance.getItem(TradeSlots.THEIR_ITEM)
             // Process trade...
-            ClickResult.CLOSE
+            ClickResult.Close
         },
         TradeActions.CANCEL to { _, instance ->
             instance.close()
-            ClickResult.CLOSE
+            ClickResult.Close
         }
     )
 

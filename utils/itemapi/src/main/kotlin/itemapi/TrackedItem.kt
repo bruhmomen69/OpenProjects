@@ -86,7 +86,7 @@ class TrackedItem(
     fun onClickDeny(action: (ItemContext, ItemControls) -> Unit = { _, _ -> }) {
         clickHandler = { ctx, controls ->
             action(ctx, controls)
-            ClickResult.DENY
+            ClickResult.Deny
         }
     }
 
@@ -96,7 +96,7 @@ class TrackedItem(
     fun onClickAllow(action: (ItemContext, ItemControls) -> Unit = { _, _ -> }) {
         clickHandler = { ctx, controls ->
             action(ctx, controls)
-            ClickResult.ALLOW
+            ClickResult.Allow
         }
     }
 
@@ -140,7 +140,7 @@ class TrackedItem(
     fun onUseDeny(action: (ItemContext, ItemControls) -> Unit = { _, _ -> }) {
         useHandler = { ctx, controls ->
             action(ctx, controls)
-            ClickResult.DENY
+            ClickResult.Deny
         }
     }
 

@@ -16,14 +16,12 @@ import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
@@ -47,7 +45,7 @@ class AuctionHouseMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<Auction>() {
     private val mm = MiniMessage.miniMessage()
 
     private var currentFilter: AuctionFilter
@@ -64,24 +62,20 @@ class AuctionHouseMenu(
         PlayerStateManager.setAuctionPage(player.uniqueId, currentPage)
     }
 
-    fun open(page: Int = 0) {
+    fun createMenu(page: Int = 0): Menu {
         currentPage = page
         saveFilterState()
 
-        // Load auctions asynchronously to avoid blocking the main thread
-        CoroutineScope(Dispatchers.IO).launch {
-            val result = auctionService.getActiveAuctions(currentFilter, currentFilter.sortBy, page, 28)
-            
-            // Open menu on main thread
-            org.bukkit.Bukkit.getScheduler().runTask(plugin as org.bukkit.plugin.Plugin, Runnable {
-                openMenu(result)
-            })
+        val result = runBlocking {
+            auctionService.getActiveAuctions(currentFilter, currentFilter.sortBy, page, 28)
         }
+
+        return createMenuFromResult(result)
     }
 
-    private fun openMenu(result: bruh.auctionhouse.service.PagedResult<bruh.auctionhouse.model.Auction>) {
-
-        val menu = menuAPI.paginated<Auction> {
+    private fun createMenuFromResult(result: bruh.auctionhouse.service.PagedResult<bruh.auctionhouse.model.Auction>): Menu {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.MAIN_TITLE)
 
@@ -110,17 +104,15 @@ class AuctionHouseMenu(
                 }
             }
 
-            staticItems[45] = createWatchlistButton()
-            staticItems[46] = createFilterButton()
-            staticItems[47] = createQuickSortButton()
-            staticItems[48] = createSearchButton()
-            staticItems[49] = createQuickSellButton()
-            staticItems[50] = createMyAuctionsButton()
-            staticItems[51] = createTransactionHistoryButton()
-            staticItems[52] = createOrdersButton()
+            items[45] = createWatchlistButton()
+            items[46] = createFilterButton()
+            items[47] = createQuickSortButton()
+            items[48] = createSearchButton()
+            items[49] = createQuickSellButton()
+            items[50] = createMyAuctionsButton()
+            items[51] = createTransactionHistoryButton()
+            items[52] = createOrdersButton()
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createAuctionItem(auction: Auction): VItem {
@@ -193,8 +185,23 @@ class AuctionHouseMenu(
 
             onClick { _, _ ->
                 // Handle click - open auction details
-                AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    AuctionDetailsMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player,
+                        auction
+                    ).createMenu()
+                )
             }
         }
     }
@@ -226,9 +233,7 @@ class AuctionHouseMenu(
                     AuctionType.BOTH -> currentFilter.copy(auctionType = null)
                 }
                 saveFilterState()
-                // Refresh menu
-                open(currentPage)
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu(currentPage))
             }
         }
     }
@@ -265,9 +270,7 @@ class AuctionHouseMenu(
                     }
                 )
                 saveFilterState()
-                // Refresh menu
-                open(currentPage)
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu(currentPage))
             }
         }
     }
@@ -308,11 +311,35 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                AdvancedSearchMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, config, translationAPI, plugin, economy, player) {
-                    // Callback to refresh with updated filters
-                    // The AdvancedSearchMenu will handle applying filters
-                }.open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    AdvancedSearchMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ) {
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    }.createMenu()
+                )
             }
         }
     }
@@ -323,8 +350,22 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    MyAuctionsMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ).createMenu()
+                )
             }
         }
     }
@@ -335,8 +376,10 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                AuctionCreateMenu(menuAPI, auctionService, config, translationAPI, plugin, player).open()
-                ClickResult.CLOSE
+                AuctionCreateMenu(menuAPI, auctionService, config, translationAPI, plugin, player)
+                    .createMenuOrNull()
+                    ?.let { ClickResult.SwitchMenu(it) }
+                    ?: ClickResult.Close
             }
         }
     }
@@ -347,8 +390,20 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                ClickResult.CLOSE
+                OrderBrowserMenu(
+                    menuAPI,
+                    auctionService,
+                    orderService,
+                    auctionRepository,
+                    bidRepository,
+                    orderRepository,
+                    watchlistRepository,
+                    config,
+                    translationAPI,
+                    plugin,
+                    economy,
+                    player
+                ).createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -359,10 +414,11 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).open {
-                    open(currentPage)
-                }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).createMenu {
+                        createMenu(currentPage)
+                    }
+                )
             }
         }
     }
@@ -384,8 +440,22 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                WatchlistMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    WatchlistMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ).createMenu()
+                )
             }
         }
     }
@@ -407,8 +477,10 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                BulkListMenu(menuAPI, auctionService, config, translationAPI, plugin, player).open()
-                ClickResult.CLOSE
+                BulkListMenu(menuAPI, auctionService, config, translationAPI, plugin, player)
+                    .createMenuOrNull()
+                    ?.let { ClickResult.SwitchMenu(it) }
+                    ?: ClickResult.Close
             }
         }
     }
@@ -424,8 +496,10 @@ class AuctionHouseMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                TransactionHistoryMenu(menuAPI, plugin.transactionRepository, config, translationAPI, plugin, player).open()
-                ClickResult.CLOSE
+                TransactionHistoryMenu(menuAPI, plugin.transactionRepository, config, translationAPI, plugin, player)
+                    .createMenuOrNull()
+                    ?.let { ClickResult.SwitchMenu(it) }
+                    ?: ClickResult.Close
             }
         }
     }
@@ -458,10 +532,12 @@ class AuctionHouseMenu(
             onClick { _, _ ->
                 if (!hasHeldItem) {
                     player.sendMessage(mm.deserialize("<red>Hold an item to use Quick Sell!"))
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 } else {
-                    QuickSellMenu(menuAPI, orderService, config, translationAPI, plugin, economy, player, heldItem).open()
-                    ClickResult.CLOSE
+                    QuickSellMenu(menuAPI, orderService, config, translationAPI, plugin, economy, player, heldItem)
+                        .createMenuOrNull()
+                        ?.let { ClickResult.SwitchMenu(it) }
+                        ?: ClickResult.Close
                 }
             }
         }

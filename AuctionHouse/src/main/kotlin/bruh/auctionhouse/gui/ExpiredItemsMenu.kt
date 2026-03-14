@@ -14,6 +14,7 @@ import bruh.auctionhouse.model.ExpiredItem
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -44,20 +45,21 @@ class ExpiredItemsMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<ExpiredItem>() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenuOrNull(): Menu? {
         val expiredItems = runBlocking {
             expiredItemRepository.getPlayerExpiredItems(player.uniqueId)
         }
 
         if (expiredItems.isEmpty()) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.NO_CLAIMABLE_ITEMS))
-            return
+            return null
         }
 
-        val menu = menuAPI.paginated<ExpiredItem> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.EXPIRED_ITEMS_TITLE)
 
@@ -81,14 +83,26 @@ class ExpiredItemsMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             }
-            staticItems[49] = backItem
+            items[49] = backItem
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createExpiredItemDisplay(expiredItem: ExpiredItem): VItem {
@@ -115,8 +129,9 @@ class ExpiredItemsMenu(
                     giveItemToPlayer(expiredItem)
                 }
                 // Refresh menu
-                open()
-                ClickResult.CLOSE
+                createMenuOrNull()
+                    ?.let { ClickResult.SwitchMenu(it) }
+                    ?: ClickResult.Close
             }
         }
     }

@@ -9,6 +9,7 @@ import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDouble
@@ -32,7 +33,7 @@ class BulkListMenu(
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private var auctionItem = player.inventory.itemInMainHand
     private var quantity = 1
@@ -42,29 +43,30 @@ class BulkListMenu(
     private var anonymous = false
     private var auctionType = AuctionType.BOTH
 
-    fun open() {
+    fun createMenuOrNull(): Menu? {
         // Check if player is holding an item
         if (auctionItem.type.isAir) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MUST_HOLD_ITEM))
-            return
+            return null
         }
 
         // Check if bulk listing is enabled
         if (!config.auctions.bulkListing.enabled) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BULK_LISTING_DISABLED))
-            return
+            return null
         }
 
-        refreshMenu()
+        return createMenu()
     }
 
-    private fun refreshMenu() {
+    fun createMenu(): Menu {
         val maxQuantity = config.auctions.bulkListing.maxBulkListings
         val totalItems = quantity
         val feePerItem = calculateFeePerItem()
         val totalFee = feePerItem * quantity
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.BULK_LISTING_TITLE)
 
@@ -98,8 +100,7 @@ class BulkListMenu(
 
                 onClick { _, _ ->
                     quantity = (quantity - 64).coerceAtLeast(1)
-                    refreshMenu()
-                    ClickResult.ALLOW
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -110,8 +111,7 @@ class BulkListMenu(
 
                 onClick { _, _ ->
                     quantity = (quantity - 1).coerceAtLeast(1)
-                    refreshMenu()
-                    ClickResult.ALLOW
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -136,9 +136,8 @@ class BulkListMenu(
                             is AnvilInputResult.Success -> quantity = result.value
                             is AnvilInputResult.Cancelled -> {}
                         }
-                        refreshMenu()
                     }
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -149,8 +148,7 @@ class BulkListMenu(
 
                 onClick { _, _ ->
                     quantity = (quantity + 1).coerceAtMost(maxQuantity)
-                    refreshMenu()
-                    ClickResult.ALLOW
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -161,8 +159,7 @@ class BulkListMenu(
 
                 onClick { _, _ ->
                     quantity = (quantity + 64).coerceAtMost(maxQuantity)
-                    refreshMenu()
-                    ClickResult.ALLOW
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -242,27 +239,39 @@ class BulkListMenu(
 
                         player.sendMessage(result.message)
                     }
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
             // Back button - just close for now, can navigate to main menu
             item(45, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    player.performCommand("ah")
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            plugin.orderService,
+                            plugin.auctionRepository,
+                            plugin.bidRepository,
+                            plugin.orderRepository,
+                            plugin.watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            plugin.economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             })
 
             // Close button
             item(53, MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createItemDisplay(): VItem {
@@ -328,9 +337,8 @@ class BulkListMenu(
                         is AnvilInputResult.Success -> startPrice = result.value
                         is AnvilInputResult.Cancelled -> {}
                     }
-                    refreshMenu()
                 }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -352,8 +360,7 @@ class BulkListMenu(
             onClick { ctx, _ ->
                 if (ctx.isRightClick) {
                     binPrice = null
-                    refreshMenu()
-                    ClickResult.ALLOW
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
                     runBlocking {
                         val minBinPrice = if (auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) {
@@ -379,9 +386,8 @@ class BulkListMenu(
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
-                        refreshMenu()
                     }
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             }
         }
@@ -406,9 +412,8 @@ class BulkListMenu(
                         is AnvilInputResult.Success -> duration = Duration.ofHours(result.value.toLong())
                         is AnvilInputResult.Cancelled -> {}
                     }
-                    refreshMenu()
                 }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -422,8 +427,7 @@ class BulkListMenu(
 
             onClick { _, _ ->
                 anonymous = !anonymous
-                refreshMenu()
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }

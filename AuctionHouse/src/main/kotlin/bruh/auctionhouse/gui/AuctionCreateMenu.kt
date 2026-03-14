@@ -8,6 +8,7 @@ import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDouble
@@ -31,7 +32,7 @@ class AuctionCreateMenu(
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private var auctionItem = player.inventory.itemInMainHand
     private var startPrice = 100.0
@@ -40,18 +41,19 @@ class AuctionCreateMenu(
     private var anonymous = false
     private var auctionType = AuctionType.BOTH
 
-    fun open() {
+    fun createMenuOrNull(): Menu? {
         // Check if player is holding an item
         if (auctionItem.type.isAir) {
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MUST_HOLD_ITEM))
-            return
+            return null
         }
 
-        refreshMenu()
+        return createMenu()
     }
 
-    private fun refreshMenu() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.CREATE_AUCTION_TITLE)
 
@@ -81,13 +83,11 @@ class AuctionCreateMenu(
             // Cancel button
             val cancelItem = MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
             item(42, cancelItem)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createItemDisplay(): VItem {
@@ -117,8 +117,7 @@ class AuctionCreateMenu(
                     AuctionType.BIN -> AuctionType.BOTH
                     AuctionType.BOTH -> AuctionType.AUCTION
                 }
-                refreshMenu()
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -142,9 +141,8 @@ class AuctionCreateMenu(
                         is AnvilInputResult.Success -> startPrice = result.value
                         is AnvilInputResult.Cancelled -> {}
                     }
-                    refreshMenu()
                 }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -166,8 +164,7 @@ class AuctionCreateMenu(
             onClick { ctx, _ ->
                 if (ctx.isRightClick) {
                     binPrice = null
-                    refreshMenu()
-                    ClickResult.ALLOW
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
                     runBlocking {
                         // For AUCTION and BOTH types, BIN must be greater than start price
@@ -195,9 +192,8 @@ class AuctionCreateMenu(
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
-                        refreshMenu()
                     }
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             }
         }
@@ -222,9 +218,8 @@ class AuctionCreateMenu(
                         is AnvilInputResult.Success -> duration = Duration.ofHours(result.value.toLong())
                         is AnvilInputResult.Cancelled -> {}
                     }
-                    refreshMenu()
                 }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -238,8 +233,7 @@ class AuctionCreateMenu(
 
             onClick { _, _ ->
                 anonymous = !anonymous
-                refreshMenu()
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -297,7 +291,7 @@ class AuctionCreateMenu(
                     player.sendMessage(result.message)
                     // Note: Item removal is handled by AuctionService.createAuction()
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }

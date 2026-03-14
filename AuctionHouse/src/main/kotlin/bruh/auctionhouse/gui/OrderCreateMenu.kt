@@ -8,6 +8,7 @@ import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDouble
@@ -50,14 +51,14 @@ class OrderCreateMenu(
     private val economy: EconomyProvider,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private var state = OrderCreateState()
     private var orderType = bruh.auctionhouse.model.OrderType.BUY_ORDER
-    private var onCloseCallback: (() -> Unit)? = null
+    private var parentMenuFactory: (() -> Menu)? = null
 
-    fun open(onCloseCallback: (() -> Unit)? = null) {
-        this.onCloseCallback = onCloseCallback
+    fun createMenu(parentMenuFactory: (() -> Menu)? = this.parentMenuFactory): Menu {
+        this.parentMenuFactory = parentMenuFactory
         // For sell orders, get item from player's hand
         if (orderType == bruh.auctionhouse.model.OrderType.SELL_ORDER) {
             val itemInHand = player.inventory.itemInMainHand
@@ -69,11 +70,9 @@ class OrderCreateMenu(
                 )
             }
         }
-        refreshMenu()
-    }
 
-    private fun refreshMenu() {
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.CREATE_ORDER_TITLE)
 
@@ -109,8 +108,10 @@ class OrderCreateMenu(
             item(45, createBackButton())
             item(53, createCloseButton())
         }
+    }
 
-        menuAPI.open(menu, player)
+    private fun refreshResult(): ClickResult {
+        return ClickResult.SwitchMenu(createMenu(parentMenuFactory))
     }
 
     private fun createOrderTypeToggle(): VItem {
@@ -136,8 +137,7 @@ class OrderCreateMenu(
                 } else {
                     bruh.auctionhouse.model.OrderType.BUY_ORDER
                 }
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -157,7 +157,6 @@ class OrderCreateMenu(
 
                 onClick { _, _ ->
                     openMaterialPicker()
-                    ClickResult.CLOSE
                 }
             }
         } else {
@@ -170,18 +169,16 @@ class OrderCreateMenu(
 
                 onClick { _, _ ->
                     openMaterialPicker()
-                    ClickResult.CLOSE
                 }
             }
         }
     }
 
-    private fun openMaterialPicker() {
-        val picker = MaterialPickerMenu(menuAPI, config, translationAPI) { material ->
+    private fun openMaterialPicker(): ClickResult {
+        return ClickResult.SwitchMenu(MaterialPickerMenu(menuAPI, config, translationAPI) { material ->
             state = state.copy(selectedMaterial = material.parseMaterial())
-            refreshMenu()
-        }
-        picker.openForPlayer(player)
+            createMenu(parentMenuFactory)
+        }.createMenu(player))
     }
 
     private fun createStackDecrement(): VItem {
@@ -196,8 +193,7 @@ class OrderCreateMenu(
             onClick { ctx, _ ->
                 val isShift = ctx.isShiftClick
                 state = state.withQuantityDelta(-64, isShift)
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -225,12 +221,11 @@ class OrderCreateMenu(
                     when (result) {
                         is AnvilInputResult.Success -> {
                             state = state.copy(stacks = result.value)
-                            refreshMenu()
                         }
                         is AnvilInputResult.Cancelled -> {}
                     }
                 }
-                ClickResult.CLOSE
+                refreshResult()
             }
         }
     }
@@ -247,8 +242,7 @@ class OrderCreateMenu(
             onClick { ctx, _ ->
                 val isShift = ctx.isShiftClick
                 state = state.withQuantityDelta(64, isShift)
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -265,8 +259,7 @@ class OrderCreateMenu(
             onClick { ctx, _ ->
                 val isShift = ctx.isShiftClick
                 state = state.withQuantityDelta(-1, isShift)
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -295,12 +288,11 @@ class OrderCreateMenu(
                     when (result) {
                         is AnvilInputResult.Success -> {
                             state = state.withItems(result.value)
-                            refreshMenu()
                         }
                         is AnvilInputResult.Cancelled -> {}
                     }
                 }
-                ClickResult.CLOSE
+                refreshResult()
             }
         }
     }
@@ -319,8 +311,7 @@ class OrderCreateMenu(
             onClick { ctx, _ ->
                 val isShift = ctx.isShiftClick
                 state = state.withQuantityDelta(1, isShift)
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -344,7 +335,7 @@ class OrderCreateMenu(
                 } else {
                     promptPricePerUnit()
                 }
-                ClickResult.CLOSE
+                refreshResult()
             }
         }
     }
@@ -361,7 +352,6 @@ class OrderCreateMenu(
             when (result) {
                 is AnvilInputResult.Success -> {
                     state = state.copy(pricePerUnit = result.value)
-                    refreshMenu()
                 }
                 is AnvilInputResult.Cancelled -> {}
             }
@@ -383,7 +373,6 @@ class OrderCreateMenu(
                     if (state.totalQuantity > 0) {
                         state = state.copy(pricePerUnit = total / state.totalQuantity)
                     }
-                    refreshMenu()
                 }
                 is AnvilInputResult.Cancelled -> {}
             }
@@ -411,8 +400,7 @@ class OrderCreateMenu(
                     (currentIndex + 1) % durations.size
                 }
                 state = state.copy(duration = Duration.ofHours(durations[newIndex]))
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -447,8 +435,7 @@ class OrderCreateMenu(
                     allowPartial = !state.allowPartial,
                     minFillQuantity = if (!state.allowPartial) null else state.minFillQuantity
                 )
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -470,8 +457,7 @@ class OrderCreateMenu(
 
             onClick { _, _ ->
                 state = state.copy(requireExactNbt = !state.requireExactNbt)
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -493,8 +479,7 @@ class OrderCreateMenu(
 
             onClick { _, _ ->
                 state = state.copy(requireExactLore = !state.requireExactLore)
-                refreshMenu()
-                ClickResult.ALLOW
+                refreshResult()
             }
         }
     }
@@ -535,9 +520,14 @@ class OrderCreateMenu(
 
             onClick { _, _ ->
                 if (canConfirm) {
-                    createOrder()
+                    val success = createOrder()
+                    if (success) {
+                        return@onClick parentMenuFactory
+                            ?.let { ClickResult.SwitchMenu(it()) }
+                            ?: ClickResult.Close
+                    }
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }
@@ -553,9 +543,9 @@ class OrderCreateMenu(
         return fee.coerceIn(feeConfig.minFee, feeConfig.maxFee)
     }
 
-    private fun createOrder() {
-        runBlocking {
-            val material = state.selectedMaterial ?: return@runBlocking
+    private fun createOrder(): Boolean {
+        return runBlocking {
+            val material = state.selectedMaterial ?: return@runBlocking false
 
             val result = if (orderType == bruh.auctionhouse.model.OrderType.BUY_ORDER) {
                 // Create buy order with NBT/lore matching options
@@ -576,7 +566,7 @@ class OrderCreateMenu(
                 val itemInHand = player.inventory.itemInMainHand
                 if (itemInHand.type != material || itemInHand.amount < state.totalQuantity) {
                     player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_MUST_HOLD_ITEM))
-                    return@runBlocking
+                    return@runBlocking false
                 }
 
                 val itemForOrder = itemInHand.clone().apply { amount = state.totalQuantity }
@@ -590,9 +580,7 @@ class OrderCreateMenu(
 
             player.sendMessage(result.message)
 
-            if (result.success) {
-                onCloseCallback?.invoke()
-            }
+            result.success
         }
     }
 
@@ -602,8 +590,7 @@ class OrderCreateMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                onCloseCallback?.invoke()
-                ClickResult.CLOSE
+                parentMenuFactory?.let { ClickResult.SwitchMenu(it()) } ?: ClickResult.Close
             }
         }
     }
@@ -611,7 +598,7 @@ class OrderCreateMenu(
     private fun createCloseButton(): VItem {
         return MenuUtils.closeButton(translationAPI).apply {
             onClick { _, _ ->
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }

@@ -2,12 +2,15 @@ package bruh.zchat.utils.menuapi
 
 import com.cryptomorin.xseries.XMaterial
 import net.kyori.adventure.text.Component
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import kotlin.properties.ReadWriteProperty
+import kotlin.reflect.KProperty
 
 /**
  * A simple menu with fixed slot positions.
  */
-class SimpleMenu : Menu {
+open class SimpleMenu : Menu {
     override var title: Component = Component.empty()
     var rows: Int = 3
     val items: MutableMap<Int, VItem> = mutableMapOf()
@@ -16,12 +19,88 @@ class SimpleMenu : Menu {
     /**
      * Called when the menu is opened.
      */
-    var onOpen: ((Player, MenuControls<SimpleMenu>) -> Unit)? = null
+    var onOpen: ((Player, MenuControls<*>) -> Unit)? = null
 
     /**
      * Called when the menu is closed.
      */
-    var onClose: ((Player, MenuControls<SimpleMenu>) -> Unit)? = null
+    var onClose: ((Player, MenuControls<*>) -> Unit)? = null
+
+    // ========================================================================
+    // Async Data
+    // ========================================================================
+
+    internal val asyncDataConfigs: MutableList<AsyncDataConfig<*>> = mutableListOf()
+
+    /**
+     * Whether any async data loaders are currently loading.
+     * Check this in [populateItems] to show loading placeholders.
+     */
+    var isAsyncLoading: Boolean = false
+        internal set
+
+    /**
+     * Register an async data source that loads data off the main thread.
+     * The framework starts all registered loaders after the menu is opened.
+     *
+     * ```kotlin
+     * asyncData<List<Auction>> {
+     *     load { auctionService.getActiveAuctions() }
+     *     onLoaded { auctions -> dataSource = auctions }
+     * }
+     * ```
+     */
+    protected fun <T> asyncData(block: AsyncDataDsl<T>.() -> Unit) {
+        asyncDataConfigs.add(AsyncDataDsl<T>().apply(block).build())
+    }
+
+    // ========================================================================
+    // Observable State (menuState delegate)
+    // ========================================================================
+
+    internal var boundControls: MenuControlsImpl<*>? = null
+    internal var isPopulating: Boolean = false
+    private var refreshScheduled: Boolean = false
+
+    /**
+     * Kotlin property delegate for observable menu state.
+     * When the property value changes and the menu is open, automatically
+     * schedules a refresh (via [populateItems] + re-render).
+     *
+     * Changes are batched: multiple property changes within the same tick
+     * result in a single refresh.
+     *
+     * During [populateItems] and init, changes do NOT trigger refresh.
+     *
+     * ```kotlin
+     * private var filter by menuState(AuctionFilter.ALL)
+     * private var sortBy by menuState(SortType.NEWEST)
+     *
+     * // In click handler:
+     * onClick { _, _ ->
+     *     filter = filter.next()  // auto-schedules refresh
+     *     ClickResult.Deny
+     * }
+     * ```
+     */
+    protected fun <T> menuState(initial: T): ReadWriteProperty<Any?, T> {
+        return MenuStateDelegate(initial, this)
+    }
+
+    internal fun scheduleRefresh() {
+        if (isPopulating) return
+        val ctrl = boundControls ?: return
+        if (refreshScheduled) return
+        refreshScheduled = true
+        Bukkit.getScheduler().runTask(ctrl.holder.menuApi.plugin, Runnable {
+            refreshScheduled = false
+            if (ctrl.isOpen()) ctrl.refresh()
+        })
+    }
+
+    // ========================================================================
+    // Item Helpers
+    // ========================================================================
 
     /**
      * Add an item at a specific slot using a builder.
@@ -102,6 +181,22 @@ class SimpleMenu : Menu {
     companion object {
         inline operator fun invoke(builder: SimpleMenu.() -> Unit): SimpleMenu {
             return SimpleMenu().apply(builder)
+        }
+    }
+}
+
+/**
+ * Property delegate that schedules a menu refresh when the value changes.
+ */
+private class MenuStateDelegate<T>(
+    private var value: T,
+    private val menu: SimpleMenu
+) : ReadWriteProperty<Any?, T> {
+    override fun getValue(thisRef: Any?, property: KProperty<*>): T = value
+    override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+        if (this.value != value) {
+            this.value = value
+            menu.scheduleRefresh()
         }
     }
 }

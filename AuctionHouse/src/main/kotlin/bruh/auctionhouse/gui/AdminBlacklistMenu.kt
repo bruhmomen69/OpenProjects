@@ -8,6 +8,7 @@ import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
@@ -28,11 +29,12 @@ class AdminBlacklistMenu(
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.ADMIN_BLACKLIST)
 
@@ -90,8 +92,7 @@ class AdminBlacklistMenu(
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -127,8 +128,7 @@ class AdminBlacklistMenu(
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(createMenu())
                 }
             })
 
@@ -149,8 +149,7 @@ class AdminBlacklistMenu(
                             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
                                 unparsed("material", material)
                             })
-                            open()
-                            ClickResult.CLOSE
+                            ClickResult.SwitchMenu(createMenu())
                         }
                     })
                 }
@@ -159,17 +158,16 @@ class AdminBlacklistMenu(
             // Back button
             item(49, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AdminDashboardMenu(menuAPI, null, null, config, translationAPI, plugin, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AdminDashboardMenu(menuAPI, null, null, config, translationAPI, plugin, player).createMenu()
+                    )
                 }
             })
 
             // Close button
             item(53, MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+                onClick { _, _ -> ClickResult.Close }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 }

@@ -8,6 +8,7 @@ import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
@@ -30,14 +31,15 @@ class AdminDashboardMenu(
     private val translationAPI: TranslationAPI,
     private val plugin: AuctionHousePlugin,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private val playerBanRepository = plugin.playerBanRepository
 
-    fun open() {
+    fun createMenu(): Menu {
         val activeAuctions = auctionRepository?.let { runBlocking { it.getActiveAuctionsCount() } } ?: 0
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.ADMIN_DASHBOARD_TITLE)
 
@@ -65,8 +67,9 @@ class AdminDashboardMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
-                    AdminViewPlayerMenu(menuAPI, auctionRepository, config, translationAPI, plugin, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AdminViewPlayerMenu(menuAPI, auctionRepository, config, translationAPI, plugin, player).createMenu()
+                    )
                 }
             })
 
@@ -93,7 +96,7 @@ class AdminDashboardMenu(
                             is AnvilInputResult.Cancelled -> {}
                         }
                     }
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
@@ -111,7 +114,7 @@ class AdminDashboardMenu(
                     player.sendMessage(translationAPI.getComponentSync(AuctionMessages.FEATURE_COMING_SOON) {
                         unparsed("feature", "Active auctions browser")
                     })
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
@@ -128,8 +131,9 @@ class AdminDashboardMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
-                    AdminBlacklistMenu(menuAPI, config, translationAPI, plugin, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AdminBlacklistMenu(menuAPI, config, translationAPI, plugin, player).createMenu()
+                    )
                 }
             })
 
@@ -144,8 +148,9 @@ class AdminDashboardMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
-                    AdminBannedPlayersMenu(menuAPI, config, translationAPI, plugin, player, playerBanRepository).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AdminBannedPlayersMenu(menuAPI, config, translationAPI, plugin, player, playerBanRepository).createMenu()
+                    )
                 }
             })
 
@@ -161,7 +166,7 @@ class AdminDashboardMenu(
 
                 onClick { _, _ ->
                     showStatistics()
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
@@ -177,7 +182,7 @@ class AdminDashboardMenu(
 
                 onClick { _, _ ->
                     player.performCommand("ahadmin purge 30")
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
@@ -193,17 +198,15 @@ class AdminDashboardMenu(
 
                 onClick { _, _ ->
                     player.performCommand("ahadmin reload")
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
             // Row 5: Close button
             item(49, MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ -> ClickResult.CLOSE }
+                onClick { _, _ -> ClickResult.Close }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun showStatistics() {

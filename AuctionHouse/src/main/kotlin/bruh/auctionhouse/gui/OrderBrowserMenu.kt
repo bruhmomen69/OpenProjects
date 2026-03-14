@@ -18,6 +18,7 @@ import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
@@ -41,26 +42,30 @@ class OrderBrowserMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.PaginatedMenu<Order>() {
     private val mm = MiniMessage.miniMessage()
     private var currentFilter = PlayerStateManager.getOrderFilter(player.uniqueId)
     private var currentSort = OrderSort.NEWEST
     private var currentPage = 0
 
-    fun open(page: Int = 0) {
+    fun createMenu(page: Int = 0): Menu = createMenuOrNull(page)
+        ?: error("OrderBrowserMenu cannot be created when order system is disabled")
+
+    fun createMenuOrNull(page: Int = 0): Menu? {
         currentPage = page
         PlayerStateManager.setOrderFilter(player.uniqueId, currentFilter)
 
         if (!config.orders.enabled) {
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
-            return
+            return null
         }
 
         val orders = runBlocking {
             orderService.getActiveOrders(currentFilter, currentSort, page, 28)
         }
 
-        val menu = menuAPI.paginated<Order> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.ORDERS_TITLE)
 
@@ -86,16 +91,14 @@ class OrderBrowserMenu(
                 }
             }
 
-            staticItems[45] = createMyOrdersButton()
-            staticItems[46] = createFilterButton()
-            staticItems[47] = createSortButton()
-            staticItems[48] = createSearchButton()
-            staticItems[50] = createSellOrderButton()
-            staticItems[51] = createBuyOrderButton()
-            staticItems[49] = createBackButton()
+            items[45] = createMyOrdersButton()
+            items[46] = createFilterButton()
+            items[47] = createSortButton()
+            items[48] = createSearchButton()
+            items[50] = createSellOrderButton()
+            items[51] = createBuyOrderButton()
+            items[49] = createBackButton()
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createMyOrdersButton(): VItem {
@@ -104,8 +107,22 @@ class OrderBrowserMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                MyOrdersMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    MyOrdersMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ).createMenu()
+                )
             }
         }
     }
@@ -151,9 +168,8 @@ class OrderBrowserMenu(
                         }
                         is AnvilInputResult.Cancelled -> {}
                     }
-                    open(currentPage)
                 }
-                ClickResult.CLOSE
+                createMenuOrNull(currentPage)?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -165,10 +181,11 @@ class OrderBrowserMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).open {
-                    open(currentPage)
-                }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).createMenu {
+                        createMenu(currentPage)
+                    }
+                )
             }
         }
     }
@@ -185,12 +202,12 @@ class OrderBrowserMenu(
             onClick { _, _ ->
                 if (player.inventory.itemInMainHand.type.isAir) {
                     player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_MUST_HOLD_ITEM))
-                    ClickResult.CLOSE
                 }
-                OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).open {
-                    open(currentPage)
-                }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    OrderCreateMenu(menuAPI, orderService, config, translationAPI, economy, plugin, player).createMenu {
+                        createMenu(currentPage)
+                    }
+                )
             }
         }
     }
@@ -267,8 +284,7 @@ class OrderBrowserMenu(
             onClick { clickType, _ ->
                 if (isOwnOrder) {
                     val menu = OrderManageMenu(menuAPI, orderService, config, translationAPI, plugin, player, order)
-                    menu.open { open(currentPage) }
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(menu.createMenu { createMenu(currentPage) })
                 } else {
                     if (clickType.isRightClick) {
                         runBlocking {
@@ -280,12 +296,12 @@ class OrderBrowserMenu(
                                 player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_ADDED))
                             }
                         }
-                        open(currentPage)
-                        ClickResult.ALLOW
+                        createMenuOrNull(currentPage)?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
                     } else {
                         val menu = OrderFulfillMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, order)
-                        val opened = menu.open()
-                        if (opened) ClickResult.CLOSE else ClickResult.ALLOW
+                        menu.createMenuOrNull()
+                            ?.let { ClickResult.SwitchMenu(it) }
+                            ?: ClickResult.Deny
                     }
                 }
             }
@@ -307,8 +323,7 @@ class OrderBrowserMenu(
                     OrderType.BUY_ORDER -> currentFilter.copy(orderType = OrderType.SELL_ORDER)
                     OrderType.SELL_ORDER -> currentFilter.copy(orderType = null)
                 }
-                open(currentPage)
-                ClickResult.ALLOW
+                createMenuOrNull(currentPage)?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -337,8 +352,7 @@ class OrderBrowserMenu(
                     OrderSort.PRICE_HIGH -> OrderSort.MOST_FILLED
                     OrderSort.MOST_FILLED -> OrderSort.NEWEST
                 }
-                open(currentPage)
-                ClickResult.ALLOW
+                createMenuOrNull(currentPage)?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -346,8 +360,22 @@ class OrderBrowserMenu(
     private fun createBackButton(): VItem {
         return MenuUtils.backButton(translationAPI).apply {
             onClick { _, _ ->
-                AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(
+                    AuctionHouseMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ).createMenu()
+                )
             }
         }
     }

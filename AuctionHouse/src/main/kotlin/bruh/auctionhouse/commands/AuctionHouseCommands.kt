@@ -57,7 +57,21 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+        val menu = AuctionHouseMenu(
+            menuAPI,
+            auctionService,
+            orderService,
+            auctionRepository,
+            bidRepository,
+            orderRepository,
+            watchlistRepository,
+            config,
+            translationAPI,
+            plugin,
+            economy,
+            player
+        ).createMenu()
+        menuAPI.open(menu, player)
     }
 
     /**
@@ -193,10 +207,11 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        ConsolidatedExpiredItemsMenu(
+        val menu = ConsolidatedExpiredItemsMenu(
             menuAPI, consolidatedExpiredItemService, auctionService, orderService, auctionRepository, bidRepository, orderRepository,
             watchlistRepository, config, translationAPI, plugin, economy, player
-        ).open()
+        ).createMenu()
+        menuAPI.open(menu, player)
     }
 
     /**
@@ -205,7 +220,21 @@ class AuctionHouseCommands(
     @Subcommand("myauctions")
     @CommandPermission("auctionhouse.myauctions")
     fun myAuctions(player: Player) {
-        MyAuctionsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
+        val menu = MyAuctionsMenu(
+            menuAPI,
+            auctionService,
+            orderService,
+            auctionRepository,
+            bidRepository,
+            orderRepository,
+            watchlistRepository,
+            config,
+            translationAPI,
+            plugin,
+            economy,
+            player
+        ).createMenu()
+        menuAPI.open(menu, player)
     }
 
     /**
@@ -218,7 +247,9 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        AuctionCreateMenu(menuAPI, auctionService, config, translationAPI, plugin, player).open()
+        AuctionCreateMenu(menuAPI, auctionService, config, translationAPI, plugin, player)
+            .createMenuOrNull()
+            ?.let { menuAPI.open(it, player) }
     }
 
     /**

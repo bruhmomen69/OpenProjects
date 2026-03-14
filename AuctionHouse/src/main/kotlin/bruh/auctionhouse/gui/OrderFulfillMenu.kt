@@ -16,6 +16,7 @@ import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.OrderService
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptInt
@@ -44,7 +45,7 @@ class OrderFulfillMenu(
     private val economy: EconomyProvider,
     private val player: Player,
     private val order: Order
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private val inventoryCount = countMatchingItems()
     private val remainingQuantity = order.remainingQuantity()
@@ -62,10 +63,7 @@ class OrderFulfillMenu(
         }
     }
 
-    /**
-     * Opens the fulfillment menu. Returns false if player doesn't have enough items.
-     */
-    fun open(): Boolean {
+    fun createMenuOrNull(): Menu? {
         // Check if player has any matching items
         if (inventoryCount == 0) {
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
@@ -73,7 +71,7 @@ class OrderFulfillMenu(
                 unparsed("have", "0")
                 unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
             })
-            return false
+            return null
         }
 
         // For non-partial fills, check if player has enough items
@@ -83,7 +81,7 @@ class OrderFulfillMenu(
                 unparsed("have", inventoryCount.toString())
                 unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
             })
-            return false
+            return null
         }
 
         // For partial fills with min fill quantity, check if player has at least the minimum
@@ -94,22 +92,24 @@ class OrderFulfillMenu(
                     unparsed("have", inventoryCount.toString())
                     unparsed("material", order.itemMaterial.name.replace("_", " ").lowercase())
                 })
-                return false
+                return null
             }
         }
 
         // If partial fills not allowed, skip directly to confirmation (no quantity selection)
-        if (!order.allowPartial) {
-            // Just show confirm dialog with full amount required
-            openConfirmOnlyMenu()
+        return if (!order.allowPartial) {
+            createConfirmOnlyMenu()
         } else {
-            openFullMenu()
+            createFullMenu()
         }
-        return true
     }
 
-    private fun openFullMenu() {
-        val menu = menuAPI.simple {
+    fun createMenu(): Menu = createMenuOrNull()
+        ?: error("OrderFulfillMenu cannot be created for this player/order combination")
+
+    private fun createFullMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 5
             title = translationAPI.getComponentSync(GuiMessages.ORDERS_TITLE)
 
@@ -128,12 +128,11 @@ class OrderFulfillMenu(
             // Confirm button
             item(33, createConfirmButton())
         }
-
-        menuAPI.open(menu, player)
     }
 
-    private fun openConfirmOnlyMenu() {
-        val menu = menuAPI.simple {
+    private fun createConfirmOnlyMenu(): Menu {
+        return this.apply {
+            items.clear()
             rows = 3
             title = translationAPI.getComponentSync(GuiMessages.ORDERS_TITLE)
 
@@ -148,8 +147,20 @@ class OrderFulfillMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    OrderBrowserMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    OrderBrowserMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player
+                    ).createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
                 }
             }
             item(18, backItem)
@@ -157,13 +168,11 @@ class OrderFulfillMenu(
             // Close button
             val closeItem = MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
             item(26, closeItem)
         }
-
-        menuAPI.open(menu, player)
     }
 
     private fun createOrderDisplayItem(): VItem {
@@ -233,9 +242,8 @@ class OrderFulfillMenu(
                         is AnvilInputResult.Success -> quantity = result.value
                         is AnvilInputResult.Cancelled -> {}
                     }
-                    open()
                 }
-                ClickResult.CLOSE
+                createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -250,8 +258,7 @@ class OrderFulfillMenu(
                 if (quantity > minQuantity) {
                     quantity--
                 }
-                open()
-                ClickResult.ALLOW
+                createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -265,8 +272,7 @@ class OrderFulfillMenu(
                 if (quantity < minOf(order.remainingQuantity(), inventoryCount)) {
                     quantity++
                 }
-                open()
-                ClickResult.ALLOW
+                createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
             }
         }
     }
@@ -306,15 +312,13 @@ class OrderFulfillMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                runBlocking {
-                    // Check for expensive confirmation
-                    if (isExpensive && !confirmationPending) {
-                        confirmationPending = true
-                        player.sendMessage(mm.deserialize("<yellow>⚠ Click again to confirm purchase of <gold>${MenuUtils.formatPrice(totalPrice, plugin.economy)}"))
-                        open()
-                        return@runBlocking
-                    }
+                if (isExpensive && !confirmationPending) {
+                    confirmationPending = true
+                    player.sendMessage(mm.deserialize("<yellow>⚠ Click again to confirm purchase of <gold>${MenuUtils.formatPrice(totalPrice, plugin.economy)}"))
+                    return@onClick createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
+                }
 
+                runBlocking {
                     // Re-count items immediately before fulfillment to catch inventory changes
                     val currentInventoryCount = countMatchingItems()
                     if (currentInventoryCount < quantity) {
@@ -348,7 +352,7 @@ class OrderFulfillMenu(
                         player.sendMessage(result.message)
                     }
                 }
-                ClickResult.CLOSE
+                ClickResult.Close
             }
         }
     }

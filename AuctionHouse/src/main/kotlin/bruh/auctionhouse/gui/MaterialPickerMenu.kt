@@ -4,6 +4,7 @@ import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptText
@@ -22,8 +23,8 @@ class MaterialPickerMenu(
     private val menuAPI: MenuAPI,
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
-    private val onSelect: (XMaterial) -> Unit
-) {
+    private val onSelect: (XMaterial) -> Menu
+) : bruh.zchat.utils.menuapi.PaginatedMenu<XMaterial>() {
     private val mm = MiniMessage.miniMessage()
     private var currentPage = 0
     private var searchQuery = ""
@@ -41,17 +42,19 @@ class MaterialPickerMenu(
         }.sortedBy { it.name }
     }
 
-    fun open(page: Int = 0) {
+    fun createMenu(player: Player, page: Int = 0): Menu {
+        this.player = player
         currentPage = page
-        refreshMenu()
+        return buildMenu()
     }
 
-    private fun refreshMenu() {
+    private fun buildMenu(): Menu {
         val filteredMaterials = getFilteredMaterials()
         val totalPages = (filteredMaterials.size + pageSize - 1) / pageSize
         val pageContent = filteredMaterials.drop(currentPage * pageSize).take(pageSize)
 
-        val menu = menuAPI.paginated<XMaterial> {
+        return this.apply {
+            items.clear()
             rows = 6
             title = translationAPI.getComponentSync(GuiMessages.MATERIAL_PICKER_TITLE)
 
@@ -77,29 +80,22 @@ class MaterialPickerMenu(
                 }
             }
 
-            staticItems[49] = createSearchButton()
-            staticItems[48] = createCategoryButton()
-            staticItems[46] = MenuUtils.backButton(translationAPI).apply {
+            items[49] = createSearchButton()
+            items[48] = createCategoryButton()
+            items[46] = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
-            staticItems[52] = MenuUtils.closeButton(translationAPI).apply {
+            items[52] = MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
         }
-
-        menuAPI.open(menu, player)
     }
 
     private lateinit var player: Player
-
-    fun openForPlayer(player: Player) {
-        this.player = player
-        open(0)
-    }
 
     private fun getFilteredMaterials(): List<XMaterial> {
         var result = allMaterials
@@ -124,8 +120,7 @@ class MaterialPickerMenu(
             hideAllFlags()
 
             onClick { _, _ ->
-                onSelect(material)
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(onSelect(material))
             }
         }
     }
@@ -153,12 +148,11 @@ class MaterialPickerMenu(
                         is AnvilInputResult.Success -> {
                             searchQuery = result.value
                             currentPage = 0
-                            refreshMenu()
                         }
                         is AnvilInputResult.Cancelled -> {}
                     }
                 }
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu(player, currentPage))
             }
         }
     }
@@ -177,8 +171,7 @@ class MaterialPickerMenu(
                     (MaterialCategory.entries.indexOf(selectedCategory) + 1) % MaterialCategory.entries.size
                 ]
                 currentPage = 0
-                refreshMenu()
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu(player, currentPage))
             }
         }
     }

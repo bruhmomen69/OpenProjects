@@ -13,6 +13,7 @@ import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -39,7 +40,7 @@ class WatchlistMenu(
     private val plugin: AuctionHousePlugin,
     private val economy: EconomyProvider,
     private val player: Player
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
     private var currentSort = WatchlistSort.ENDING_SOON
     private var currentTab = WatchlistTab.AUCTIONS
@@ -57,7 +58,7 @@ class WatchlistMenu(
         ALL
     }
 
-    fun open() {
+    fun createMenu(): Menu {
         val watchlistEntries = runBlocking {
             watchlistRepository.getPlayerWatchlist(player.uniqueId)
         }
@@ -118,7 +119,8 @@ class WatchlistMenu(
             WatchlistTab.ALL -> watchedAuctions.size + watchedOrders.size
         }
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 6
             title = mm.deserialize("<yellow>My Watchlist <gray>($totalCount)")
 
@@ -163,8 +165,22 @@ class WatchlistMenu(
             // Back button
             val backItem = MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             }
             item(45, backItem)
@@ -172,7 +188,7 @@ class WatchlistMenu(
             // Close button
             val closeItem = MenuUtils.closeButton(translationAPI).apply {
                 onClick { _, _ ->
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             }
             item(53, closeItem)
@@ -192,7 +208,6 @@ class WatchlistMenu(
             }
         }
 
-        menuAPI.open(menu, player)
     }
 
     private fun createTabButton(tab: WatchlistTab, count: Int): VItem {
@@ -209,8 +224,7 @@ class WatchlistMenu(
 
             onClick { _, _ ->
                 currentTab = tab
-                open()
-                ClickResult.ALLOW
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -265,11 +279,24 @@ class WatchlistMenu(
                         watchlistRepository.removeOrder(player.uniqueId, order.id)
                     }
                     player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_REMOVED))
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
-                    OrderFulfillMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, order).open()
+                    OrderFulfillMenu(
+                        menuAPI,
+                        auctionService,
+                        orderService,
+                        auctionRepository,
+                        bidRepository,
+                        orderRepository,
+                        watchlistRepository,
+                        config,
+                        translationAPI,
+                        plugin,
+                        economy,
+                        player,
+                        order
+                    ).createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -340,11 +367,26 @@ class WatchlistMenu(
                         watchlistRepository.remove(player.uniqueId, auction.id)
                     }
                     player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_REMOVED))
-                    open()
+                    ClickResult.SwitchMenu(createMenu())
                 } else {
-                    AuctionDetailsMenu(menuAPI, auctionService, orderService, auctionRepository, bidRepository, orderRepository, watchlistRepository, config, translationAPI, plugin, economy, player, auction).open()
+                    ClickResult.SwitchMenu(
+                        AuctionDetailsMenu(
+                            menuAPI,
+                            auctionService,
+                            orderService,
+                            auctionRepository,
+                            bidRepository,
+                            orderRepository,
+                            watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player,
+                            auction
+                        ).createMenu()
+                    )
                 }
-                ClickResult.CLOSE
             }
         }
     }
@@ -376,8 +418,7 @@ class WatchlistMenu(
                     }
                 }
                 player.sendMessage(translationAPI.getComponentSync(GuiMessages.WATCHLIST_CLEARED))
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }
@@ -414,8 +455,7 @@ class WatchlistMenu(
                     WatchlistSort.PRICE_HIGH -> WatchlistSort.RECENTLY_ADDED
                     WatchlistSort.RECENTLY_ADDED -> WatchlistSort.ENDING_SOON
                 }
-                open()
-                ClickResult.CLOSE
+                ClickResult.SwitchMenu(createMenu())
             }
         }
     }

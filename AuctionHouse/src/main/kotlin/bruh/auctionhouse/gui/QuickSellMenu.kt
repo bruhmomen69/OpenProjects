@@ -8,6 +8,7 @@ import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.service.ServiceResult
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.ClickResult
+import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.translations.TranslationAPI
@@ -27,13 +28,13 @@ class QuickSellMenu(
     private val economy: EconomyProvider,
     private val player: Player,
     private val item: ItemStack
-) {
+) : bruh.zchat.utils.menuapi.SimpleMenu() {
     private val mm = MiniMessage.miniMessage()
 
-    fun open() {
+    fun createMenuOrNull(): Menu? {
         if (!config.orders.enabled) {
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
-            return
+            return null
         }
 
         val bestOrder = runBlocking {
@@ -42,7 +43,7 @@ class QuickSellMenu(
 
         if (bestOrder == null) {
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_QUICK_SELL_NO_ORDER))
-            return
+            return null
         }
 
         val sellQuantity = minOf(item.amount, bestOrder.remainingQuantity())
@@ -50,7 +51,8 @@ class QuickSellMenu(
         val isExpensive = totalPrice > config.gui.confirm.expensiveThreshold
         var confirmationPending = false
 
-        val menu = menuAPI.simple {
+        return this.apply {
+            items.clear()
             rows = 4
             title = mm.deserialize("<green>Quick Sell")
 
@@ -98,14 +100,13 @@ class QuickSellMenu(
                 hideAllFlags()
 
                 onClick { _, _ ->
-                    runBlocking {
-                        if (isExpensive && !confirmationPending) {
-                            confirmationPending = true
-                            player.sendMessage(mm.deserialize("<yellow>⚠ Click again to confirm sale of <gold>${MenuUtils.formatPrice(totalPrice, economy)}"))
-                            open()
-                            return@runBlocking
-                        }
+                    if (isExpensive && !confirmationPending) {
+                        confirmationPending = true
+                        player.sendMessage(mm.deserialize("<yellow>⚠ Click again to confirm sale of <gold>${MenuUtils.formatPrice(totalPrice, economy)}"))
+                        return@onClick createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
+                    }
 
+                    runBlocking {
                         val itemsToSell = listOf(item.clone().apply { amount = sellQuantity })
                         val result = orderService.fulfillOrder(player, bestOrder.id, itemsToSell)
                         
@@ -121,18 +122,30 @@ class QuickSellMenu(
                         }
                         player.sendMessage(result.message)
                     }
-                    ClickResult.CLOSE
+                    ClickResult.Close
                 }
             })
 
             item(27, MenuUtils.backButton(translationAPI).apply {
                 onClick { _, _ ->
-                    AuctionHouseMenu(menuAPI, plugin.auctionService, orderService, plugin.auctionRepository, plugin.bidRepository, plugin.orderRepository, plugin.watchlistRepository, config, translationAPI, plugin, economy, player).open()
-                    ClickResult.CLOSE
+                    ClickResult.SwitchMenu(
+                        AuctionHouseMenu(
+                            menuAPI,
+                            plugin.auctionService,
+                            orderService,
+                            plugin.auctionRepository,
+                            plugin.bidRepository,
+                            plugin.orderRepository,
+                            plugin.watchlistRepository,
+                            config,
+                            translationAPI,
+                            plugin,
+                            economy,
+                            player
+                        ).createMenu()
+                    )
                 }
             })
         }
-
-        menuAPI.open(menu, player)
     }
 }
