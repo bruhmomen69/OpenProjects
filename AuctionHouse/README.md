@@ -231,13 +231,17 @@ Quick sell to best buy order (4 rows):
 - Short IDs for easy command usage
 - Watchlist for auctions and orders
 
-### Menu API Migration (In Progress)
+### Menu API Architecture
 
-Order menus have been migrated to the new Menu API pattern (`PlayerMenuContext`-based):
-- **OrderCreateMenu** — Uses `menuState` for reactive form state, `promptIntAsync`/`promptDoubleAsync` for inputs, `controls.runAsync` for order creation
-- **OrderManageMenu** — Uses `menuState` for `currentOrder`, coroutine-based async price editing, `controls.runAsync` for cancellation
-- **OrderFulfillMenu** — Uses `menuState` for quantity/confirmation state, `controls.runAsync` for fulfillment with inventory validation
-- **OrderBrowserMenu** — `PaginatedMenu` with `asyncData` for async order loading, `menuState` for filter/sort, `controls.reloadData()` on filter changes
-- **MyOrdersMenu** — `PaginatedMenu` with `asyncData` for async player order loading
+All 22 GUI menus use the modern Menu API pattern:
 
-Remaining menus (AuctionHouseMenu, AuctionDetailsMenu, MaterialPickerMenu, etc.) still use the old constructor pattern.
+- **`PlayerMenuContext`-based constructors** — single context object replaces 8-13 dependency params
+- **`populateItems()` override** — framework-driven item building on open and refresh
+- **`asyncData {}`** — declarative async data loading with loading/empty placeholders
+- **`menuState`** — observable property delegates with batched auto-refresh
+- **`controls.runAsync()`** — async action execution from click handlers
+- **`controls.reloadData()`** — re-run async loaders on filter/sort changes
+- **`promptTextAsync`/`promptDoubleAsync`/`promptIntAsync`** — non-blocking anvil input
+- **`PaginatedMenu`** — built-in client-side pagination with auto-navigation
+- **`ClickResult.Refresh`** — in-place state changes without menu recreation
+- **`ClickResult.SwitchMenu(OtherMenu(pctx))`** — clean menu-to-menu transitions
