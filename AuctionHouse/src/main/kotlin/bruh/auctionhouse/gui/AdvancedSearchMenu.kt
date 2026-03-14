@@ -1,128 +1,107 @@
 package bruh.auctionhouse.gui
 
-import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.config.AuctionHouseConfig
-import bruh.auctionhouse.database.AuctionRepository
-import bruh.auctionhouse.database.BidRepository
-import bruh.auctionhouse.economy.EconomyProvider
 import bruh.auctionhouse.model.AuctionFilter
 import bruh.auctionhouse.model.AuctionSort
 import bruh.auctionhouse.model.AuctionType
-import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
-import bruh.zchat.utils.menuapi.Menu
-import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
-import bruh.zchat.utils.menuapi.promptDouble
-import bruh.zchat.utils.menuapi.promptText
-import bruh.zchat.utils.translations.TranslationAPI
+import bruh.zchat.utils.menuapi.promptDoubleAsync
+import bruh.zchat.utils.menuapi.promptTextAsync
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.minimessage.MiniMessage
-import org.bukkit.entity.Player
 import java.time.Duration
-import java.util.UUID
 
 /**
  * Advanced search menu with comprehensive filtering options.
  */
 class AdvancedSearchMenu(
-    private val menuAPI: MenuAPI,
-    private val auctionService: AuctionService,
-    private val orderService: bruh.auctionhouse.service.OrderService,
-    private val auctionRepository: AuctionRepository,
-    private val bidRepository: BidRepository,
-    private val config: AuctionHouseConfig,
-    private val translationAPI: TranslationAPI,
-    private val plugin: AuctionHousePlugin,
-    private val economy: EconomyProvider,
-    private val player: Player,
-    private val parentMenuFactory: () -> Menu
-) : bruh.zchat.utils.menuapi.SimpleMenu() {
-    private val mm = MiniMessage.miniMessage()
-    
-    private var searchQuery: String? = PlayerStateManager.getAuctionFilter(player.uniqueId).searchQuery
-    private var sellerName: String? = PlayerStateManager.getAuctionFilter(player.uniqueId).sellerName
-    private var material: XMaterial? = PlayerStateManager.getAuctionFilter(player.uniqueId).material?.let { XMaterial.matchXMaterial(it).orElse(null) }
-    private var minPrice: Double? = PlayerStateManager.getAuctionFilter(player.uniqueId).minPrice
-    private var maxPrice: Double? = PlayerStateManager.getAuctionFilter(player.uniqueId).maxPrice
-    private var auctionType: AuctionType? = PlayerStateManager.getAuctionFilter(player.uniqueId).auctionType
-    private var endingWithin: Duration? = PlayerStateManager.getAuctionFilter(player.uniqueId).endingWithin
-    private var sortBy: AuctionSort = PlayerStateManager.getAuctionFilter(player.uniqueId).sortBy
+    private val pctx: PlayerMenuContext
+) : SimpleMenu() {
 
-    fun createMenu(): Menu {
-        return this.apply {
-            items.clear()
-            rows = 6
-            title = mm.deserialize("<yellow>Advanced Search")
+    private var searchQuery: String? = PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).searchQuery
+    private var sellerName: String? = PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).sellerName
+    private var material: XMaterial? = PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).material?.let { XMaterial.matchXMaterial(it).orElse(null) }
+    private var minPrice: Double? = PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).minPrice
+    private var maxPrice: Double? = PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).maxPrice
+    private var auctionType by menuState<AuctionType?>(PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).auctionType)
+    private var endingWithin by menuState<Duration?>(PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).endingWithin)
+    private var sortBy by menuState(PlayerStateManager.getAuctionFilter(pctx.player.uniqueId).sortBy)
 
-            background = MenuUtils.backgroundItem()
+    init {
+        rows = 6
+        title = pctx.mm.deserialize("<yellow>Advanced Search")
+        background = MenuUtils.backgroundItem()
+    }
 
-            // Row 1: Search Query, Seller Name, Material Selector
-            item(10, createSearchQueryItem())
-            item(13, createSellerNameItem())
-            item(16, createMaterialSelectorItem())
+    override fun populateItems() {
+        items.clear()
 
-            // Row 2: Min Price, Max Price, Price Range Preset
-            item(19, createMinPriceItem())
-            item(22, createMaxPriceItem())
-            item(25, createPricePresetItem())
+        // Row 1: Search Query, Seller Name, Material Selector
+        item(10, createSearchQueryItem())
+        item(13, createSellerNameItem())
+        item(16, createMaterialSelectorItem())
 
-            // Row 3: Auction Type Filter, Ending Soon Filter, Sort Options
-            item(28, createAuctionTypeFilterItem())
-            item(31, createEndingSoonFilterItem())
-            item(34, createSortOptionsItem())
+        // Row 2: Min Price, Max Price, Price Range Preset
+        item(19, createMinPriceItem())
+        item(22, createMaxPriceItem())
+        item(25, createPricePresetItem())
 
-            // Row 4: Active Filters Display, Clear All Filters
-            item(40, createActiveFiltersDisplayItem())
-            item(42, createClearAllButton())
+        // Row 3: Auction Type Filter, Ending Soon Filter, Sort Options
+        item(28, createAuctionTypeFilterItem())
+        item(31, createEndingSoonFilterItem())
+        item(34, createSortOptionsItem())
 
-            // Row 5: Back, Apply Search, Close
-            item(45, createBackButton())
-            item(49, createApplySearchButton())
-            item(53, createCloseButton())
-        }
+        // Row 4: Active Filters Display, Clear All Filters
+        item(40, createActiveFiltersDisplayItem())
+        item(42, createClearAllButton())
+
+        // Row 5: Back, Apply Search, Close
+        item(45, createBackButton())
+        item(49, createApplySearchButton())
+        item(53, createCloseButton())
     }
 
     private fun createSearchQueryItem(): VItem {
         return VItem(XMaterial.OAK_SIGN) {
-            name = mm.deserialize("<yellow>Search Query")
+            name = pctx.mm.deserialize("<yellow>Search Query")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Search by item name or material"))
-            loreList.add(mm.deserialize("<gray>Partial matches supported"))
-            loreList.add(mm.deserialize("<gray>Case-insensitive"))
+            loreList.add(pctx.mm.deserialize("<gray>Search by item name or material"))
+            loreList.add(pctx.mm.deserialize("<gray>Partial matches supported"))
+            loreList.add(pctx.mm.deserialize("<gray>Case-insensitive"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>${searchQuery ?: "None"}"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>${searchQuery ?: "None"}"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to set"))
-            loreList.add(mm.deserialize("<red>Right-click to clear"))
+            loreList.add(pctx.mm.deserialize("<green>Click to set"))
+            loreList.add(pctx.mm.deserialize("<red>Right-click to clear"))
             lore = loreList
             hideAllFlags()
 
             onClick { click, _ ->
                 if (click.isRightClick) {
                     searchQuery = null
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Refresh
                 } else {
-                    runBlocking {
-                        val result = menuAPI.promptText(
-                            player,
-                            "Search Query",
-                            searchQuery ?: ""
-                        )
+                    pctx.menuAPI.promptTextAsync(
+                        pctx.player,
+                        "Search Query",
+                        searchQuery ?: ""
+                    ).thenAccept { result ->
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 searchQuery = result.value.takeIf { it.isNotBlank() }
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
+                        pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                            pctx.menuAPI.open(this@AdvancedSearchMenu, pctx.player)
+                        })
                     }
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Deny
                 }
             }
         }
@@ -130,37 +109,39 @@ class AdvancedSearchMenu(
 
     private fun createSellerNameItem(): VItem {
         return VItem(XMaterial.PLAYER_HEAD) {
-            name = mm.deserialize("<yellow>Seller Name")
+            name = pctx.mm.deserialize("<yellow>Seller Name")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Find auctions from specific players"))
-            loreList.add(mm.deserialize("<gray>Enter exact player name"))
+            loreList.add(pctx.mm.deserialize("<gray>Find auctions from specific players"))
+            loreList.add(pctx.mm.deserialize("<gray>Enter exact player name"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>${sellerName ?: "None"}"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>${sellerName ?: "None"}"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to set"))
-            loreList.add(mm.deserialize("<red>Right-click to clear"))
+            loreList.add(pctx.mm.deserialize("<green>Click to set"))
+            loreList.add(pctx.mm.deserialize("<red>Right-click to clear"))
             lore = loreList
             hideAllFlags()
 
             onClick { click, _ ->
                 if (click.isRightClick) {
                     sellerName = null
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Refresh
                 } else {
-                    runBlocking {
-                        val result = menuAPI.promptText(
-                            player,
-                            "Seller Name",
-                            sellerName ?: ""
-                        )
+                    pctx.menuAPI.promptTextAsync(
+                        pctx.player,
+                        "Seller Name",
+                        sellerName ?: ""
+                    ).thenAccept { result ->
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 sellerName = result.value.takeIf { it.isNotBlank() }
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
+                        pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                            pctx.menuAPI.open(this@AdvancedSearchMenu, pctx.player)
+                        })
                     }
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Deny
                 }
             }
         }
@@ -170,28 +151,28 @@ class AdvancedSearchMenu(
         val displayMaterial = material ?: XMaterial.HOPPER
 
         return VItem(displayMaterial) {
-            name = mm.deserialize("<yellow>Material Filter")
+            name = pctx.mm.deserialize("<yellow>Material Filter")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Filter by specific item material"))
-            loreList.add(mm.deserialize("<gray>Opens material picker menu"))
+            loreList.add(pctx.mm.deserialize("<gray>Filter by specific item material"))
+            loreList.add(pctx.mm.deserialize("<gray>Opens material picker menu"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>${material?.name ?: "Any"}"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>${material?.name ?: "Any"}"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to select"))
-            loreList.add(mm.deserialize("<red>Right-click to clear"))
+            loreList.add(pctx.mm.deserialize("<green>Click to select"))
+            loreList.add(pctx.mm.deserialize("<red>Right-click to clear"))
             lore = loreList
             hideAllFlags()
 
             onClick { click, _ ->
                 if (click.isRightClick) {
                     this@AdvancedSearchMenu.material = null
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Refresh
                 } else {
                     ClickResult.SwitchMenu(
-                        MaterialPickerMenu(menuAPI, config, translationAPI) { selectedMaterial ->
+                        MaterialPickerMenu(pctx.menuAPI, pctx.config, pctx.translationAPI) { selectedMaterial ->
                             this@AdvancedSearchMenu.material = selectedMaterial
-                            createMenu()
-                        }.createMenu(player)
+                            this@AdvancedSearchMenu
+                        }.createMenu(pctx.player)
                     )
                 }
             }
@@ -200,39 +181,41 @@ class AdvancedSearchMenu(
 
     private fun createMinPriceItem(): VItem {
         return VItem(XMaterial.GOLD_INGOT) {
-            name = mm.deserialize("<yellow>Minimum Price")
+            name = pctx.mm.deserialize("<yellow>Minimum Price")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Set minimum price filter"))
-            loreList.add(mm.deserialize("<gray>Only show auctions >= this price"))
+            loreList.add(pctx.mm.deserialize("<gray>Set minimum price filter"))
+            loreList.add(pctx.mm.deserialize("<gray>Only show auctions >= this price"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>${minPrice?.let { MenuUtils.formatPrice(it, economy) } ?: "None"}"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>${minPrice?.let { MenuUtils.formatPrice(it, pctx.economy) } ?: "None"}"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to set"))
-            loreList.add(mm.deserialize("<red>Right-click to clear"))
+            loreList.add(pctx.mm.deserialize("<green>Click to set"))
+            loreList.add(pctx.mm.deserialize("<red>Right-click to clear"))
             lore = loreList
             hideAllFlags()
 
             onClick { click, _ ->
                 if (click.isRightClick) {
                     minPrice = null
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Refresh
                 } else {
-                    runBlocking {
-                        val result = menuAPI.promptDouble(
-                            player,
-                            "Minimum Price",
-                            minPrice,
-                            0.0,
-                            Double.MAX_VALUE
-                        )
+                    pctx.menuAPI.promptDoubleAsync(
+                        pctx.player,
+                        "Minimum Price",
+                        minPrice,
+                        0.0,
+                        Double.MAX_VALUE
+                    ).thenAccept { result ->
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 minPrice = result.value.takeIf { it > 0 }
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
+                        pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                            pctx.menuAPI.open(this@AdvancedSearchMenu, pctx.player)
+                        })
                     }
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Deny
                 }
             }
         }
@@ -240,43 +223,45 @@ class AdvancedSearchMenu(
 
     private fun createMaxPriceItem(): VItem {
         return VItem(XMaterial.GOLD_BLOCK) {
-            name = mm.deserialize("<yellow>Maximum Price")
+            name = pctx.mm.deserialize("<yellow>Maximum Price")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Set maximum price filter"))
-            loreList.add(mm.deserialize("<gray>Only show auctions <= this price"))
+            loreList.add(pctx.mm.deserialize("<gray>Set maximum price filter"))
+            loreList.add(pctx.mm.deserialize("<gray>Only show auctions <= this price"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>${maxPrice?.let { MenuUtils.formatPrice(it, economy) } ?: "None"}"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>${maxPrice?.let { MenuUtils.formatPrice(it, pctx.economy) } ?: "None"}"))
             loreList.add(Component.empty())
             if (minPrice != null && maxPrice != null && maxPrice!! < minPrice!!) {
-                loreList.add(mm.deserialize("<red>Warning: Max < Min!"))
+                loreList.add(pctx.mm.deserialize("<red>Warning: Max < Min!"))
             }
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to set"))
-            loreList.add(mm.deserialize("<red>Right-click to clear"))
+            loreList.add(pctx.mm.deserialize("<green>Click to set"))
+            loreList.add(pctx.mm.deserialize("<red>Right-click to clear"))
             lore = loreList
             hideAllFlags()
 
             onClick { click, _ ->
                 if (click.isRightClick) {
                     maxPrice = null
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Refresh
                 } else {
-                    runBlocking {
-                        val result = menuAPI.promptDouble(
-                            player,
-                            "Maximum Price",
-                            maxPrice,
-                            0.0,
-                            Double.MAX_VALUE
-                        )
+                    pctx.menuAPI.promptDoubleAsync(
+                        pctx.player,
+                        "Maximum Price",
+                        maxPrice,
+                        0.0,
+                        Double.MAX_VALUE
+                    ).thenAccept { result ->
                         when (result) {
                             is AnvilInputResult.Success -> {
                                 maxPrice = result.value.takeIf { it > 0 }
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
+                        pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                            pctx.menuAPI.open(this@AdvancedSearchMenu, pctx.player)
+                        })
                     }
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Deny
                 }
             }
         }
@@ -286,19 +271,19 @@ class AdvancedSearchMenu(
         val (presetMaterial, displayName, presetLore) = getPricePresetInfo()
 
         return VItem(presetMaterial) {
-            name = mm.deserialize("<yellow>Price Preset")
+            name = pctx.mm.deserialize("<yellow>Price Preset")
             val loreList = mutableListOf<Component>()
             loreList.addAll(presetLore)
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>$displayName"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>$displayName"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to cycle presets"))
+            loreList.add(pctx.mm.deserialize("<green>Click to cycle presets"))
             lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
                 cyclePricePreset()
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Refresh
             }
         }
     }
@@ -308,27 +293,27 @@ class AdvancedSearchMenu(
             maxPrice == null -> Triple(
                 XMaterial.GRAY_DYE,
                 "Any",
-                listOf(mm.deserialize("<gray>No price range set"))
+                listOf(pctx.mm.deserialize("<gray>No price range set"))
             )
             maxPrice!! <= 100 -> Triple(
                 XMaterial.LIME_DYE,
                 "Under $100",
-                listOf(mm.deserialize("<gray>Preset: Under $100"))
+                listOf(pctx.mm.deserialize("<gray>Preset: Under $100"))
             )
             maxPrice!! <= 1000 -> Triple(
                 XMaterial.YELLOW_DYE,
                 "Under $1,000",
-                listOf(mm.deserialize("<gray>Preset: Under $1,000"))
+                listOf(pctx.mm.deserialize("<gray>Preset: Under $1,000"))
             )
             maxPrice!! <= 10000 -> Triple(
                 XMaterial.ORANGE_DYE,
                 "Under $10,000",
-                listOf(mm.deserialize("<gray>Preset: Under $10,000"))
+                listOf(pctx.mm.deserialize("<gray>Preset: Under $10,000"))
             )
             else -> Triple(
                 XMaterial.RED_DYE,
                 "Custom",
-                listOf(mm.deserialize("<gray>Custom price range"))
+                listOf(pctx.mm.deserialize("<gray>Custom price range"))
             )
         }
     }
@@ -353,17 +338,17 @@ class AdvancedSearchMenu(
         }
 
         return VItem(material) {
-            name = mm.deserialize("<yellow>Auction Type")
+            name = pctx.mm.deserialize("<yellow>Auction Type")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Filter by auction type"))
+            loreList.add(pctx.mm.deserialize("<gray>Filter by auction type"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<white>• Auction Only</white> - Bidding only"))
-            loreList.add(mm.deserialize("<white>• BIN Only</white> - Buy-it-now only"))
-            loreList.add(mm.deserialize("<white>• Auction + BIN</white> - Both options"))
+            loreList.add(pctx.mm.deserialize("<white>• Auction Only</white> - Bidding only"))
+            loreList.add(pctx.mm.deserialize("<white>• BIN Only</white> - Buy-it-now only"))
+            loreList.add(pctx.mm.deserialize("<white>• Auction + BIN</white> - Both options"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>$displayName"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>$displayName"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to cycle"))
+            loreList.add(pctx.mm.deserialize("<green>Click to cycle"))
             lore = loreList
             hideAllFlags()
 
@@ -374,7 +359,7 @@ class AdvancedSearchMenu(
                     AuctionType.BIN -> AuctionType.BOTH
                     AuctionType.BOTH -> null
                 }
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
@@ -383,20 +368,20 @@ class AdvancedSearchMenu(
         val (material, displayName, color) = getEndingSoonInfo()
 
         return VItem(material) {
-            name = mm.deserialize("${color}Ending Soon Filter")
+            name = pctx.mm.deserialize("${color}Ending Soon Filter")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Find auctions ending within"))
-            loreList.add(mm.deserialize("<gray>specific timeframes"))
+            loreList.add(pctx.mm.deserialize("<gray>Find auctions ending within"))
+            loreList.add(pctx.mm.deserialize("<gray>specific timeframes"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>$displayName"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>$displayName"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to cycle"))
+            loreList.add(pctx.mm.deserialize("<green>Click to cycle"))
             lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
                 cycleEndingSoon()
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
@@ -427,19 +412,19 @@ class AdvancedSearchMenu(
         val (material, displayName) = getSortInfo()
 
         return VItem(material) {
-            name = mm.deserialize("<yellow>Sort Options")
+            name = pctx.mm.deserialize("<yellow>Sort Options")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Change how results are ordered"))
+            loreList.add(pctx.mm.deserialize("<gray>Change how results are ordered"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<gray>Current: <white>$displayName"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <white>$displayName"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to cycle"))
+            loreList.add(pctx.mm.deserialize("<green>Click to cycle"))
             lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
                 cycleSortOption()
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
@@ -470,19 +455,19 @@ class AdvancedSearchMenu(
         val activeFilters = getActiveFiltersList()
 
         return VItem(XMaterial.PAPER) {
-            name = mm.deserialize("<yellow>Active Filters")
+            name = pctx.mm.deserialize("<yellow>Active Filters")
             val loreList = mutableListOf<Component>()
             if (activeFilters.isEmpty()) {
-                loreList.add(mm.deserialize("<gray>No active filters"))
-                loreList.add(mm.deserialize("<gray>Set filters above to refine search"))
+                loreList.add(pctx.mm.deserialize("<gray>No active filters"))
+                loreList.add(pctx.mm.deserialize("<gray>Set filters above to refine search"))
             } else {
-                loreList.add(mm.deserialize("<gray>Click filter to clear:"))
+                loreList.add(pctx.mm.deserialize("<gray>Click filter to clear:"))
                 loreList.add(Component.empty())
                 activeFilters.forEach { (name, value) ->
-                    loreList.add(mm.deserialize("<red>✖ <gray>$name<white>: $value"))
+                    loreList.add(pctx.mm.deserialize("<red>✖ <gray>$name<white>: $value"))
                 }
                 loreList.add(Component.empty())
-                loreList.add(mm.deserialize("<gray>${activeFilters.size} filter(s) active"))
+                loreList.add(pctx.mm.deserialize("<gray>${activeFilters.size} filter(s) active"))
             }
             lore = loreList
             hideAllFlags()
@@ -494,8 +479,8 @@ class AdvancedSearchMenu(
         searchQuery?.let { filters.add("Search" to "\"$it\"") }
         sellerName?.let { filters.add("Seller" to it) }
         material?.let { filters.add("Material" to it.name.replace("_", " ")) }
-        minPrice?.let { filters.add("Min Price" to MenuUtils.formatPrice(it, economy)) }
-        maxPrice?.let { filters.add("Max Price" to MenuUtils.formatPrice(it, economy)) }
+        minPrice?.let { filters.add("Min Price" to MenuUtils.formatPrice(it, pctx.economy)) }
+        maxPrice?.let { filters.add("Max Price" to MenuUtils.formatPrice(it, pctx.economy)) }
         auctionType?.let { filters.add("Type" to it.name) }
         endingWithin?.let { filters.add("Ending" to formatDuration(it)) }
         return filters
@@ -511,11 +496,11 @@ class AdvancedSearchMenu(
 
     private fun createClearAllButton(): VItem {
         return VItem(XMaterial.BARRIER) {
-            name = mm.deserialize("<red>Clear All Filters")
+            name = pctx.mm.deserialize("<red>Clear All Filters")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Reset all filters to default"))
+            loreList.add(pctx.mm.deserialize("<gray>Reset all filters to default"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<red>Click to clear all"))
+            loreList.add(pctx.mm.deserialize("<red>Click to clear all"))
             lore = loreList
             hideAllFlags()
 
@@ -528,21 +513,21 @@ class AdvancedSearchMenu(
                 this@AdvancedSearchMenu.auctionType = null
                 this@AdvancedSearchMenu.endingWithin = null
                 this@AdvancedSearchMenu.sortBy = AuctionSort.ENDING_SOON
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Refresh
             }
         }
     }
 
     private fun createApplySearchButton(): VItem {
         return VItem(XMaterial.EMERALD_BLOCK) {
-            name = mm.deserialize("<green>Apply Search")
+            name = pctx.mm.deserialize("<green>Apply Search")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Apply all filters and view results"))
+            loreList.add(pctx.mm.deserialize("<gray>Apply all filters and view results"))
             loreList.add(Component.empty())
             val activeCount = getActiveFiltersList().size
-            loreList.add(mm.deserialize("<gray>Active filters: <white>$activeCount"))
+            loreList.add(pctx.mm.deserialize("<gray>Active filters: <white>$activeCount"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to search"))
+            loreList.add(pctx.mm.deserialize("<green>Click to search"))
             lore = loreList
             hideAllFlags()
 
@@ -565,24 +550,24 @@ class AdvancedSearchMenu(
         )
 
         val activeCount = getActiveFiltersList().size
-        player.sendMessage(translationAPI.getComponentSync(AuctionMessages.SEARCH_APPLYING) {
+        pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.SEARCH_APPLYING) {
             unparsed("count", activeCount.toString())
         })
-        PlayerStateManager.setAuctionFilter(player.uniqueId, filter)
-        PlayerStateManager.setAuctionPage(player.uniqueId, 0)
-        return ClickResult.SwitchMenu(parentMenuFactory())
+        PlayerStateManager.setAuctionFilter(pctx.player.uniqueId, filter)
+        PlayerStateManager.setAuctionPage(pctx.player.uniqueId, 0)
+        return ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
     }
 
     private fun createBackButton(): VItem {
-        return MenuUtils.backButton(translationAPI).apply {
+        return MenuUtils.backButton(pctx.translationAPI).apply {
             onClick { _, _ ->
-                ClickResult.SwitchMenu(parentMenuFactory())
+                ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
             }
         }
     }
 
     private fun createCloseButton(): VItem {
-        return MenuUtils.closeButton(translationAPI).apply {
+        return MenuUtils.closeButton(pctx.translationAPI).apply {
             onClick { _, _ ->
                 ClickResult.Close
             }

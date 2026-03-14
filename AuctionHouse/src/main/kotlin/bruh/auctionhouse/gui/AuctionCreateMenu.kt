@@ -1,93 +1,51 @@
 package bruh.auctionhouse.gui
 
-import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.model.AuctionType
-import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
-import bruh.zchat.utils.menuapi.Menu
-import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
-import bruh.zchat.utils.menuapi.promptDouble
-import bruh.zchat.utils.menuapi.promptInt
-import bruh.zchat.utils.translations.TranslationAPI
+import bruh.zchat.utils.menuapi.promptDoubleAsync
+import bruh.zchat.utils.menuapi.promptIntAsync
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.minimessage.MiniMessage
-import org.bukkit.entity.Player
-import org.bukkit.inventory.ItemStack
 import java.time.Duration
 
 /**
  * Menu for creating new auctions.
+ * Caller is responsible for verifying the player is holding a valid item before opening.
  */
 class AuctionCreateMenu(
-    private val menuAPI: MenuAPI,
-    private val auctionService: AuctionService,
-    private val config: AuctionHouseConfig,
-    private val translationAPI: TranslationAPI,
-    private val plugin: AuctionHousePlugin,
-    private val player: Player
-) : bruh.zchat.utils.menuapi.SimpleMenu() {
-    private val mm = MiniMessage.miniMessage()
-    private var auctionItem = player.inventory.itemInMainHand
+    private val pctx: PlayerMenuContext
+) : SimpleMenu() {
+    private var auctionItem = pctx.player.inventory.itemInMainHand
     private var startPrice = 100.0
     private var binPrice: Double? = null
-    private var duration = Duration.ofHours(config.auctions.defaultDuration.toLong())
-    private var anonymous = false
-    private var auctionType = AuctionType.BOTH
+    private var duration = Duration.ofHours(pctx.config.auctions.defaultDuration.toLong())
+    private var anonymous by menuState(false)
+    private var auctionType by menuState(AuctionType.BOTH)
 
-    fun createMenuOrNull(): Menu? {
-        // Check if player is holding an item
-        if (auctionItem.type.isAir) {
-            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.MUST_HOLD_ITEM))
-            return null
-        }
-
-        return createMenu()
+    init {
+        rows = 6
+        title = pctx.translationAPI.getComponentSync(GuiMessages.CREATE_AUCTION_TITLE)
+        background = MenuUtils.backgroundItem()
     }
 
-    fun createMenu(): Menu {
-        return this.apply {
-            items.clear()
-            rows = 6
-            title = translationAPI.getComponentSync(GuiMessages.CREATE_AUCTION_TITLE)
+    override fun populateItems() {
+        items.clear()
 
-            background = MenuUtils.backgroundItem()
-
-            // Item slot
-            item(13, createItemDisplay())
-
-            // Auction type selector
-            item(29, createTypeButton())
-
-            // Start price
-            item(30, createStartPriceButton())
-
-            // BIN price
-            item(31, createBinPriceButton())
-
-            // Duration
-            item(32, createDurationButton())
-
-            // Anonymous toggle
-            item(33, createAnonymousButton())
-
-            // Confirm button
-            item(38, createConfirmButton())
-
-            // Cancel button
-            val cancelItem = MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ ->
-                    ClickResult.Close
-                }
-            }
-            item(42, cancelItem)
-        }
+        item(13, createItemDisplay())
+        item(29, createTypeButton())
+        item(30, createStartPriceButton())
+        item(31, createBinPriceButton())
+        item(32, createDurationButton())
+        item(33, createAnonymousButton())
+        item(38, createConfirmButton())
+        item(42, MenuUtils.closeButton(pctx.translationAPI).apply {
+            onClick { _, _ -> ClickResult.Close }
+        })
     }
 
     private fun createItemDisplay(): VItem {
@@ -107,8 +65,8 @@ class AuctionCreateMenu(
         }
 
         return VItem(material) {
-            name = mm.deserialize("<yellow>Type: <white>$typeName")
-            lore = mutableListOf(mm.deserialize("<gray>Click to change"))
+            name = pctx.mm.deserialize("<yellow>Type: <white>$typeName")
+            lore = mutableListOf(pctx.mm.deserialize("<gray>Click to change"))
             hideAllFlags()
 
             onClick { _, _ ->
@@ -117,32 +75,34 @@ class AuctionCreateMenu(
                     AuctionType.BIN -> AuctionType.BOTH
                     AuctionType.BOTH -> AuctionType.AUCTION
                 }
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
 
     private fun createStartPriceButton(): VItem {
         return VItem(XMaterial.GOLD_NUGGET) {
-            name = mm.deserialize("<yellow>Start Price: <gold>${MenuUtils.formatPrice(startPrice, plugin.economy)}")
-            lore = mutableListOf(mm.deserialize("<gray>Click to change"))
+            name = pctx.mm.deserialize("<yellow>Start Price: <gold>${MenuUtils.formatPrice(startPrice, pctx.economy)}")
+            lore = mutableListOf(pctx.mm.deserialize("<gray>Click to change"))
             hideAllFlags()
 
             onClick { _, _ ->
-                runBlocking {
-                    val result = menuAPI.promptDouble(
-                        player,
-                        "Enter Start Price",
-                        startPrice,
-                        config.auctions.minStartPrice,
-                        config.auctions.maxStartPrice
-                    )
+                pctx.menuAPI.promptDoubleAsync(
+                    pctx.player,
+                    "Enter Start Price",
+                    startPrice,
+                    pctx.config.auctions.minStartPrice,
+                    pctx.config.auctions.maxStartPrice
+                ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> startPrice = result.value
                         is AnvilInputResult.Cancelled -> {}
                     }
+                    pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                        pctx.menuAPI.open(this@AuctionCreateMenu, pctx.player)
+                    })
                 }
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
@@ -152,48 +112,48 @@ class AuctionCreateMenu(
             val loreList = mutableListOf<Component>()
 
             if (binPrice != null) {
-                name = mm.deserialize("<green>BIN Price: <gold>${MenuUtils.formatPrice(binPrice!!, plugin.economy)}")
+                name = pctx.mm.deserialize("<green>BIN Price: <gold>${MenuUtils.formatPrice(binPrice!!, pctx.economy)}")
             } else {
-                name = mm.deserialize("<gray>BIN Price: <red>Not Set")
+                name = pctx.mm.deserialize("<gray>BIN Price: <red>Not Set")
             }
-            loreList.add(mm.deserialize("<gray>Click to set"))
-            loreList.add(mm.deserialize("<gray>Right-click to clear"))
+            loreList.add(pctx.mm.deserialize("<gray>Click to set"))
+            loreList.add(pctx.mm.deserialize("<gray>Right-click to clear"))
             lore = loreList
             hideAllFlags()
 
             onClick { ctx, _ ->
                 if (ctx.isRightClick) {
                     binPrice = null
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Refresh
                 } else {
-                    runBlocking {
-                        // For AUCTION and BOTH types, BIN must be greater than start price
-                        val minBinPrice = if (auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) {
-                            startPrice.coerceAtLeast(config.auctions.minStartPrice)
-                        } else {
-                            config.auctions.minStartPrice
-                        }
+                    val minBinPrice = if (auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) {
+                        startPrice.coerceAtLeast(pctx.config.auctions.minStartPrice)
+                    } else {
+                        pctx.config.auctions.minStartPrice
+                    }
 
-                        val result = menuAPI.promptDouble(
-                            player,
-                            "Enter BIN Price",
-                            binPrice,
-                            minBinPrice,
-                            config.auctions.maxStartPrice
-                        )
+                    pctx.menuAPI.promptDoubleAsync(
+                        pctx.player,
+                        "Enter BIN Price",
+                        binPrice,
+                        minBinPrice,
+                        pctx.config.auctions.maxStartPrice
+                    ).thenAccept { result ->
                         when (result) {
                             is AnvilInputResult.Success -> {
-                                // Validate BIN > start price for auction types
                                 if ((auctionType == AuctionType.AUCTION || auctionType == AuctionType.BOTH) && result.value <= startPrice) {
-                                    player.sendMessage(translationAPI.getComponentSync(AuctionMessages.BIN_PRICE_MUST_BE_GREATER))
+                                    pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.BIN_PRICE_MUST_BE_GREATER))
                                 } else {
                                     binPrice = result.value
                                 }
                             }
                             is AnvilInputResult.Cancelled -> {}
                         }
+                        pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                            pctx.menuAPI.open(this@AuctionCreateMenu, pctx.player)
+                        })
                     }
-                    ClickResult.SwitchMenu(createMenu())
+                    ClickResult.Deny
                 }
             }
         }
@@ -201,25 +161,27 @@ class AuctionCreateMenu(
 
     private fun createDurationButton(): VItem {
         return VItem(XMaterial.CLOCK) {
-            name = mm.deserialize("<yellow>Duration: <white>${duration.toHours()}h")
-            lore = mutableListOf(mm.deserialize("<gray>Click to change"))
+            name = pctx.mm.deserialize("<yellow>Duration: <white>${duration.toHours()}h")
+            lore = mutableListOf(pctx.mm.deserialize("<gray>Click to change"))
             hideAllFlags()
 
             onClick { _, _ ->
-                runBlocking {
-                    val result = menuAPI.promptInt(
-                        player,
-                        "Enter Duration (hours)",
-                        duration.toHours().toInt(),
-                        1,
-                        config.auctions.maxDuration
-                    )
+                pctx.menuAPI.promptIntAsync(
+                    pctx.player,
+                    "Enter Duration (hours)",
+                    duration.toHours().toInt(),
+                    1,
+                    pctx.config.auctions.maxDuration
+                ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> duration = Duration.ofHours(result.value.toLong())
                         is AnvilInputResult.Cancelled -> {}
                     }
+                    pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                        pctx.menuAPI.open(this@AuctionCreateMenu, pctx.player)
+                    })
                 }
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
@@ -227,71 +189,69 @@ class AuctionCreateMenu(
     private fun createAnonymousButton(): VItem {
         val material = if (anonymous) XMaterial.LIME_DYE else XMaterial.GRAY_DYE
         return VItem(material) {
-            name = mm.deserialize("<yellow>Anonymous: <white>${if (anonymous) "Yes" else "No"}")
-            lore = mutableListOf(mm.deserialize("<gray>Click to toggle"))
+            name = pctx.mm.deserialize("<yellow>Anonymous: <white>${if (anonymous) "Yes" else "No"}")
+            lore = mutableListOf(pctx.mm.deserialize("<gray>Click to toggle"))
             hideAllFlags()
 
             onClick { _, _ ->
                 anonymous = !anonymous
-                ClickResult.SwitchMenu(createMenu())
+                ClickResult.Deny
             }
         }
     }
 
     private fun createConfirmButton(): VItem {
         return VItem(XMaterial.LIME_WOOL) {
-            name = mm.deserialize("<green>Confirm")
+            name = pctx.mm.deserialize("<green>Confirm")
             val loreList = mutableListOf<Component>()
 
-            // Calculate fee
-            val listingFee = config.auctions.listingFee
+            val listingFee = pctx.config.auctions.listingFee
             val fee = when (listingFee.type.uppercase()) {
                 "PERCENTAGE" -> startPrice * (listingFee.amount / 100.0)
                 else -> listingFee.amount
             }.coerceIn(listingFee.minFee, listingFee.maxFee)
 
-            val totalFee = if (anonymous && config.auctions.display.allowAnonymous) {
-                fee + config.auctions.display.anonymousFee
+            val totalFee = if (anonymous && pctx.config.auctions.display.allowAnonymous) {
+                fee + pctx.config.auctions.display.anonymousFee
             } else fee
 
-            loreList.add(mm.deserialize("<gray>Listing Fee: <gold>${MenuUtils.formatPrice(totalFee, plugin.economy)}"))
-            
-            // Show expensive warning if applicable
+            loreList.add(pctx.mm.deserialize("<gray>Listing Fee: <gold>${MenuUtils.formatPrice(totalFee, pctx.economy)}"))
+
             val binPriceTotal = binPrice ?: 0.0
             val totalValue = startPrice.coerceAtLeast(binPriceTotal)
-            if (MenuUtils.isExpensiveAction(totalValue, config.gui.confirm.expensiveThreshold)) {
+            if (MenuUtils.isExpensiveAction(totalValue, pctx.config.gui.confirm.expensiveThreshold)) {
                 loreList.add(Component.empty())
-                loreList.add(translationAPI.getComponentSync(GuiMessages.EXPENSIVE_TRANSACTION_WARNING))
-                loreList.add(translationAPI.getComponentSync(GuiMessages.EXPENSIVE_TRANSACTION_THRESHOLD) {
-                    unparsed("threshold", MenuUtils.formatPrice(config.gui.confirm.expensiveThreshold, plugin.economy))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.EXPENSIVE_TRANSACTION_WARNING))
+                loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.EXPENSIVE_TRANSACTION_THRESHOLD) {
+                    unparsed("threshold", MenuUtils.formatPrice(pctx.config.gui.confirm.expensiveThreshold, pctx.economy))
                 })
             }
-            
+
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to create auction"))
+            loreList.add(pctx.mm.deserialize("<green>Click to create auction"))
             lore = loreList
             hideAllFlags()
 
-            onClick { _, _ ->
-                runBlocking {
-                    val actualBinPrice = if (auctionType == AuctionType.BOTH || auctionType == AuctionType.BIN) binPrice else null
-                    
-                    // Check if confirmation is needed for expensive actions
-                    val totalValue = startPrice.coerceAtLeast(binPrice ?: 0.0)
-                    if (MenuUtils.isExpensiveAction(totalValue, config.gui.confirm.expensiveThreshold)) {
-                        // Show confirmation message
-                        player.sendMessage(translationAPI.getComponentSync(GuiMessages.CONFIRM_EXPENSIVE_AUCTION))
-                        // Note: Full implementation would require a pending confirmation system
-                        // For now, we just warn the user
-                    }
-                    
-                    val result = auctionService.createAuction(
-                        player, auctionItem, auctionType, startPrice, actualBinPrice, duration, anonymous
-                    )
-                    player.sendMessage(result.message)
-                    // Note: Item removal is handled by AuctionService.createAuction()
+            onClick { _, controls ->
+                val actualBinPrice = if (auctionType == AuctionType.BOTH || auctionType == AuctionType.BIN) binPrice else null
+
+                val totalValue = startPrice.coerceAtLeast(binPrice ?: 0.0)
+                if (MenuUtils.isExpensiveAction(totalValue, pctx.config.gui.confirm.expensiveThreshold)) {
+                    pctx.player.sendMessage(pctx.translationAPI.getComponentSync(GuiMessages.CONFIRM_EXPENSIVE_AUCTION))
                 }
-                ClickResult.Close
+
+                controls.runAsync(
+                    action = {
+                        pctx.auctionService.createAuction(
+                            pctx.player, auctionItem, auctionType, startPrice, actualBinPrice, duration, anonymous
+                        )
+                    },
+                    onSuccess = { result ->
+                        pctx.player.sendMessage(result.message)
+                        controls.close()
+                    }
+                )
+                ClickResult.Deny
             }
         }
     }
