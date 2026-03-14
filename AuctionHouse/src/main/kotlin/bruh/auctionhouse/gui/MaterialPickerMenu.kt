@@ -1,35 +1,26 @@
 package bruh.auctionhouse.gui
 
-import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.Menu
-import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.menuapi.PaginatedMenu
 import bruh.zchat.utils.menuapi.VItem
-import bruh.zchat.utils.menuapi.promptText
-import bruh.zchat.utils.translations.TranslationAPI
+import bruh.zchat.utils.menuapi.promptTextAsync
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.minimessage.MiniMessage
-import org.bukkit.entity.Player
 
 /**
  * Menu for selecting a material when creating an order.
  * Features search, categories, and pagination.
  */
 class MaterialPickerMenu(
-    private val menuAPI: MenuAPI,
-    private val config: AuctionHouseConfig,
-    private val translationAPI: TranslationAPI,
+    private val pctx: PlayerMenuContext,
     private val onSelect: (XMaterial) -> Menu
-) : bruh.zchat.utils.menuapi.PaginatedMenu<XMaterial>() {
-    private val mm = MiniMessage.miniMessage()
-    private var currentPage = 0
-    private var searchQuery = ""
-    private var selectedCategory = MaterialCategory.ALL
-    private val pageSize = 28
+) : PaginatedMenu<XMaterial>() {
+
+    private var searchQuery by menuState("")
+    private var selectedCategory by menuState(MaterialCategory.ALL)
 
     private val allMaterials: List<XMaterial> by lazy {
         XMaterial.entries.filter { material ->
@@ -42,68 +33,55 @@ class MaterialPickerMenu(
         }.sortedBy { it.name }
     }
 
-    fun createMenu(player: Player, page: Int = 0): Menu {
-        this.player = player
-        currentPage = page
-        return buildMenu()
+    init {
+        rows = 6
+        title = pctx.translationAPI.getComponentSync(GuiMessages.MATERIAL_PICKER_TITLE)
+        background = MenuUtils.backgroundItem()
+
+        contentSlots = (10..16) + (19..25) + (28..34) + (37..43)
+
+        itemRenderer = { material, _ ->
+            createMaterialItem(material)
+        }
+
+        previousPageItem = VItem(XMaterial.ARROW) {
+            name = pctx.translationAPI.getComponentSync(GuiMessages.PREVIOUS_PAGE)
+        }
+        nextPageItem = VItem(XMaterial.ARROW) {
+            name = pctx.translationAPI.getComponentSync(GuiMessages.NEXT_PAGE)
+        }
+        pageIndicatorRenderer = { current, total ->
+            VItem(XMaterial.PAPER) {
+                name = Component.text("$current/$total")
+            }
+        }
+
+        dataSource = getFilteredMaterials()
     }
 
-    private fun buildMenu(): Menu {
-        val filteredMaterials = getFilteredMaterials()
-        val totalPages = (filteredMaterials.size + pageSize - 1) / pageSize
-        val pageContent = filteredMaterials.drop(currentPage * pageSize).take(pageSize)
+    override fun populateItems() {
+        items.clear()
+        dataSource = getFilteredMaterials()
 
-        return this.apply {
-            items.clear()
-            rows = 6
-            title = translationAPI.getComponentSync(GuiMessages.MATERIAL_PICKER_TITLE)
-
-            contentSlots = (10..16) + (19..25) + (28..34) + (37..43)
-
-            dataSource = pageContent
-
-            itemRenderer = { material, _ ->
-                createMaterialItem(material)
+        items[49] = createSearchButton()
+        items[48] = createCategoryButton()
+        items[46] = MenuUtils.backButton(pctx.translationAPI).apply {
+            onClick { _, _ ->
+                ClickResult.Close
             }
-
-            background = MenuUtils.backgroundItem()
-
-            previousPageItem = VItem(XMaterial.ARROW) {
-                name = translationAPI.getComponentSync(GuiMessages.PREVIOUS_PAGE)
-            }
-            nextPageItem = VItem(XMaterial.ARROW) {
-                name = translationAPI.getComponentSync(GuiMessages.NEXT_PAGE)
-            }
-            pageIndicatorRenderer = { current, total ->
-                VItem(XMaterial.PAPER) {
-                    name = Component.text("$current/$total")
-                }
-            }
-
-            items[49] = createSearchButton()
-            items[48] = createCategoryButton()
-            items[46] = MenuUtils.backButton(translationAPI).apply {
-                onClick { _, _ ->
-                    ClickResult.Close
-                }
-            }
-            items[52] = MenuUtils.closeButton(translationAPI).apply {
-                onClick { _, _ ->
-                    ClickResult.Close
-                }
+        }
+        items[52] = MenuUtils.closeButton(pctx.translationAPI).apply {
+            onClick { _, _ ->
+                ClickResult.Close
             }
         }
     }
 
-    private lateinit var player: Player
-
     private fun getFilteredMaterials(): List<XMaterial> {
         var result = allMaterials
 
-        // Apply category filter
         result = selectedCategory.filter(result)
 
-        // Apply search filter
         if (searchQuery.isNotBlank()) {
             val query = searchQuery.lowercase()
             result = result.filter { material ->
@@ -128,41 +106,42 @@ class MaterialPickerMenu(
     private fun createSearchButton(): VItem {
         return VItem(XMaterial.OAK_SIGN) {
             name = if (searchQuery.isBlank()) {
-                mm.deserialize("<yellow>Search...")
+                pctx.mm.deserialize("<yellow>Search...")
             } else {
-                mm.deserialize("<yellow>Search: <white>$searchQuery")
+                pctx.mm.deserialize("<yellow>Search: <white>$searchQuery")
             }
             lore = mutableListOf(
-                mm.deserialize("<gray>Click to search for materials")
+                pctx.mm.deserialize("<gray>Click to search for materials")
             )
             hideAllFlags()
 
             onClick { _, _ ->
-                runBlocking {
-                    val result = menuAPI.promptText(
-                        player,
-                        "Search materials",
-                        searchQuery
-                    )
+                pctx.menuAPI.promptTextAsync(
+                    pctx.player,
+                    "Search materials",
+                    searchQuery
+                ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> {
                             searchQuery = result.value
-                            currentPage = 0
                         }
                         is AnvilInputResult.Cancelled -> {}
                     }
+                    pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                        pctx.menuAPI.open(this@MaterialPickerMenu, pctx.player)
+                    })
                 }
-                ClickResult.SwitchMenu(createMenu(player, currentPage))
+                ClickResult.Deny
             }
         }
     }
 
     private fun createCategoryButton(): VItem {
         return VItem(selectedCategory.icon) {
-            name = mm.deserialize("<yellow>Category: <white>${selectedCategory.displayName}")
+            name = pctx.mm.deserialize("<yellow>Category: <white>${selectedCategory.displayName}")
             lore = mutableListOf(
-                mm.deserialize("<gray>Click to cycle categories"),
-                mm.deserialize("<gray>Current: ${selectedCategory.displayName}")
+                pctx.mm.deserialize("<gray>Click to cycle categories"),
+                pctx.mm.deserialize("<gray>Current: ${selectedCategory.displayName}")
             )
             hideAllFlags()
 
@@ -170,8 +149,7 @@ class MaterialPickerMenu(
                 selectedCategory = MaterialCategory.entries[
                     (MaterialCategory.entries.indexOf(selectedCategory) + 1) % MaterialCategory.entries.size
                 ]
-                currentPage = 0
-                ClickResult.SwitchMenu(createMenu(player, currentPage))
+                ClickResult.Deny
             }
         }
     }

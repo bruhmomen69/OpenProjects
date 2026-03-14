@@ -1,151 +1,141 @@
 package bruh.auctionhouse.gui
 
-import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.config.AuctionHouseConfig
-import bruh.auctionhouse.economy.EconomyProvider
-import bruh.auctionhouse.model.OrderType
-import bruh.auctionhouse.service.OrderService
+import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.service.ServiceResult
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.ClickResult
-import bruh.zchat.utils.menuapi.Menu
-import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
-import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.minimessage.MiniMessage
-import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 
 class QuickSellMenu(
-    private val menuAPI: MenuAPI,
-    private val orderService: OrderService,
-    private val config: AuctionHouseConfig,
-    private val translationAPI: TranslationAPI,
-    private val plugin: AuctionHousePlugin,
-    private val economy: EconomyProvider,
-    private val player: Player,
+    private val pctx: PlayerMenuContext,
     private val item: ItemStack
-) : bruh.zchat.utils.menuapi.SimpleMenu() {
-    private val mm = MiniMessage.miniMessage()
+) : SimpleMenu() {
 
-    fun createMenuOrNull(): Menu? {
-        if (!config.orders.enabled) {
-            player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
-            return null
+    private var bestOrder: Order? = null
+    private var confirmationPending by menuState(false)
+
+    init {
+        rows = 4
+        title = pctx.mm.deserialize("<green>Quick Sell")
+        background = MenuUtils.backgroundItem()
+
+        asyncData<Order?> {
+            load {
+                if (!pctx.config.orders.enabled) return@load null
+                pctx.orderService.findBestBuyOrderForMaterial(item.type)
+            }
+            onLoaded { order -> bestOrder = order }
+        }
+    }
+
+    override fun populateItems() {
+        items.clear()
+
+        val order = bestOrder
+
+        if (isAsyncLoading) {
+            item(13, MenuUtils.loadingAuctionItem())
+            return
         }
 
-        val bestOrder = runBlocking {
-            orderService.findBestBuyOrderForMaterial(item.type)
-        }
-
-        if (bestOrder == null) {
-            player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_QUICK_SELL_NO_ORDER))
-            return null
-        }
-
-        val sellQuantity = minOf(item.amount, bestOrder.remainingQuantity())
-        val totalPrice = sellQuantity * bestOrder.pricePerUnit
-        val isExpensive = totalPrice > config.gui.confirm.expensiveThreshold
-        var confirmationPending = false
-
-        return this.apply {
-            items.clear()
-            rows = 4
-            title = mm.deserialize("<green>Quick Sell")
-
-            background = MenuUtils.backgroundItem()
-
-            item(11, VItem(XMaterial.matchXMaterial(item.type.name).orElse(XMaterial.STONE)) {
-                name = item.itemMeta?.displayName() ?: Component.text(item.type.name.replace("_", " "))
-                val loreList = mutableListOf<Component>()
-                loreList.add(Component.empty())
-                loreList.add(mm.deserialize("<gray>Amount: <white>${item.amount}"))
-                lore = loreList
+        if (order == null) {
+            item(13, VItem(XMaterial.BARRIER) {
+                name = pctx.mm.deserialize("<red>No Buy Orders Available")
+                lore = mutableListOf(
+                    pctx.mm.deserialize("<gray>There are no buy orders for this item")
+                )
                 hideAllFlags()
             })
-
-            item(15, VItem(XMaterial.EMERALD) {
-                name = mm.deserialize("<yellow>Best Buy Order")
-                val loreList = mutableListOf<Component>()
-                loreList.add(Component.empty())
-                loreList.add(mm.deserialize("<gray>Buyer: <white>${bestOrder.creatorName}"))
-                loreList.add(mm.deserialize("<gray>Price: <gold>${MenuUtils.formatPrice(bestOrder.pricePerUnit, economy)} per unit"))
-                loreList.add(mm.deserialize("<gray>Available: <white>${bestOrder.remainingQuantity()}"))
-                loreList.add(Component.empty())
-                loreList.add(mm.deserialize("<green>Sell up to $sellQuantity for ${MenuUtils.formatPrice(totalPrice, economy)}"))
-                lore = loreList
-                hideAllFlags()
-            })
-
-            item(31, VItem(if (confirmationPending) XMaterial.GOLD_BLOCK else XMaterial.EMERALD_BLOCK) {
-                name = mm.deserialize(if (confirmationPending) "<yellow>⚠ Click Again to Confirm" else "<green>Confirm Quick Sell")
-                val loreList = mutableListOf<Component>()
-                loreList.add(mm.deserialize("<gray>Quantity: <white>$sellQuantity"))
-                loreList.add(mm.deserialize("<gray>Price per unit: <gold>${MenuUtils.formatPrice(bestOrder.pricePerUnit, economy)}"))
-                loreList.add(mm.deserialize("<gray>Total: <gold>${MenuUtils.formatPrice(totalPrice, economy)}"))
-                loreList.add(Component.empty())
-                
-                if (isExpensive && !confirmationPending) {
-                    loreList.add(mm.deserialize("<red>⚠ High Value Transaction"))
-                    loreList.add(mm.deserialize("<yellow>Click again to confirm"))
-                } else if (confirmationPending) {
-                    loreList.add(mm.deserialize("<yellow>Click to complete sale"))
-                } else {
-                    loreList.add(mm.deserialize("<green>Click to confirm"))
-                }
-                lore = loreList
-                hideAllFlags()
-
+            item(27, MenuUtils.backButton(pctx.translationAPI).apply {
                 onClick { _, _ ->
-                    if (isExpensive && !confirmationPending) {
-                        confirmationPending = true
-                        player.sendMessage(mm.deserialize("<yellow>⚠ Click again to confirm sale of <gold>${MenuUtils.formatPrice(totalPrice, economy)}"))
-                        return@onClick createMenuOrNull()?.let { ClickResult.SwitchMenu(it) } ?: ClickResult.Close
-                    }
+                    ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
+                }
+            })
+            return
+        }
 
-                    runBlocking {
-                        val itemsToSell = listOf(item.clone().apply { amount = sellQuantity })
-                        val result = orderService.fulfillOrder(player, bestOrder.id, itemsToSell)
-                        
+        val sellQuantity = minOf(item.amount, order.remainingQuantity())
+        val totalPrice = sellQuantity * order.pricePerUnit
+        val isExpensive = totalPrice > pctx.config.gui.confirm.expensiveThreshold
+
+        item(11, VItem(XMaterial.matchXMaterial(item.type.name).orElse(XMaterial.STONE)) {
+            name = item.itemMeta?.displayName() ?: Component.text(item.type.name.replace("_", " "))
+            val loreList = mutableListOf<Component>()
+            loreList.add(Component.empty())
+            loreList.add(pctx.mm.deserialize("<gray>Amount: <white>${item.amount}"))
+            lore = loreList
+            hideAllFlags()
+        })
+
+        item(15, VItem(XMaterial.EMERALD) {
+            name = pctx.mm.deserialize("<yellow>Best Buy Order")
+            val loreList = mutableListOf<Component>()
+            loreList.add(Component.empty())
+            loreList.add(pctx.mm.deserialize("<gray>Buyer: <white>${order.creatorName}"))
+            loreList.add(pctx.mm.deserialize("<gray>Price: <gold>${MenuUtils.formatPrice(order.pricePerUnit, pctx.economy)} per unit"))
+            loreList.add(pctx.mm.deserialize("<gray>Available: <white>${order.remainingQuantity()}"))
+            loreList.add(Component.empty())
+            loreList.add(pctx.mm.deserialize("<green>Sell up to $sellQuantity for ${MenuUtils.formatPrice(totalPrice, pctx.economy)}"))
+            lore = loreList
+            hideAllFlags()
+        })
+
+        item(31, VItem(if (confirmationPending) XMaterial.GOLD_BLOCK else XMaterial.EMERALD_BLOCK) {
+            name = pctx.mm.deserialize(if (confirmationPending) "<yellow>⚠ Click Again to Confirm" else "<green>Confirm Quick Sell")
+            val loreList = mutableListOf<Component>()
+            loreList.add(pctx.mm.deserialize("<gray>Quantity: <white>$sellQuantity"))
+            loreList.add(pctx.mm.deserialize("<gray>Price per unit: <gold>${MenuUtils.formatPrice(order.pricePerUnit, pctx.economy)}"))
+            loreList.add(pctx.mm.deserialize("<gray>Total: <gold>${MenuUtils.formatPrice(totalPrice, pctx.economy)}"))
+            loreList.add(Component.empty())
+
+            if (isExpensive && !confirmationPending) {
+                loreList.add(pctx.mm.deserialize("<red>⚠ High Value Transaction"))
+                loreList.add(pctx.mm.deserialize("<yellow>Click again to confirm"))
+            } else if (confirmationPending) {
+                loreList.add(pctx.mm.deserialize("<yellow>Click to complete sale"))
+            } else {
+                loreList.add(pctx.mm.deserialize("<green>Click to confirm"))
+            }
+            lore = loreList
+            hideAllFlags()
+
+            onClick { _, controls ->
+                if (isExpensive && !confirmationPending) {
+                    confirmationPending = true
+                    pctx.player.sendMessage(pctx.mm.deserialize("<yellow>⚠ Click again to confirm sale of <gold>${MenuUtils.formatPrice(totalPrice, pctx.economy)}"))
+                    return@onClick ClickResult.Deny
+                }
+
+                val itemsToSell = listOf(item.clone().apply { amount = sellQuantity })
+                controls.runAsync(
+                    action = { pctx.orderService.fulfillOrder(pctx.player, order.id, itemsToSell) },
+                    onSuccess = { result ->
                         when (result) {
                             is ServiceResult.Success<*> -> {
                                 if (sellQuantity >= item.amount) {
-                                    player.inventory.setItemInMainHand(null)
+                                    pctx.player.inventory.setItemInMainHand(null)
                                 } else {
                                     item.amount -= sellQuantity
                                 }
                             }
                             is ServiceResult.Failure -> {}
                         }
-                        player.sendMessage(result.message)
+                        pctx.player.sendMessage(result.message)
+                        controls.close()
                     }
-                    ClickResult.Close
-                }
-            })
+                )
+                ClickResult.Deny
+            }
+        })
 
-            item(27, MenuUtils.backButton(translationAPI).apply {
-                onClick { _, _ ->
-                    ClickResult.SwitchMenu(
-                        AuctionHouseMenu(
-                            menuAPI,
-                            plugin.auctionService,
-                            orderService,
-                            plugin.auctionRepository,
-                            plugin.bidRepository,
-                            plugin.orderRepository,
-                            plugin.watchlistRepository,
-                            config,
-                            translationAPI,
-                            plugin,
-                            economy,
-                            player
-                        ).createMenu()
-                    )
-                }
-            })
-        }
+        item(27, MenuUtils.backButton(pctx.translationAPI).apply {
+            onClick { _, _ ->
+                ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
+            }
+        })
     }
 }
