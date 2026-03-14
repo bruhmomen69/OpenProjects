@@ -33,20 +33,8 @@ class OrderCommands(
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
             return
         }
-        OrderBrowserMenu(
-            menuAPI,
-            auctionService,
-            orderService,
-            ctx.auctionRepository,
-            ctx.bidRepository,
-            ctx.orderRepository,
-            ctx.watchlistRepository,
-            config,
-            translationAPI,
-            plugin,
-            ctx.economy,
-            player
-        ).createMenuOrNull()?.let { menuAPI.open(it, player) }
+        val pctx = ctx.forPlayer(player)
+        menuAPI.open(OrderBrowserMenu(pctx), player)
     }
 
     @Subcommand("buy")
@@ -176,20 +164,7 @@ class OrderCommands(
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED))
             return
         }
-        val menu = MyOrdersMenu(
-            menuAPI,
-            auctionService,
-            orderService,
-            ctx.auctionRepository,
-            ctx.bidRepository,
-            ctx.orderRepository,
-            ctx.watchlistRepository,
-            config,
-            translationAPI,
-            plugin,
-            ctx.economy,
-            player
-        ).createMenu()
-        menuAPI.open(menu, player)
+        val pctx = ctx.forPlayer(player)
+        menuAPI.open(MyOrdersMenu(pctx), player)
     }
 }

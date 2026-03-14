@@ -12,13 +12,11 @@ import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDoubleAsync
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
 
 /**
  * Menu for viewing auction details and placing bids or buying.
@@ -169,12 +167,20 @@ class AuctionDetailsMenu(
                 ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val bidResult = pctx.auctionService.placeBid(pctx.player, auction.id, result.value)
-                                pctx.player.sendMessage(bidResult.message)
+                            CompletableFuture.supplyAsync {
+                                kotlinx.coroutines.runBlocking { pctx.auctionService.placeBid(pctx.player, auction.id, result.value) }
+                            }.thenAccept { bidResult ->
+                                pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                                    pctx.player.sendMessage(bidResult.message)
+                                    pctx.menuAPI.open(AuctionDetailsMenu(pctx, auction), pctx.player)
+                                })
                             }
                         }
-                        is AnvilInputResult.Cancelled -> {}
+                        is AnvilInputResult.Cancelled -> {
+                            pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                                pctx.menuAPI.open(AuctionDetailsMenu(pctx, auction), pctx.player)
+                            })
+                        }
                     }
                 }
                 ClickResult.Deny
@@ -367,8 +373,9 @@ class AuctionDetailsMenu(
     }
 
     private fun handlePriceUpdate(newStart: Double?, newBin: Double?) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val result = pctx.auctionService.editAuctionPrice(pctx.player, auction.id, newStart, newBin)
+        CompletableFuture.supplyAsync {
+            kotlinx.coroutines.runBlocking { pctx.auctionService.editAuctionPrice(pctx.player, auction.id, newStart, newBin) }
+        }.thenAccept { result ->
             pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
                 when (result) {
                     is ServiceResult.Success -> {

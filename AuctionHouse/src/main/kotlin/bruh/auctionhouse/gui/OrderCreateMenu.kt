@@ -150,10 +150,10 @@ class OrderCreateMenu(
     }
 
     private fun openMaterialPicker(): ClickResult {
-        return ClickResult.SwitchMenu(MaterialPickerMenu(pctx.menuAPI, pctx.config, pctx.translationAPI) { material ->
+        return ClickResult.SwitchMenu(MaterialPickerMenu(pctx) { material ->
             state = state.copy(selectedMaterial = material.parseMaterial())
             this@OrderCreateMenu
-        }.createMenu(pctx.player))
+        })
     }
 
     private fun createStackDecrement(): VItem {

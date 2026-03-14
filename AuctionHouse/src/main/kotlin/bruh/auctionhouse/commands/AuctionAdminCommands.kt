@@ -10,7 +10,6 @@ import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
-import kotlinx.coroutines.runBlocking
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -414,15 +413,7 @@ class AuctionAdminCommands(
             return
         }
 
-        val menu = AdminDashboardMenu(
-            menuAPI,
-            auctionRepository,
-            transactionRepository,
-            config,
-            translationAPI,
-            plugin,
-            player
-        ).createMenu()
+        val menu = AdminDashboardMenu(ctx.forPlayer(player))
         menuAPI.open(menu, player)
     }
 
@@ -431,7 +422,7 @@ class AuctionAdminCommands(
      */
     @Subcommand("ban")
     @CommandPermission("auctionhouse.admin.ban")
-    fun adminBan(
+    suspend fun adminBan(
         actor: BukkitCommandActor,
         @Named("player") playerName: String,
         @Optional @Named("duration") duration: String?,
@@ -467,16 +458,14 @@ class AuctionAdminCommands(
 
         // Cancel auctions if configured
         if (config.restrictions.admin.onBanCancelAuctions) {
-            runBlocking {
-                val auctions = auctionRepository.getPlayerAuctions(offlinePlayer.uniqueId, AuctionStatus.ACTIVE)
-                auctions.forEach { auction ->
-                    auctionRepository.updateStatus(auction.id, AuctionStatus.CANCELLED)
-                }
-                if (auctions.isNotEmpty()) {
-                    actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_AUCTIONS_CANCELLED) {
-                        unparsed("count", auctions.size.toString())
-                    })
-                }
+            val auctions = auctionRepository.getPlayerAuctions(offlinePlayer.uniqueId, AuctionStatus.ACTIVE)
+            auctions.forEach { auction ->
+                auctionRepository.updateStatus(auction.id, AuctionStatus.CANCELLED)
+            }
+            if (auctions.isNotEmpty()) {
+                actor.reply(translationAPI.getComponentSync(AuctionMessages.ADMIN_BAN_AUCTIONS_CANCELLED) {
+                    unparsed("count", auctions.size.toString())
+                })
             }
         }
 

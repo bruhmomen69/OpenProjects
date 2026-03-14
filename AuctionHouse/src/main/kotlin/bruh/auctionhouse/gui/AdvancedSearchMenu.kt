@@ -169,10 +169,10 @@ class AdvancedSearchMenu(
                     ClickResult.Refresh
                 } else {
                     ClickResult.SwitchMenu(
-                        MaterialPickerMenu(pctx.menuAPI, pctx.config, pctx.translationAPI) { selectedMaterial ->
+                        MaterialPickerMenu(pctx) { selectedMaterial ->
                             this@AdvancedSearchMenu.material = selectedMaterial
                             this@AdvancedSearchMenu
-                        }.createMenu(pctx.player)
+                        }
                     )
                 }
             }

@@ -42,21 +42,8 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        val menu = AuctionHouseMenu(
-            menuAPI,
-            auctionService,
-            orderService,
-            ctx.auctionRepository,
-            ctx.bidRepository,
-            ctx.orderRepository,
-            ctx.watchlistRepository,
-            config,
-            translationAPI,
-            plugin,
-            economy,
-            player
-        ).createMenu()
-        menuAPI.open(menu, player)
+        val pctx = ctx.forPlayer(player)
+        menuAPI.open(AuctionHouseMenu(pctx), player)
     }
 
     /**
@@ -192,11 +179,8 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        val menu = ConsolidatedExpiredItemsMenu(
-            menuAPI, ctx.consolidatedExpiredItemService, auctionService, orderService, ctx.auctionRepository, ctx.bidRepository, ctx.orderRepository,
-            ctx.watchlistRepository, config, translationAPI, plugin, economy, player
-        ).createMenu()
-        menuAPI.open(menu, player)
+        val pctx = ctx.forPlayer(player)
+        menuAPI.open(ConsolidatedExpiredItemsMenu(pctx), player)
     }
 
     /**
@@ -205,21 +189,8 @@ class AuctionHouseCommands(
     @Subcommand("myauctions")
     @CommandPermission("auctionhouse.myauctions")
     fun myAuctions(player: Player) {
-        val menu = MyAuctionsMenu(
-            menuAPI,
-            auctionService,
-            orderService,
-            ctx.auctionRepository,
-            ctx.bidRepository,
-            ctx.orderRepository,
-            ctx.watchlistRepository,
-            config,
-            translationAPI,
-            plugin,
-            economy,
-            player
-        ).createMenu()
-        menuAPI.open(menu, player)
+        val pctx = ctx.forPlayer(player)
+        menuAPI.open(MyAuctionsMenu(pctx), player)
     }
 
     /**
@@ -232,9 +203,13 @@ class AuctionHouseCommands(
             player.sendMessage(translationAPI.getComponentSync(AuctionMessages.ADMIN_TOGGLE_OFF))
             return
         }
-        AuctionCreateMenu(menuAPI, auctionService, config, translationAPI, plugin, player)
-            .createMenuOrNull()
-            ?.let { menuAPI.open(it, player) }
+        val item = player.inventory.itemInMainHand
+        if (item.type.isAir) {
+            player.sendMessage(translationAPI.getComponentSync(AuctionMessages.AUCTION_INVALID_ITEM))
+            return
+        }
+        val pctx = ctx.forPlayer(player)
+        menuAPI.open(AuctionCreateMenu(pctx), player)
     }
 
     /**
