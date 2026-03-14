@@ -230,3 +230,14 @@ Quick sell to best buy order (4 rows):
 - Automatic expiration handling
 - Short IDs for easy command usage
 - Watchlist for auctions and orders
+
+### Menu API Migration (In Progress)
+
+Order menus have been migrated to the new Menu API pattern (`PlayerMenuContext`-based):
+- **OrderCreateMenu** — Uses `menuState` for reactive form state, `promptIntAsync`/`promptDoubleAsync` for inputs, `controls.runAsync` for order creation
+- **OrderManageMenu** — Uses `menuState` for `currentOrder`, coroutine-based async price editing, `controls.runAsync` for cancellation
+- **OrderFulfillMenu** — Uses `menuState` for quantity/confirmation state, `controls.runAsync` for fulfillment with inventory validation
+- **OrderBrowserMenu** — `PaginatedMenu` with `asyncData` for async order loading, `menuState` for filter/sort, `controls.reloadData()` on filter changes
+- **MyOrdersMenu** — `PaginatedMenu` with `asyncData` for async player order loading
+
+Remaining menus (AuctionHouseMenu, AuctionDetailsMenu, MaterialPickerMenu, etc.) still use the old constructor pattern.

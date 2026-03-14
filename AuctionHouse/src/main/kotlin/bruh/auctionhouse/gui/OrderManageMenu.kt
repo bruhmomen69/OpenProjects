@@ -1,57 +1,48 @@
 package bruh.auctionhouse.gui
 
-import bruh.auctionhouse.AuctionHousePlugin
-import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.model.Order
 import bruh.auctionhouse.model.OrderType
-import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.service.ServiceResult
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.Menu
-import bruh.zchat.utils.menuapi.MenuAPI
+import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
-import bruh.zchat.utils.menuapi.promptDouble
-import bruh.zchat.utils.translations.TranslationAPI
+import bruh.zchat.utils.menuapi.promptDoubleAsync
 import com.cryptomorin.xseries.XMaterial
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.minimessage.MiniMessage
-import org.bukkit.entity.Player
 
 class OrderManageMenu(
-    private val menuAPI: MenuAPI,
-    private val orderService: OrderService,
-    private val config: AuctionHouseConfig,
-    private val translationAPI: TranslationAPI,
-    private val plugin: AuctionHousePlugin,
-    private val player: Player,
-    private val order: Order
-) : bruh.zchat.utils.menuapi.SimpleMenu() {
-    private val mm = MiniMessage.miniMessage()
-    private var currentOrder = order
+    private val pctx: PlayerMenuContext,
+    private val order: Order,
+    private val parentMenu: () -> Menu
+) : SimpleMenu() {
+    private var currentOrder by menuState(order)
 
-    fun createMenu(parentMenu: () -> Menu): Menu {
+    init {
+        background = MenuUtils.backgroundItem()
+    }
+
+    override fun populateItems() {
+        items.clear()
+
         val canEditPrice = currentOrder.isActive() && currentOrder.quantityFilled == 0
+        rows = if (canEditPrice) 5 else 4
+        title = pctx.mm.deserialize("<yellow>Order ${currentOrder.shortId}")
 
-        return this.apply {
-            items.clear()
-            rows = if (canEditPrice) 5 else 4
-            title = mm.deserialize("<yellow>Order ${currentOrder.shortId}")
+        item(13, createOrderDisplayItem())
 
-            background = MenuUtils.backgroundItem()
-
-            item(13, createOrderDisplayItem())
-            
-            if (canEditPrice) {
-                item(29, createEditPriceButton(parentMenu))
-            }
-            
-            item(if (canEditPrice) 31 else 29, createCancelButton(parentMenu))
-            item(33, createBackButton(parentMenu))
+        if (canEditPrice) {
+            item(29, createEditPriceButton())
         }
+
+        item(if (canEditPrice) 31 else 29, createCancelButton())
+        item(33, createBackButton())
     }
 
     private fun createOrderDisplayItem(): VItem {
@@ -60,39 +51,39 @@ class OrderManageMenu(
 
         val loreList = mutableListOf<Component>()
         loreList.add(Component.empty())
-        loreList.add(mm.deserialize("<gray>ID: <white>${currentOrder.shortId}"))
+        loreList.add(pctx.mm.deserialize("<gray>ID: <white>${currentOrder.shortId}"))
         loreList.add(Component.empty())
 
-        loreList.add(translationAPI.getComponentSync(
+        loreList.add(pctx.translationAPI.getComponentSync(
             if (isBuyOrder) GuiMessages.ORDER_TYPE_BUY else GuiMessages.ORDER_TYPE_SELL
         ))
 
-        loreList.add(translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_QUANTITY) {
+        loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_QUANTITY) {
             unparsed("current", currentOrder.quantityFilled.toString())
             unparsed("total", currentOrder.quantityRequested.toString())
         })
 
-        loreList.add(translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_PRICE) {
-            unparsed("price", MenuUtils.formatPrice(currentOrder.pricePerUnit, plugin.economy))
+        loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_PRICE) {
+            unparsed("price", MenuUtils.formatPrice(currentOrder.pricePerUnit, pctx.economy))
         })
 
-        loreList.add(translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_TOTAL) {
-            unparsed("total", MenuUtils.formatPrice(currentOrder.totalValue(), plugin.economy))
+        loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_TOTAL) {
+            unparsed("total", MenuUtils.formatPrice(currentOrder.totalValue(), pctx.economy))
         })
 
-        loreList.add(translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_TIME_LEFT) {
+        loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_TIME_LEFT) {
             unparsed("time", MenuUtils.formatTimeRemaining(currentOrder.expiresAt))
         })
 
         if (currentOrder.allowPartial) {
-            loreList.add(translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_PARTIAL))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_PARTIAL))
         } else {
-            loreList.add(translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_NO_PARTIAL))
+            loreList.add(pctx.translationAPI.getComponentSync(GuiMessages.ORDER_ITEM_NO_PARTIAL))
         }
 
         return VItem(material) {
             name = currentOrder.itemDisplayName?.let {
-                mm.deserialize(it)
+                pctx.mm.deserialize(it)
             } ?: Component.text(currentOrder.itemMaterial.name.replace("_", " "))
             lore = loreList
             hideAllFlags()
@@ -100,100 +91,100 @@ class OrderManageMenu(
         }
     }
 
-    private fun createEditPriceButton(parentMenu: () -> Menu): VItem {
+    private fun createEditPriceButton(): VItem {
         return VItem(XMaterial.ANVIL) {
-            name = mm.deserialize("<yellow>Edit Price")
+            name = pctx.mm.deserialize("<yellow>Edit Price")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Current: <gold>${MenuUtils.formatPrice(currentOrder.pricePerUnit, plugin.economy)} per unit"))
+            loreList.add(pctx.mm.deserialize("<gray>Current: <gold>${MenuUtils.formatPrice(currentOrder.pricePerUnit, pctx.economy)} per unit"))
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<green>Click to edit price"))
+            loreList.add(pctx.mm.deserialize("<green>Click to edit price"))
             lore = loreList
             hideAllFlags()
 
             onClick { _, _ ->
-                var updated = false
-                runBlocking {
-                    val result = menuAPI.promptDouble(
-                        player,
-                        "New Price Per Unit",
-                        currentOrder.pricePerUnit,
-                        config.orders.minPricePerUnit,
-                        config.orders.maxPricePerUnit
-                    )
+                pctx.menuAPI.promptDoubleAsync(
+                    pctx.player,
+                    "New Price Per Unit",
+                    currentOrder.pricePerUnit,
+                    pctx.config.orders.minPricePerUnit,
+                    pctx.config.orders.maxPricePerUnit
+                ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> {
-                            val editResult = orderService.editOrderPrice(player, currentOrder.id, result.value)
-                            when (editResult) {
-                                is ServiceResult.Success -> {
-                                    currentOrder = editResult.data
-                                    updated = true
-                                    player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_PRICE_UPDATED) {
-                                        unparsed("price", MenuUtils.formatPrice(result.value, plugin.economy))
-                                    })
-                                }
-                                is ServiceResult.Failure -> {
-                                    player.sendMessage(editResult.message)
-                                }
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val editResult = pctx.orderService.editOrderPrice(pctx.player, currentOrder.id, result.value)
+                                pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                                    when (editResult) {
+                                        is ServiceResult.Success -> {
+                                            currentOrder = editResult.data
+                                            pctx.player.sendMessage(pctx.translationAPI.getComponentSync(OrderMessages.ORDER_PRICE_UPDATED) {
+                                                unparsed("price", MenuUtils.formatPrice(result.value, pctx.economy))
+                                            })
+                                        }
+                                        is ServiceResult.Failure -> {
+                                            pctx.player.sendMessage(editResult.message)
+                                        }
+                                    }
+                                    pctx.menuAPI.open(this@OrderManageMenu, pctx.player)
+                                })
                             }
                         }
-                        is AnvilInputResult.Cancelled -> {}
+                        is AnvilInputResult.Cancelled -> {
+                            pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
+                                pctx.menuAPI.open(this@OrderManageMenu, pctx.player)
+                            })
+                        }
                     }
                 }
-                if (updated) {
-                    ClickResult.SwitchMenu(createMenu(parentMenu))
-                } else {
-                    ClickResult.Close
-                }
+                ClickResult.Deny
             }
         }
     }
 
-    private fun createCancelButton(parentMenu: () -> Menu): VItem {
+    private fun createCancelButton(): VItem {
         return VItem(XMaterial.BARRIER) {
-            name = mm.deserialize("<red>Cancel Order")
+            name = pctx.mm.deserialize("<red>Cancel Order")
             val loreList = mutableListOf<Component>()
-            loreList.add(mm.deserialize("<gray>Cancel this order and"))
+            loreList.add(pctx.mm.deserialize("<gray>Cancel this order and"))
             if (currentOrder.orderType == OrderType.BUY_ORDER) {
-                loreList.add(mm.deserialize("<gray>receive a refund for unfilled items"))
+                loreList.add(pctx.mm.deserialize("<gray>receive a refund for unfilled items"))
                 val remainingValue = currentOrder.remainingValue()
                 if (remainingValue > 0) {
                     loreList.add(Component.empty())
-                    loreList.add(mm.deserialize("<gray>Refund: <gold>${MenuUtils.formatPrice(remainingValue, plugin.economy)}"))
+                    loreList.add(pctx.mm.deserialize("<gray>Refund: <gold>${MenuUtils.formatPrice(remainingValue, pctx.economy)}"))
                 }
             } else {
-                loreList.add(mm.deserialize("<gray>get your items back"))
+                loreList.add(pctx.mm.deserialize("<gray>get your items back"))
             }
             loreList.add(Component.empty())
-            loreList.add(mm.deserialize("<yellow>Click to cancel"))
+            loreList.add(pctx.mm.deserialize("<yellow>Click to cancel"))
             lore = loreList
             hideAllFlags()
 
-            onClick { _, _ ->
-                var wasSuccessful = false
-                runBlocking {
-                    val result = orderService.cancelOrder(player, currentOrder.id)
-                    when (result) {
-                        is ServiceResult.Success -> {
-                            wasSuccessful = true
-                            player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_CANCELLED))
-                        }
-                        is ServiceResult.Failure -> {
-                            player.sendMessage(result.message)
+            onClick { _, controls ->
+                controls.runAsync(
+                    action = { pctx.orderService.cancelOrder(pctx.player, currentOrder.id) },
+                    onSuccess = { result ->
+                        when (result) {
+                            is ServiceResult.Success -> {
+                                pctx.player.sendMessage(pctx.translationAPI.getComponentSync(OrderMessages.ORDER_CANCELLED))
+                                pctx.menuAPI.open(parentMenu(), pctx.player)
+                            }
+                            is ServiceResult.Failure -> {
+                                pctx.player.sendMessage(result.message)
+                                controls.close()
+                            }
                         }
                     }
-                }
-                if (wasSuccessful) {
-                    ClickResult.SwitchMenu(parentMenu())
-                } else {
-                    ClickResult.Close
-                }
+                )
+                ClickResult.Deny
             }
         }
     }
 
-    private fun createBackButton(parentMenu: () -> Menu): VItem {
+    private fun createBackButton(): VItem {
         return VItem(XMaterial.OAK_DOOR) {
-            name = translationAPI.getComponentSync(GuiMessages.BACK)
+            name = pctx.translationAPI.getComponentSync(GuiMessages.BACK)
             hideAllFlags()
 
             onClick { _, _ ->
