@@ -11,7 +11,13 @@ import bruh.regionrestore.cmd.SuggestInstanceId
 import bruh.regionrestore.api.RegionRestore as RegionRestoreApiHolder
 import bruh.regionrestore.api.createRegionRestoreApi
 import bruh.regionrestore.cloner.MassClonerService
-import bruh.regionrestore.cmd.RegionRestoreCommands
+import bruh.regionrestore.cmd.TemplateCommands
+import bruh.regionrestore.cmd.RestoreCommands
+import bruh.regionrestore.cmd.ClonerCommands
+import bruh.regionrestore.cmd.InstanceCommands
+import bruh.regionrestore.cmd.TimerCommands
+import bruh.regionrestore.cmd.SelectionCommands
+import bruh.regionrestore.cmd.GuiCommands
 import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.config.RegionRestoreConfigLoader
 import bruh.regionrestore.loader.PaperNmsAdapterLoader
@@ -201,7 +207,50 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                 }
             }
             .build()
-        lamp.register(RegionRestoreCommands(
+        lamp.register(TemplateCommands(
+            nmsAdapter,
+            templateRepository,
+            config,
+            translations
+        ))
+        lamp.register(RestoreCommands(
+            nmsAdapter,
+            templateRepository,
+            schedulerService,
+            config,
+            translations
+        ))
+        lamp.register(ClonerCommands(
+            massClonerService,
+            config,
+            translations
+        ))
+        lamp.register(InstanceCommands(
+            nmsAdapter,
+            templateRepository,
+            massClonerService,
+            config,
+            translations,
+            this,
+            menuAPI
+        ))
+        lamp.register(TimerCommands(
+            nmsAdapter,
+            templateRepository,
+            massClonerService,
+            config,
+            translations
+        ))
+        lamp.register(SelectionCommands(
+            nmsAdapter,
+            templateRepository,
+            config,
+            translations,
+            selectionService,
+            selectionWandService,
+            this
+        ))
+        lamp.register(GuiCommands(
             nmsAdapter,
             templateRepository,
             schedulerService,
@@ -209,9 +258,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
             massClonerService,
             menuAPI,
             this,
-            translations,
-            selectionService,
-            selectionWandService
+            translations
         ))
     }
 
