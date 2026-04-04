@@ -37,11 +37,10 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin(), CommandPlugin {
     override val config: CommonServerCommandsConfig
         get() = essentiallyStatelessConfig.toCommonServerCommandsConfig()
     
-    override lateinit var menuAPI: MenuAPI
-        private set
-    
     override lateinit var translations: TranslationAPI
         private set
+
+    override val menuAPI: MenuAPI? = null // unused
 
     override fun getUnderlyingPlugin(): SuspendingJavaPlugin = this
 

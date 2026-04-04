@@ -13,7 +13,13 @@ dependencies {
     implementation(project(":utils:translations")) {
         isTransitive = false
     }
+    implementation(project(":utils:common-server-commands")) {
+        isTransitive = false
+    }
     implementation(project(":utils:configapi")) {
+        isTransitive = false
+    }
+    implementation(project(":utils:menuapi")) {
         isTransitive = false
     }
     
