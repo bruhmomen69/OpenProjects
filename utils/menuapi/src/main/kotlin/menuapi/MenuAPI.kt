@@ -17,7 +17,9 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.Closeable
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Core class for the Menu API. Manages all menu state and event handling.
@@ -45,7 +47,7 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
     private val listener = MenuListener()
     private val openMenus: MutableMap<UUID, MenuHolder<*>> = ConcurrentHashMap()
     private val scheduledTasks: MutableList<BukkitTask> = mutableListOf()
-    
+    private val generationCounter = AtomicLong(0)
 
     init {
         Bukkit.getPluginManager().registerEvents(listener, plugin)
@@ -57,9 +59,13 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
 
     /**
      * Create a simple menu with fixed slot positions.
+     * Items set in [builder] are captured and replayed via [Menu.populateItems].
      */
     inline fun simple(builder: SimpleMenu.() -> Unit): SimpleMenu {
-        return SimpleMenu().apply(builder)
+        val menu = BuilderSimpleMenu()
+        menu.apply(builder)
+        menu.builderItems.putAll(menu.items)
+        return menu
     }
 
     /**
@@ -78,9 +84,14 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
 
     /**
      * Create a paginated menu.
+     * Chrome items set in [builder] (via [SimpleMenu.item]) are captured
+     * and replayed via [Menu.populateItems].
      */
     inline fun <T> paginated(builder: PaginatedMenu<T>.() -> Unit): PaginatedMenu<T> {
-        return PaginatedMenu<T>().apply(builder)
+        val menu = BuilderPaginatedMenu<T>()
+        menu.apply(builder)
+        menu.builderItems.putAll(menu.items)
+        return menu
     }
 
     /**
@@ -104,7 +115,20 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
             player.closeInventory()
         }
 
-        val holder = MenuHolder(this, menu, player)
+        val holder = MenuHolder(this, menu, player, generationCounter.incrementAndGet())
+
+        // Bind controls for menuState delegates
+        if (menu is SimpleMenu) {
+            menu.boundControls = holder.controls
+            // Pre-set loading flag so first populateItems() sees it
+            if (menu.asyncDataConfigs.isNotEmpty()) {
+                menu.isAsyncLoading = true
+            }
+        }
+
+        // Build items from state before inventory creation
+        menu.populateItems()
+
         val inventory = createInventory(holder, menu)
         holder.setInventory(inventory)
 
@@ -113,18 +137,24 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
         openMenus[player.uniqueId] = holder
         player.openInventory(inventory)
 
+        // Start async data loaders after inventory is visible
+        startAsyncLoaders(holder)
+
         // Call onOpen callback
-        when (menu) {
-            is SimpleMenu -> menu.onOpen?.invoke(player, holder.controls as MenuControls<SimpleMenu>)
-            is DynamicMenu -> menu.onOpen?.invoke(player, holder.controls as MenuControls<DynamicMenu>)
-            is ItemMenu -> menu.onOpen?.invoke(player, holder.controls as MenuControls<ItemMenu>)
-            is PaginatedMenu<*> -> (menu as PaginatedMenu<Any>).onOpen?.invoke(
-                player, holder.controls as MenuControls<PaginatedMenu<Any>>
-            )
-            is ConfirmationMenu -> {} // No onOpen for confirmation menus
+        when {
+            menu is SimpleMenu -> menu.onOpen?.invoke(player, holder.controls)
+            menu is DynamicMenu -> menu.onOpen?.invoke(player, holder.controls as MenuControls<DynamicMenu>)
+            menu is ItemMenu -> menu.onOpen?.invoke(player, holder.controls as MenuControls<ItemMenu>)
+            menu is ConfirmationMenu -> {} // No onOpen for confirmation menus
         }
 
         return holder.controls
+    }
+
+    internal fun isHolderOpen(holder: MenuHolder<*>): Boolean {
+        val currentHolder = openMenus[holder.player.uniqueId] ?: return false
+        if (currentHolder !== holder) return false
+        return holder.player.openInventory.topInventory.holder === holder
     }
 
     /**
@@ -171,10 +201,9 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
         }
 
         val size = when (menu) {
-            is SimpleMenu -> menu.size
+            is SimpleMenu -> menu.size // PaginatedMenu inherits from SimpleMenu
             is DynamicMenu -> menu.rows * 9
             is ItemMenu -> menu.size
-            is PaginatedMenu<*> -> menu.size
             is ConfirmationMenu -> menu.rows * 9
         }
 
@@ -196,23 +225,82 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
             }
         }
 
-        // Then populate based on menu type
-        when (menu) {
-            is SimpleMenu -> {
+        // Then populate based on menu type.
+        // PaginatedMenu extends SimpleMenu, so check it BEFORE SimpleMenu.
+        when {
+            menu is PaginatedMenu<*> -> {
+                val paginatedMenu = menu as PaginatedMenu<Any>
+
+                // Chrome items (inherited from SimpleMenu, built by populateItems())
+                paginatedMenu.items.forEach { (slot, vItem) ->
+                    holder.slotItems[slot] = vItem
+                    inventory.setItem(slot, vItem.build())
+                }
+
+                // Content slots: data items OR placeholders
+                val pageItems = paginatedMenu.getPageItems(holder.currentPage)
+                if (pageItems.isEmpty()) {
+                    if (paginatedMenu.isAsyncLoading && paginatedMenu.loadingPlaceholder != null) {
+                        // Fill all content slots with loading placeholder
+                        for (slot in paginatedMenu.contentSlots) {
+                            holder.slotItems[slot] = paginatedMenu.loadingPlaceholder!!
+                            inventory.setItem(slot, paginatedMenu.loadingPlaceholder!!.build())
+                        }
+                    } else if (!paginatedMenu.isAsyncLoading && paginatedMenu.emptyPlaceholder != null) {
+                        // Show empty placeholder centered in content area
+                        val centerSlot = paginatedMenu.contentSlots[paginatedMenu.contentSlots.size / 2]
+                        holder.slotItems[centerSlot] = paginatedMenu.emptyPlaceholder!!
+                        inventory.setItem(centerSlot, paginatedMenu.emptyPlaceholder!!.build())
+                    }
+                } else {
+                    // Render data items into content slots (overlays chrome items in those slots)
+                    pageItems.forEach { (slot, vItem) ->
+                        holder.slotItems[slot] = vItem
+                        inventory.setItem(slot, vItem.build())
+                    }
+                }
+
+                // Auto-navigation buttons
+                if (paginatedMenu.autoNavigation) {
+                    if (holder.currentPage > 0) {
+                        val prevItem = paginatedMenu.previousPageItem.copy().apply {
+                            onClickDeny { _, controls -> controls.previousPage() }
+                        }
+                        holder.slotItems[paginatedMenu.previousPageSlot] = prevItem
+                        inventory.setItem(paginatedMenu.previousPageSlot, prevItem.build())
+                    }
+
+                    if (holder.currentPage < paginatedMenu.pageCount - 1) {
+                        val nextItem = paginatedMenu.nextPageItem.copy().apply {
+                            onClickDeny { _, controls -> controls.nextPage() }
+                        }
+                        holder.slotItems[paginatedMenu.nextPageSlot] = nextItem
+                        inventory.setItem(paginatedMenu.nextPageSlot, nextItem.build())
+                    }
+
+                    paginatedMenu.pageIndicatorRenderer?.let { renderer ->
+                        val indicator = renderer(holder.currentPage + 1, paginatedMenu.pageCount)
+                        holder.slotItems[paginatedMenu.pageIndicatorSlot] = indicator
+                        inventory.setItem(paginatedMenu.pageIndicatorSlot, indicator.build())
+                    }
+                }
+            }
+
+            menu is SimpleMenu -> {
                 menu.items.forEach { (slot, vItem) ->
                     holder.slotItems[slot] = vItem
                     inventory.setItem(slot, vItem.build())
                 }
             }
 
-            is DynamicMenu -> {
+            menu is DynamicMenu -> {
                 menu.calculateSlots().forEach { (slot, vItem) ->
                     holder.slotItems[slot] = vItem
                     inventory.setItem(slot, vItem.build())
                 }
             }
 
-            is ItemMenu -> {
+            menu is ItemMenu -> {
                 menu.items.forEach { (slot, slottable) ->
                     when (slottable) {
                         is VItem -> {
@@ -229,47 +317,7 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
                 }
             }
 
-            is PaginatedMenu<*> -> {
-                val paginatedMenu = menu as PaginatedMenu<Any>
-
-                // Static items
-                paginatedMenu.staticItems.forEach { (slot, vItem) ->
-                    holder.slotItems[slot] = vItem
-                    inventory.setItem(slot, vItem.build())
-                }
-
-                // Page items
-                paginatedMenu.getPageItems(holder.currentPage).forEach { (slot, vItem) ->
-                    holder.slotItems[slot] = vItem
-                    inventory.setItem(slot, vItem.build())
-                }
-
-                // Navigation buttons
-                if (holder.currentPage > 0) {
-                    val prevItem = paginatedMenu.previousPageItem.copy().apply {
-                        onClickDeny { _, controls -> controls.previousPage() }
-                    }
-                    holder.slotItems[paginatedMenu.previousPageSlot] = prevItem
-                    inventory.setItem(paginatedMenu.previousPageSlot, prevItem.build())
-                }
-
-                if (holder.currentPage < paginatedMenu.pageCount - 1) {
-                    val nextItem = paginatedMenu.nextPageItem.copy().apply {
-                        onClickDeny { _, controls -> controls.nextPage() }
-                    }
-                    holder.slotItems[paginatedMenu.nextPageSlot] = nextItem
-                    inventory.setItem(paginatedMenu.nextPageSlot, nextItem.build())
-                }
-
-                // Page indicator
-                paginatedMenu.pageIndicatorRenderer?.let { renderer ->
-                    val indicator = renderer(holder.currentPage + 1, paginatedMenu.pageCount)
-                    holder.slotItems[paginatedMenu.pageIndicatorSlot] = indicator
-                    inventory.setItem(paginatedMenu.pageIndicatorSlot, indicator.build())
-                }
-            }
-
-            is ConfirmationMenu -> {
+            menu is ConfirmationMenu -> {
                 // Confirm button
                 val confirmItem = menu.confirmItem.copy().apply {
                     onClickClose { ctx, _ -> menu.onConfirm?.invoke(ctx.player) }
@@ -296,15 +344,70 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
     internal fun refreshMenu(holder: MenuHolder<*>) {
         val menu = holder.menu
 
-        // Update title for paginated menus
-        if (menu is PaginatedMenu<*>) {
-            val newTitle = menu.titleProvider?.invoke(holder.currentPage + 1, menu.pageCount) ?: menu.title
-            // Clear and repopulate
-            holder.inventory.clear()
-            populateInventory(holder)
+        // Rebuild items from state via populateItems()
+        if (menu is SimpleMenu) {
+            menu.isPopulating = true
+            menu.populateItems()
+            menu.isPopulating = false
         } else {
-            holder.inventory.clear()
-            populateInventory(holder)
+            menu.populateItems()
+        }
+
+        holder.inventory.clear()
+        populateInventory(holder)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun startAsyncLoaders(holder: MenuHolder<*>) {
+        val menu = holder.menu
+        if (menu !is SimpleMenu) return // PaginatedMenu is a SimpleMenu, caught here too
+        val configs = menu.asyncDataConfigs
+        if (configs.isEmpty()) return
+
+        // isAsyncLoading was already set in open() before populateItems()
+
+        for (config in configs) {
+            val typedConfig = config as AsyncDataConfig<Any?>
+            val handle = bindAsyncData(
+                controls = holder.controls,
+                source = AsyncMenuDataSource { _ ->
+                    CompletableFuture.supplyAsync {
+                        kotlinx.coroutines.runBlocking { typedConfig.loader() }
+                    }
+                },
+                policy = AsyncDataPolicy(staleAfter = config.staleAfter, eagerLoadOnBind = false),
+                onData = { data, controls ->
+                    typedConfig.onLoaded(data)
+                    checkAsyncLoadingComplete(holder)
+                    controls.refresh()
+                },
+                onStateChange = { state, controls ->
+                    if (state is AsyncMenuState.Error) {
+                        typedConfig.onError?.invoke(state.cause)
+                            ?: plugin.slF4JLogger.warn(
+                                "Async load failed for ${holder.player.name}", state.cause
+                            )
+                        checkAsyncLoadingComplete(holder)
+                        controls.refresh()
+                    }
+                }
+            )
+            holder.asyncHandles.add(handle)
+        }
+
+        // Start all loaders after all handles are registered (avoids race conditions)
+        for (handle in holder.asyncHandles) {
+            handle.refresh()
+        }
+    }
+
+    private fun checkAsyncLoadingComplete(holder: MenuHolder<*>) {
+        val menu = holder.menu as? SimpleMenu ?: return
+        val allDone = holder.asyncHandles.all {
+            it.state is AsyncMenuState.Ready || it.state is AsyncMenuState.Error
+        }
+        if (allDone) {
+            menu.isAsyncLoading = false
         }
     }
 
@@ -477,15 +580,33 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
                 val result = handler(context, holder.controls)
 
                 when (result) {
-                    ClickResult.ALLOW -> event.isCancelled = false
-                    ClickResult.DENY -> event.isCancelled = true
-                    ClickResult.CLOSE -> {
+                    ClickResult.Allow -> event.isCancelled = false
+                    ClickResult.Deny -> event.isCancelled = true
+                    ClickResult.Close -> {
                         event.isCancelled = true
-                        Bukkit.getScheduler().runTask(plugin, Runnable { player.closeInventory() })
+                        val sourceHolder = holder
+                        Bukkit.getScheduler().runTask(plugin, Runnable {
+                            if (openMenus[player.uniqueId] === sourceHolder) {
+                                player.closeInventory()
+                            }
+                        })
                     }
-                    ClickResult.REFRESH -> {
+                    ClickResult.Refresh -> {
                         event.isCancelled = true
-                        Bukkit.getScheduler().runTask(plugin, Runnable { refreshMenu(holder) })
+                        val sourceHolder = holder
+                        Bukkit.getScheduler().runTask(plugin, Runnable {
+                            if (openMenus[player.uniqueId] === sourceHolder) {
+                                refreshMenu(sourceHolder)
+                            }
+                        })
+                    }
+                    is ClickResult.SwitchMenu -> {
+                        event.isCancelled = true
+                        if (Bukkit.isPrimaryThread()) {
+                            open(result.menu, player)
+                        } else {
+                            Bukkit.getScheduler().runTask(plugin, Runnable { open(result.menu, player) })
+                        }
                     }
                 }
             }
@@ -536,16 +657,17 @@ class MenuAPI(val plugin: JavaPlugin) : Closeable, AutoCloseable {
             if (holder.menuApi !== this@MenuAPI) return
 
             val player = event.player as? Player ?: return
-            openMenus.remove(player.uniqueId)
+            if (openMenus[player.uniqueId] === holder) {
+                openMenus.remove(player.uniqueId)
+            }
 
             // Call onClose callback
+            // PaginatedMenu extends SimpleMenu — its onClose is inherited, so
+            // the SimpleMenu branch handles both.
             when (val menu = holder.menu) {
-                is SimpleMenu -> menu.onClose?.invoke(player, holder.controls as MenuControls<SimpleMenu>)
+                is SimpleMenu -> menu.onClose?.invoke(player, holder.controls)
                 is DynamicMenu -> menu.onClose?.invoke(player, holder.controls as MenuControls<DynamicMenu>)
                 is ItemMenu -> menu.onClose?.invoke(player, holder.controls as MenuControls<ItemMenu>)
-                is PaginatedMenu<*> -> (menu as PaginatedMenu<Any>).onClose?.invoke(
-                    player, holder.controls as MenuControls<PaginatedMenu<Any>>
-                )
                 is ConfirmationMenu -> {}
             }
         }

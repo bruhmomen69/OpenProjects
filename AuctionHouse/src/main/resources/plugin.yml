@@ -1,0 +1,43 @@
+name: AuctionHouse
+version: ${version}
+main: bruh.auctionhouse.AuctionHousePlugin
+api-version: '1.21'
+depend: [Vault]
+commands:
+  ah:
+    description: Auction House main command
+    usage: /ah [sell|bid|buy|expired|myauctions]
+    permission: auctionhouse.use
+  order:
+    description: Order system commands
+    usage: /order [buy|sell|myorders]
+    permission: auctionhouse.order.use
+  ahadmin:
+    description: Auction House admin commands
+    usage: /ahadmin [reload|purge]
+    permission: auctionhouse.admin
+permissions:
+  auctionhouse.use:
+    description: Allows using the auction house
+    default: true
+  auctionhouse.create:
+    description: Allows creating auctions
+    default: true
+  auctionhouse.bid:
+    description: Allows placing bids
+    default: true
+  auctionhouse.buy:
+    description: Allows BIN purchases
+    default: true
+  auctionhouse.admin:
+    description: Allows admin commands
+    default: op
+  auctionhouse.order.use:
+    description: Allows using order system
+    default: true
+  auctionhouse.order.create:
+    description: Allows creating orders
+    default: true
+  auctionhouse.order.fill:
+    description: Allows filling orders
+    default: true

@@ -15,8 +15,21 @@ sealed interface MenuSlottable
  * Marker interface for all menu types.
  */
 sealed interface Menu {
-    val title: Component
+    var title: Component
     val background: VItem?
+
+    /**
+     * Called by the framework before initial render and before each refresh.
+     * Override to build items from current state.
+     *
+     * For SimpleMenu: populate the [SimpleMenu.items] map (call items.clear() first).
+     * For PaginatedMenu: populate chrome items in [SimpleMenu.items] (inherited).
+     *   Content items come from [PaginatedMenu.dataSource] + [PaginatedMenu.itemRenderer].
+     *
+     * Default: no-op. Items set directly in init/builders are preserved
+     * (see [BuilderSimpleMenu] / [BuilderPaginatedMenu]).
+     */
+    fun populateItems() {}
 }
 
 /**
@@ -42,15 +55,25 @@ data class ClickContext(
 /**
  * Result of a click action - determines post-click behavior.
  */
-enum class ClickResult {
+sealed interface ClickResult {
     /** Allow the default behavior */
-    ALLOW,
+    data object Allow : ClickResult
+
     /** Cancel the click entirely */
-    DENY,
+    data object Deny : ClickResult
+
     /** Close the menu after the click */
-    CLOSE,
+    data object Close : ClickResult
+
     /** Refresh the menu after the click */
-    REFRESH
+    data object Refresh : ClickResult
+
+    /**
+     * Switch to another menu.
+     *
+     * This is used for menu-to-menu transitions to avoid close/open sequencing bugs.
+     */
+    data class SwitchMenu(val menu: Menu) : ClickResult
 }
 
 /**
@@ -86,8 +109,14 @@ interface MenuControls<out T : Menu> {
     /** The player viewing this menu */
     val player: Player
 
+    /** Unique generation for this open menu instance */
+    val generation: Long
+
     /** Get the underlying Bukkit inventory */
     fun bukkit(): Inventory
+
+    /** Check whether this controls object still represents the player's active open menu */
+    fun isOpen(): Boolean
 
     /** Get the ItemStack at a specific slot */
     fun itemStackAt(slot: Int): ItemStack?
@@ -127,4 +156,28 @@ interface MenuControls<out T : Menu> {
 
     /** Get total number of pages */
     val totalPages: Int
+
+    /**
+     * Re-execute all async data loaders registered on the menu.
+     * Use when a filter/sort changes and data needs to reload.
+     * Automatically shows loading state and refreshes when data arrives.
+     */
+    fun reloadData()
+
+    /**
+     * Run an async action from a click handler.
+     * Runs the action off the main thread, then calls [onSuccess] on the
+     * main thread (only if the menu is still open).
+     *
+     * @param processingSlot Slot to show a processing indicator (null = don't show)
+     * @param action Suspending function to run off-thread
+     * @param onSuccess Called on main thread with result
+     * @param onError Called on main thread on failure (defaults to SLF4J warning)
+     */
+    fun <R> runAsync(
+        processingSlot: Int? = null,
+        action: suspend () -> R,
+        onSuccess: (R) -> Unit,
+        onError: ((Throwable) -> Unit)? = null
+    )
 }

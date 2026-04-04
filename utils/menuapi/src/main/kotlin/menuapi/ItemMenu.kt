@@ -8,7 +8,7 @@ import org.bukkit.inventory.Inventory
 /**
  * A menu that supports both fixed items and drag-and-drop slots.
  */
-class ItemMenu : Menu {
+open class ItemMenu : Menu {
     override var title: Component = Component.empty()
     var rows: Int = 3
     val items: MutableMap<Int, MenuSlottable> = mutableMapOf()

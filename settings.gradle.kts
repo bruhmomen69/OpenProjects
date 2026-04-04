@@ -26,6 +26,7 @@ include(":utils:database")
 include(":utils:translations")
 include(":utils:menuapi")
 include(":utils:itemapi")
+include(":utils:common-server-commands")
 include(":ZealousChat")
 // EssentiallyStateless
 include(":EssentiallyStateless")
@@ -40,6 +41,9 @@ include(":RegionRestore:nms:PaperMC-1_21_8")
 include(":RegionRestore:nms:PaperMC-1_21_9")
 include(":RegionRestore:nms:PaperMC-1_21_10")
 include(":RegionRestore:nms:PaperMC-1_21_11")
+include(":RegionRestore:nms:PaperMC-26_1")
 include(":RegionRestore:plugin")
+// AuctionHouse
+include(":AuctionHouse")
 
 rootProject.name = "OpenProjects"

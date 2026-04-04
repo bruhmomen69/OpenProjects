@@ -1,0 +1,810 @@
+package bruh.auctionhouse.database
+
+import bruh.zchat.utils.database.migration.DatabaseSchema
+import bruh.zchat.utils.database.sql
+
+/**
+ * Database schema and migrations for the AuctionHouse plugin.
+ * Contains all table definitions for auctions, orders, bids, and transactions.
+ */
+object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
+    
+    override val migrations = listOf(
+        migration(1, "Initial schema") {
+
+            // auctions table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS auctions (
+                        id VARCHAR(36) PRIMARY KEY,
+                        seller_uuid VARCHAR(36) NOT NULL,
+                        seller_name VARCHAR(16) NOT NULL,
+                        item_stack BLOB NOT NULL,
+                        item_material VARCHAR(64) NOT NULL,
+                        item_display_name TEXT,
+                        auction_type VARCHAR(20) NOT NULL,
+                        start_price DECIMAL(19, 4) NOT NULL,
+                        buy_now_price DECIMAL(19, 4),
+                        reserve_price DECIMAL(19, 4),
+                        min_increment DECIMAL(19, 4) NOT NULL DEFAULT 1.0,
+                        status VARCHAR(20) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        ends_at TIMESTAMP NOT NULL,
+                        sold_at TIMESTAMP,
+                        sold_to_uuid VARCHAR(36),
+                        sold_to_name VARCHAR(16),
+                        final_price DECIMAL(19, 4),
+                        view_count INT NOT NULL DEFAULT 0,
+                        bid_count INT NOT NULL DEFAULT 0,
+                        is_anonymous BOOLEAN NOT NULL DEFAULT FALSE,
+                        INDEX idx_status (status),
+                        INDEX idx_seller (seller_uuid, status),
+                        INDEX idx_ends_at (ends_at, status),
+                        INDEX idx_material (item_material, status)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS auctions (
+                        id VARCHAR(36) PRIMARY KEY,
+                        seller_uuid VARCHAR(36) NOT NULL,
+                        seller_name VARCHAR(16) NOT NULL,
+                        item_stack BYTEA NOT NULL,
+                        item_material VARCHAR(64) NOT NULL,
+                        item_display_name TEXT,
+                        auction_type VARCHAR(20) NOT NULL,
+                        start_price DECIMAL(19, 4) NOT NULL,
+                        buy_now_price DECIMAL(19, 4),
+                        reserve_price DECIMAL(19, 4),
+                        min_increment DECIMAL(19, 4) NOT NULL DEFAULT 1.0,
+                        status VARCHAR(20) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        ends_at TIMESTAMP NOT NULL,
+                        sold_at TIMESTAMP,
+                        sold_to_uuid VARCHAR(36),
+                        sold_to_name VARCHAR(16),
+                        final_price DECIMAL(19, 4),
+                        view_count INT NOT NULL DEFAULT 0,
+                        bid_count INT NOT NULL DEFAULT 0,
+                        is_anonymous BOOLEAN NOT NULL DEFAULT FALSE
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS auctions (
+                        id TEXT PRIMARY KEY,
+                        seller_uuid TEXT NOT NULL,
+                        seller_name TEXT NOT NULL,
+                        item_stack BLOB NOT NULL,
+                        item_material TEXT NOT NULL,
+                        item_display_name TEXT,
+                        auction_type TEXT NOT NULL,
+                        start_price REAL NOT NULL,
+                        buy_now_price REAL,
+                        reserve_price REAL,
+                        min_increment REAL NOT NULL DEFAULT 1.0,
+                        status TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        ends_at TIMESTAMP NOT NULL,
+                        sold_at TIMESTAMP,
+                        sold_to_uuid TEXT,
+                        sold_to_name TEXT,
+                        final_price REAL,
+                        view_count INTEGER NOT NULL DEFAULT 0,
+                        bid_count INTEGER NOT NULL DEFAULT 0,
+                        is_anonymous INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+            })
+            
+            // auction_bids table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS auction_bids (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        auction_id VARCHAR(36) NOT NULL,
+                        bidder_uuid VARCHAR(36) NOT NULL,
+                        bidder_name VARCHAR(16) NOT NULL,
+                        bid_amount DECIMAL(19, 4) NOT NULL,
+                        bid_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_outbid BOOLEAN NOT NULL DEFAULT FALSE,
+                        FOREIGN KEY (auction_id) REFERENCES auctions(id) ON DELETE CASCADE,
+                        INDEX idx_auction (auction_id, bid_amount DESC),
+                        INDEX idx_bidder (bidder_uuid)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS auction_bids (
+                        id BIGSERIAL PRIMARY KEY,
+                        auction_id VARCHAR(36) NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+                        bidder_uuid VARCHAR(36) NOT NULL,
+                        bidder_name VARCHAR(16) NOT NULL,
+                        bid_amount DECIMAL(19, 4) NOT NULL,
+                        bid_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_outbid BOOLEAN NOT NULL DEFAULT FALSE
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS auction_bids (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        auction_id TEXT NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+                        bidder_uuid TEXT NOT NULL,
+                        bidder_name TEXT NOT NULL,
+                        bid_amount REAL NOT NULL,
+                        bid_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_outbid INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+            })
+            
+            // orders table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id VARCHAR(36) PRIMARY KEY,
+                        creator_uuid VARCHAR(36) NOT NULL,
+                        creator_name VARCHAR(16) NOT NULL,
+                        order_type VARCHAR(20) NOT NULL,
+                        item_material VARCHAR(64) NOT NULL,
+                        item_display_name VARCHAR(255),
+                        item_lore_hash VARCHAR(64),
+                        item_nbt_hash VARCHAR(64),
+                        item_stack BLOB,
+                        quantity_requested INT NOT NULL,
+                        quantity_filled INT NOT NULL DEFAULT 0,
+                        price_per_unit DECIMAL(19, 4) NOT NULL,
+                        total_price DECIMAL(19, 4) NOT NULL,
+                        status VARCHAR(20) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        filled_at TIMESTAMP,
+                        allow_partial BOOLEAN NOT NULL DEFAULT TRUE,
+                        min_fill_quantity INT,
+                        INDEX idx_status (status),
+                        INDEX idx_creator (creator_uuid, status),
+                        INDEX idx_item (item_material, status, order_type),
+                        INDEX idx_expires (expires_at, status)
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id TEXT PRIMARY KEY,
+                        creator_uuid TEXT NOT NULL,
+                        creator_name TEXT NOT NULL,
+                        order_type TEXT NOT NULL,
+                        item_material TEXT NOT NULL,
+                        item_display_name TEXT,
+                        item_lore_hash TEXT,
+                        item_nbt_hash TEXT,
+                        item_stack BLOB,
+                        quantity_requested INTEGER NOT NULL,
+                        quantity_filled INTEGER NOT NULL DEFAULT 0,
+                        price_per_unit REAL NOT NULL,
+                        total_price REAL NOT NULL,
+                        status TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        filled_at TIMESTAMP,
+                        allow_partial INTEGER NOT NULL DEFAULT 1,
+                        min_fill_quantity INTEGER
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id VARCHAR(36) PRIMARY KEY,
+                        creator_uuid VARCHAR(36) NOT NULL,
+                        creator_name VARCHAR(16) NOT NULL,
+                        order_type VARCHAR(20) NOT NULL,
+                        item_material VARCHAR(64) NOT NULL,
+                        item_display_name TEXT,
+                        item_lore_hash TEXT,
+                        item_nbt_hash TEXT,
+                        item_stack BYTEA,
+                        quantity_requested INT NOT NULL,
+                        quantity_filled INT NOT NULL DEFAULT 0,
+                        price_per_unit DECIMAL(19, 4) NOT NULL,
+                        total_price DECIMAL(19, 4) NOT NULL,
+                        status VARCHAR(20) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        filled_at TIMESTAMP,
+                        allow_partial BOOLEAN NOT NULL DEFAULT TRUE,
+                        min_fill_quantity INT
+                    )
+                """)
+            })
+            
+            // order_fills table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS order_fills (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        order_id VARCHAR(36) NOT NULL,
+                        filler_uuid VARCHAR(36) NOT NULL,
+                        filler_name VARCHAR(16) NOT NULL,
+                        quantity INT NOT NULL,
+                        price_per_unit DECIMAL(19, 4) NOT NULL,
+                        total_price DECIMAL(19, 4) NOT NULL,
+                        filled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS order_fills (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                        filler_uuid TEXT NOT NULL,
+                        filler_name TEXT NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        price_per_unit REAL NOT NULL,
+                        total_price REAL NOT NULL,
+                        filled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS order_fills (
+                        id BIGSERIAL PRIMARY KEY,
+                        order_id VARCHAR(36) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                        filler_uuid VARCHAR(36) NOT NULL,
+                        filler_name VARCHAR(16) NOT NULL,
+                        quantity INT NOT NULL,
+                        price_per_unit DECIMAL(19, 4) NOT NULL,
+                        total_price DECIMAL(19, 4) NOT NULL,
+                        filled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+            })
+            
+            // expired_items table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS expired_items (
+                        id BINARY(16) PRIMARY KEY,
+                        owner_uuid BINARY(16) NOT NULL,
+                        owner_name VARCHAR(16) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id BINARY(16) NOT NULL,
+                        item_stack BLOB NOT NULL,
+                        reason VARCHAR(50) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        claimed BOOLEAN NOT NULL DEFAULT FALSE,
+                        claimed_at TIMESTAMP,
+                        INDEX idx_owner (owner_uuid, claimed),
+                        INDEX idx_expired (expired_at)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS expired_items (
+                        id BYTEA PRIMARY KEY,
+                        owner_uuid BYTEA NOT NULL,
+                        owner_name VARCHAR(16) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id BYTEA NOT NULL,
+                        item_stack BYTEA NOT NULL,
+                        reason VARCHAR(50) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        claimed BOOLEAN NOT NULL DEFAULT FALSE,
+                        claimed_at TIMESTAMP
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS expired_items (
+                        id BLOB(16) PRIMARY KEY,
+                        owner_uuid BLOB(16) NOT NULL,
+                        owner_name TEXT NOT NULL,
+                        item_type TEXT NOT NULL,
+                        source_id BLOB(16) NOT NULL,
+                        item_stack BLOB NOT NULL,
+                        reason TEXT NOT NULL,
+                        expired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        claimed INTEGER NOT NULL DEFAULT 0,
+                        claimed_at TIMESTAMP
+                    )
+                """)
+            })
+            
+            // transactions table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        transaction_type VARCHAR(30) NOT NULL,
+                        from_uuid VARCHAR(36),
+                        from_name VARCHAR(16),
+                        to_uuid VARCHAR(36),
+                        to_name VARCHAR(16),
+                        amount DECIMAL(19, 4) NOT NULL,
+                        tax_amount DECIMAL(19, 4) NOT NULL DEFAULT 0,
+                        item_material VARCHAR(64),
+                        item_quantity INT,
+                        reference_id VARCHAR(36),
+                        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        server_id VARCHAR(64),
+                        INDEX idx_from (from_uuid, timestamp),
+                        INDEX idx_to (to_uuid, timestamp),
+                        INDEX idx_reference (reference_id)
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        transaction_type TEXT NOT NULL,
+                        from_uuid TEXT,
+                        from_name TEXT,
+                        to_uuid TEXT,
+                        to_name TEXT,
+                        amount REAL NOT NULL,
+                        tax_amount REAL NOT NULL DEFAULT 0,
+                        item_material TEXT,
+                        item_quantity INTEGER,
+                        reference_id TEXT,
+                        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        server_id TEXT
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id BIGSERIAL PRIMARY KEY,
+                        transaction_type VARCHAR(30) NOT NULL,
+                        from_uuid VARCHAR(36),
+                        from_name VARCHAR(16),
+                        to_uuid VARCHAR(36),
+                        to_name VARCHAR(16),
+                        amount DECIMAL(19, 4) NOT NULL,
+                        tax_amount DECIMAL(19, 4) NOT NULL DEFAULT 0,
+                        item_material VARCHAR(64),
+                        item_quantity INT,
+                        reference_id VARCHAR(36),
+                        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        server_id VARCHAR(64)
+                    )
+                """)
+            })
+        },
+        migration(2, "Add consolidated expired items") {
+            // Create plugin_metadata table for tracking migrations and flags
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS plugin_metadata (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value VARCHAR(255) NOT NULL
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS plugin_metadata (
+                        key VARCHAR(100) PRIMARY KEY,
+                        value VARCHAR(255) NOT NULL
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS plugin_metadata (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    )
+                """)
+            })
+
+            // Create consolidated_expired_items table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS consolidated_expired_items (
+                        id BINARY(16) PRIMARY KEY,
+                        owner_uuid BINARY(16) NOT NULL,
+                        owner_name VARCHAR(32) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id BINARY(16) NOT NULL,
+                        item_material VARCHAR(50) NOT NULL,
+                        item_display_name TEXT,
+                        total_quantity INT NOT NULL DEFAULT 0,
+                        claimed_quantity INT NOT NULL DEFAULT 0,
+                        item_stack BLOB NOT NULL,
+                        reason VARCHAR(100) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL,
+                        last_updated_at TIMESTAMP NOT NULL,
+                        is_fully_claimed BOOLEAN DEFAULT FALSE,
+                        INDEX idx_owner_uuid (owner_uuid),
+                        INDEX idx_source_id (source_id),
+                        INDEX idx_fully_claimed (is_fully_claimed)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS consolidated_expired_items (
+                        id BYTEA PRIMARY KEY,
+                        owner_uuid BYTEA NOT NULL,
+                        owner_name VARCHAR(32) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id BYTEA NOT NULL,
+                        item_material VARCHAR(50) NOT NULL,
+                        item_display_name TEXT,
+                        total_quantity INT NOT NULL DEFAULT 0,
+                        claimed_quantity INT NOT NULL DEFAULT 0,
+                        item_stack BYTEA NOT NULL,
+                        reason VARCHAR(100) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL,
+                        last_updated_at TIMESTAMP NOT NULL,
+                        is_fully_claimed BOOLEAN DEFAULT FALSE
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS consolidated_expired_items (
+                        id BLOB(16) PRIMARY KEY,
+                        owner_uuid BLOB(16) NOT NULL,
+                        owner_name TEXT NOT NULL,
+                        item_type TEXT NOT NULL,
+                        source_id BLOB(16) NOT NULL,
+                        item_material TEXT NOT NULL,
+                        item_display_name TEXT,
+                        total_quantity INTEGER NOT NULL DEFAULT 0,
+                        claimed_quantity INTEGER NOT NULL DEFAULT 0,
+                        item_stack BLOB NOT NULL,
+                        reason TEXT NOT NULL,
+                        expired_at TIMESTAMP NOT NULL,
+                        last_updated_at TIMESTAMP NOT NULL,
+                        is_fully_claimed INTEGER DEFAULT 0
+                    )
+                """)
+            })
+
+            // Add consolidated_group_id column to expired_items table
+            execute(sql {
+                mysql("""
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id BINARY(16) NULL
+                """)
+                postgres("""
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id BYTEA NULL
+                """)
+                sqlite("""
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id BLOB(16)
+                """)
+            })
+
+            // Create index for the new column (not supported in SQLite for ALTER TABLE)
+            execute(sql {
+                mysql("""
+                    CREATE INDEX idx_consolidated_group ON expired_items(consolidated_group_id)
+                """)
+                postgres("""
+                    CREATE INDEX idx_consolidated_group ON expired_items(consolidated_group_id)
+                """)
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_consolidated_group ON expired_items(consolidated_group_id)
+                """)
+            })
+        },
+        migration(3, "Add extension_count column to auctions table") {
+            // Add extension_count column to auctions table for anti-snipe tracking
+            execute(sql {
+                mysql("""
+                    ALTER TABLE auctions ADD COLUMN extension_count INT NOT NULL DEFAULT 0
+                """)
+                postgres("""
+                    ALTER TABLE auctions ADD COLUMN extension_count INT NOT NULL DEFAULT 0
+                """)
+                sqlite("""
+                    ALTER TABLE auctions ADD COLUMN extension_count INTEGER NOT NULL DEFAULT 0
+                """)
+            })
+        },
+        migration(4, "Add watchlist and notifications tables") {
+            // Create watchlist table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        auction_id VARCHAR(36) NOT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity BOOLEAN NOT NULL DEFAULT FALSE,
+                        UNIQUE KEY unique_player_auction (player_uuid, auction_id),
+                        INDEX idx_player (player_uuid),
+                        INDEX idx_auction (auction_id)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id BIGSERIAL PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        auction_id VARCHAR(36) NOT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity BOOLEAN NOT NULL DEFAULT FALSE,
+                        CONSTRAINT unique_player_auction UNIQUE (player_uuid, auction_id)
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_uuid TEXT NOT NULL,
+                        auction_id TEXT NOT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE(player_uuid, auction_id)
+                    )
+                """)
+            })
+
+            // Create notifications table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        type VARCHAR(30) NOT NULL,
+                        title VARCHAR(100) NOT NULL,
+                        message TEXT NOT NULL,
+                        related_auction_id VARCHAR(36),
+                        related_order_id VARCHAR(36),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        expires_at TIMESTAMP,
+                        INDEX idx_player (player_uuid, is_read),
+                        INDEX idx_created (created_at)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id BIGSERIAL PRIMARY KEY,
+                        player_uuid VARCHAR(36) NOT NULL,
+                        type VARCHAR(30) NOT NULL,
+                        title VARCHAR(100) NOT NULL,
+                        message TEXT NOT NULL,
+                        related_auction_id VARCHAR(36),
+                        related_order_id VARCHAR(36),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        expires_at TIMESTAMP
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_uuid TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        related_auction_id TEXT,
+                        related_order_id TEXT,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_read INTEGER NOT NULL DEFAULT 0,
+                        expires_at TIMESTAMP
+                    )
+                """)
+            })
+        },
+        migration(5, "Add manual_extension_count column to auctions table") {
+            // Add manual_extension_count column to auctions table for tracking manual extensions separately from anti-snipe
+            execute(sql {
+                mysql("""
+                    ALTER TABLE auctions ADD COLUMN manual_extension_count INT NOT NULL DEFAULT 0
+                """)
+                postgres("""
+                    ALTER TABLE auctions ADD COLUMN manual_extension_count INT NOT NULL DEFAULT 0
+                """)
+                sqlite("""
+                    ALTER TABLE auctions ADD COLUMN manual_extension_count INTEGER NOT NULL DEFAULT 0
+                """)
+            })
+        },
+        migration(6, "Add player_bans table for persistent ban storage") {
+            // Create player_bans table
+            execute(sql {
+                mysql("""
+                    CREATE TABLE IF NOT EXISTS player_bans (
+                        player_uuid VARCHAR(36) PRIMARY KEY,
+                        player_name VARCHAR(255) NOT NULL,
+                        ban_reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        banned_by VARCHAR(36),
+                        banned_by_name VARCHAR(255),
+                        INDEX idx_banned_at (banned_at)
+                    )
+                """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS player_bans (
+                        player_uuid VARCHAR(36) PRIMARY KEY,
+                        player_name VARCHAR(255) NOT NULL,
+                        ban_reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        banned_by VARCHAR(36),
+                        banned_by_name VARCHAR(255)
+                    )
+                """)
+                sqlite("""
+                    CREATE TABLE IF NOT EXISTS player_bans (
+                        player_uuid TEXT PRIMARY KEY,
+                        player_name TEXT NOT NULL,
+                        ban_reason TEXT NOT NULL,
+                        banned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        banned_by TEXT,
+                        banned_by_name TEXT
+                    )
+                """)
+            })
+        },
+        migration(7, "Add order_id and order_type columns to watchlist table") {
+            execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist
+                    ADD COLUMN order_id VARCHAR(36) NULL,
+                    ADD COLUMN order_type VARCHAR(20) NULL
+                """)
+                postgres("""
+                    ALTER TABLE watchlist
+                    ADD COLUMN order_id VARCHAR(36) NULL,
+                    ADD COLUMN order_type VARCHAR(20) NULL
+                """)
+                sqlite("""
+                    ALTER TABLE watchlist ADD COLUMN order_id TEXT NULL
+                """)
+            })
+            execute(sql {
+                mysql("SELECT 1")
+                postgres("SELECT 1")
+                sqlite("""
+                    ALTER TABLE watchlist ADD COLUMN order_type TEXT NULL
+                """)
+            })
+        },
+        migration(8, "Add version columns for optimistic locking and SQLite indexes") {
+            // Add version column to auctions for optimistic locking
+            execute(sql {
+                mysql("""
+                    ALTER TABLE auctions ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                postgres("""
+                    ALTER TABLE auctions ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                sqlite("""
+                    ALTER TABLE auctions ADD COLUMN version INTEGER NOT NULL DEFAULT 1
+                """)
+            })
+
+            // Add version column to orders for optimistic locking
+            execute(sql {
+                mysql("""
+                    ALTER TABLE orders ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                postgres("""
+                    ALTER TABLE orders ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                sqlite("""
+                    ALTER TABLE orders ADD COLUMN version INTEGER NOT NULL DEFAULT 1
+                """)
+            })
+
+            // Add SQLite indexes (MySQL/PostgreSQL already have these from migration 1)
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_status ON auctions(status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_seller ON auctions(seller_uuid, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_ends_at ON auctions(ends_at, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_material ON auctions(item_material, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_bids_auction ON auction_bids(auction_id, bid_amount DESC)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_bids_bidder ON auction_bids(bidder_uuid)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_creator ON orders(creator_uuid, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_item ON orders(item_material, status, order_type)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_expires ON orders(expires_at, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_order_fills_order ON order_fills(order_id)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_expired_items_owner ON expired_items(owner_uuid, claimed)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_expired_items_expired ON expired_items(expired_at)
+                """)
+            })
+        },
+        migration(9, "Make watchlist.auction_id nullable and add order unique constraint") {
+            // MySQL/Postgres: alter the existing column and add a second unique constraint.
+            // SQLite recreates the table because it cannot alter nullability in place.
+            execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist MODIFY COLUMN auction_id VARCHAR(36) NULL
+                """)
+                postgres("""
+                    ALTER TABLE watchlist ALTER COLUMN auction_id DROP NOT NULL
+                """)
+                sqlite("""
+                    CREATE TABLE watchlist_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_uuid TEXT NOT NULL,
+                        auction_id TEXT NULL,
+                        order_id TEXT NULL,
+                        order_type TEXT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE(player_uuid, auction_id),
+                        UNIQUE(player_uuid, order_id)
+                    )
+                """)
+            })
+            execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
+                """)
+                postgres("""
+                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
+                """)
+                sqlite("""
+                    INSERT INTO watchlist_new (id, player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity)
+                    SELECT id, player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity
+                    FROM watchlist
+                """)
+            })
+            execute(sql {
+                mysql("SELECT 1")
+                postgres("SELECT 1")
+                sqlite("""
+                    DROP TABLE watchlist
+                """)
+            })
+            execute(sql {
+                mysql("SELECT 1")
+                postgres("SELECT 1")
+                sqlite("""
+                    ALTER TABLE watchlist_new RENAME TO watchlist
+                """)
+            })
+        },
+        migration(10, "Add composite index for ending soon sort query") {
+            // This composite index optimizes the common query:
+            // WHERE status = 'ACTIVE' ... ORDER BY ends_at ASC
+            // Used by getActiveAuctions with AuctionSort.ENDING_SOON
+            execute(sql {
+                mysql("CREATE INDEX idx_auctions_status_ends_at ON auctions(status, ends_at)")
+            })
+            execute(sql {
+                postgres("CREATE INDEX IF NOT EXISTS idx_auctions_status_ends_at ON auctions(status, ends_at)")
+            })
+            execute(sql {
+                sqlite("CREATE INDEX IF NOT EXISTS idx_auctions_status_ends_at ON auctions(status, ends_at)")
+            })
+        }
+    )
+}

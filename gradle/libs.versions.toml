@@ -3,7 +3,7 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 
 [versions]
-kotlin = "2.1.20"
+kotlin = "2.3.20"
 kotlinxDatetime = "0.6.1"
 kotlinxSerializationJson = "1.7.2"
 kotlinxSerializationCbor = "1.8.0"
@@ -12,7 +12,7 @@ caffeine = "3.1.8"
 
 # Gradle plugins
 shadow = "9.3.0"
-paperweightUserdev = "2.0.0-beta.19"
+paperweightUserdev = "2.0.0-beta.21"
 runPaper = "3.0.2"
 
 # Minecraft

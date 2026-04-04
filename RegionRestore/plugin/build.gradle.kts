@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":RegionRestore:nms:PaperMC-1_21_9"))
     implementation(project(":RegionRestore:nms:PaperMC-1_21_10"))
     implementation(project(":RegionRestore:nms:PaperMC-1_21_11"))
+    implementation(project(":RegionRestore:nms:PaperMC-26_1"))
     compileOnly(libs.paperApi)
     compileOnly(libs.placeholderapi)
     compileOnly(libs.miniplaceholders)
@@ -47,7 +48,7 @@ tasks.runServer {
     minecraftVersion("1.21.11")
 
     downloadPlugins {
-        url("https://ci.lucko.me/job/spark/508/artifact/spark-bukkit/build/libs/spark-1.10.158-bukkit.jar")
+        url("https://ci.lucko.me/job/spark/524/artifact/spark-bukkit/build/libs/spark-1.10.172-bukkit.jar")
     }
 }
 

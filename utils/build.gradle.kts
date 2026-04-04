@@ -10,4 +10,5 @@ dependencies {
     api(project(":utils:translations"))
     api(project(":utils:menuapi"))
     api(project(":utils:itemapi"))
+    api(project(":utils:common-server-commands"))
 }

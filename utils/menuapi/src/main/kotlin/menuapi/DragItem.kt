@@ -8,7 +8,7 @@ import org.bukkit.inventory.ItemStack
  *
  * @param defaultItem Optional item to display when the slot is empty
  */
-class DragItem(
+open class DragItem(
     var defaultItem: VItem? = null
 ) : MenuSlottable {
     /**

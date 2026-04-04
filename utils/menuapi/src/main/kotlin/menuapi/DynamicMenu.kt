@@ -8,7 +8,7 @@ import org.bukkit.entity.Player
  * A menu that automatically positions items for optimal spacing.
  * Items are distributed evenly across the available space with proper centering.
  */
-class DynamicMenu : Menu {
+open class DynamicMenu : Menu {
     override var title: Component = Component.empty()
     val items: MutableList<VItem> = mutableListOf()
     override var background: VItem? = null

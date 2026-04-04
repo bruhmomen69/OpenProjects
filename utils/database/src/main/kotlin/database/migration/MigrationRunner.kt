@@ -1,6 +1,7 @@
 package bruh.zchat.utils.database.migration
 
 import bruh.zchat.utils.database.DatabaseDialect
+import bruh.zchat.utils.database.DialectNotSupportedException
 import bruh.zchat.utils.database.MigrationException
 import org.slf4j.LoggerFactory
 import java.sql.Connection
@@ -131,7 +132,17 @@ internal class MigrationRunner(
                     logger.debug("Applying migration v${migration.version}: ${migration.description}")
                     
                     for (statement in migration.statements) {
-                        val sql = statement.forDialect(dialect)
+                        val sql = try {
+                            statement.forDialect(dialect)
+                        } catch (_: DialectNotSupportedException) {
+                            logger.debug(
+                                "Skipping migration statement without {} SQL in v{} ({})",
+                                dialect,
+                                migration.version,
+                                migration.description
+                            )
+                            continue
+                        }
                         // Split by semicolons for multi-statement support, but be careful with strings
                         val statements = splitStatements(sql)
                         for (singleSql in statements) {

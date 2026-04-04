@@ -196,6 +196,34 @@ class SubmenuNode(
     }
 
     /**
+     * Add a custom menu node that opens an arbitrary [Menu] when clicked.
+     * When the custom menu closes, the player returns to this submenu (if [returnOnClose] is true).
+     */
+    fun customMenu(
+        id: String,
+        title: String,
+        material: XMaterial = XMaterial.CHEST,
+        returnOnClose: Boolean = true,
+        menuFactory: (Player) -> Menu
+    ) {
+        val icon = VItem(material) { name = Component.text(title) }
+        children.add(CustomMenuNode(id, Component.text(title), icon, menuFactory, returnOnClose))
+    }
+
+    /**
+     * Add a custom menu node with a custom icon.
+     */
+    fun customMenu(
+        id: String,
+        title: Component,
+        icon: VItem,
+        returnOnClose: Boolean = true,
+        menuFactory: (Player) -> Menu
+    ) {
+        children.add(CustomMenuNode(id, title, icon, menuFactory, returnOnClose))
+    }
+
+    /**
      * Enable pagination for this submenu.
      */
     fun paginated(itemsPerPage: Int = 28) {
@@ -235,6 +263,21 @@ class DisplayNode(
     override val id: String,
     override val title: Component,
     override val icon: VItem
+) : MenuNode()
+
+/**
+ * A node that opens a custom [Menu] when clicked.
+ * When the custom menu is closed, the tree navigator can optionally
+ * return the player to the parent node.
+ *
+ * @param returnOnClose If true, closing the custom menu returns to the parent tree node.
+ */
+class CustomMenuNode(
+    override val id: String,
+    override val title: Component,
+    override val icon: VItem,
+    val menuFactory: (Player) -> Menu,
+    val returnOnClose: Boolean = true
 ) : MenuNode()
 
 /**
@@ -608,7 +651,7 @@ class MenuTreeNavigator(
 
             // Back button at slot 45
             if (breadcrumb.isNotEmpty()) {
-                staticItem(45, backItem.material) {
+                item(45, backItem.material) {
                     name = backItem.name
                     onClickDeny { _, _ ->
                         interacted = true
@@ -620,7 +663,7 @@ class MenuTreeNavigator(
             }
 
             // Close button at slot 53 (but next page is there, so use 44)
-            staticItem(44, closeItem.material) {
+            item(44, closeItem.material) {
                 name = closeItem.name
                 onClickDeny { _, _ ->
                     interacted = true
@@ -773,6 +816,25 @@ class MenuTreeNavigator(
             is DisplayNode -> {
                 // Display-only item: no click handler, just shows info
                 // Nothing to do - the icon is already set up with lore
+            }
+
+            is CustomMenuNode -> {
+                icon.onClickDeny { _, _ ->
+                    onInteraction()
+                    val customMenu = child.menuFactory(player)
+                    if (child.returnOnClose && customMenu is SimpleMenu) {
+                        val originalOnClose = customMenu.onClose
+                        customMenu.onClose = { p, ctrl ->
+                            originalOnClose?.invoke(p, ctrl)
+                            menuApi.plugin.server.scheduler.runTask(menuApi.plugin, Runnable {
+                                if (!menuApi.hasMenuOpen(player)) {
+                                    showNode(player, parentNode, breadcrumb, future)
+                                }
+                            })
+                        }
+                    }
+                    menuApi.open(customMenu, player)
+                }
             }
         }
 

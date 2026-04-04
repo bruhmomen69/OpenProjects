@@ -21,6 +21,20 @@ import java.time.Instant
 import java.util.UUID
 
 /**
+ * Transaction isolation levels for concurrent access control.
+ */
+enum class TransactionIsolation {
+    /** Default isolation level (READ_COMMITTED for most databases). */
+    DEFAULT,
+    /**
+     * Serializable isolation - prevents phantom reads and ensures full transaction isolation.
+     * In SQLite, this is equivalent to BEGIN IMMEDIATE or BEGIN EXCLUSIVE.
+     * Use for critical operations that require strict consistency (e.g., auction bidding).
+     */
+    SERIALIZABLE
+}
+
+/**
  * Main database class providing connection pooling, query execution, and migration support.
  * 
  * Usage:
@@ -251,6 +265,45 @@ class Database private constructor(
         sql: String,
         vararg params: Any?
     ): Int = execute(sql(sql), *params)
+
+    /**
+     * Executes an INSERT statement and returns the generated key.
+     * Works cross-platform by using JDBC's RETURN_GENERATED_KEYS.
+     * @param sql The dialect-aware SQL query
+     * @param params Query parameters
+     * @return The generated key, or null if no key was generated
+     */
+    suspend fun executeInsert(
+        sql: DialectQuery,
+        vararg params: Any?
+    ): Long? = withContext(Dispatchers.IO) {
+        ensureInitialized()
+        val sqlString = sql.forDialect(dialect)
+
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(sqlString, java.sql.Statement.RETURN_GENERATED_KEYS).use { stmt ->
+                setParameters(stmt, params)
+                stmt.executeUpdate()
+                val generatedKeys = stmt.generatedKeys
+                if (generatedKeys.next()) {
+                    generatedKeys.getLong(1)
+                } else {
+                    null
+                }
+            }
+        }
+    }
+
+    /**
+     * Executes an INSERT statement and returns the generated key.
+     * @param sql The SQL query string
+     * @param params Query parameters
+     * @return The generated key, or null if no key was generated
+     */
+    suspend fun executeInsert(
+        sql: String,
+        vararg params: Any?
+    ): Long? = executeInsert(sql(sql), *params)
     
     /**
      * Executes a batch of statements with multiple parameter sets.
@@ -291,18 +344,33 @@ class Database private constructor(
      * Executes operations within a transaction.
      * All operations in the block share the same connection and will be committed
      * together, or rolled back if an exception occurs.
+     * @param isolation The transaction isolation level. Use SERIALIZABLE for operations
+     *                  that require strict consistency (e.g., auction bidding).
      * @param block The operations to execute
      * @return The result of the block
      */
     suspend fun <T> transaction(
+        isolation: TransactionIsolation = TransactionIsolation.DEFAULT,
         block: suspend TransactionScope.() -> T
     ): T = withContext(Dispatchers.IO) {
         ensureInitialized()
         
         dataSource.connection.use { connection ->
             val originalAutoCommit = connection.autoCommit
+            val originalIsolation = connection.transactionIsolation
             try {
                 connection.autoCommit = false
+                
+                // Set isolation level if not DEFAULT
+                when (isolation) {
+                    TransactionIsolation.SERIALIZABLE -> {
+                        connection.transactionIsolation = Connection.TRANSACTION_SERIALIZABLE
+                    }
+                    TransactionIsolation.DEFAULT -> {
+                        // Keep original isolation level
+                    }
+                }
+                
                 val scope = TransactionScope(connection, dialect)
                 val result = block(scope)
                 connection.commit()
@@ -312,6 +380,7 @@ class Database private constructor(
                 throw e
             } finally {
                 connection.autoCommit = originalAutoCommit
+                connection.transactionIsolation = originalIsolation
             }
         }
     }

@@ -15,11 +15,13 @@
             </builds>
           </compositeBuild>
         </compositeConfiguration>
+        <option name="distributionType" value="WRAPPED" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="gradleHome" value="" />
+        <option name="gradleJvm" value="corretto-21" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/AuctionHouse" />
             <option value="$PROJECT_DIR$/EssentiallyStateless" />
             <option value="$PROJECT_DIR$/RegionRestore" />
             <option value="$PROJECT_DIR$/RegionRestore/PaperMC" />
@@ -33,11 +35,13 @@
             <option value="$PROJECT_DIR$/RegionRestore/nms/PaperMC-1_21_7" />
             <option value="$PROJECT_DIR$/RegionRestore/nms/PaperMC-1_21_8" />
             <option value="$PROJECT_DIR$/RegionRestore/nms/PaperMC-1_21_9" />
+            <option value="$PROJECT_DIR$/RegionRestore/nms/PaperMC-26_1" />
             <option value="$PROJECT_DIR$/RegionRestore/plugin" />
             <option value="$PROJECT_DIR$/ZealousChat" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/buildSrc" />
             <option value="$PROJECT_DIR$/utils" />
+            <option value="$PROJECT_DIR$/utils/common-server-commands" />
             <option value="$PROJECT_DIR$/utils/configapi" />
             <option value="$PROJECT_DIR$/utils/core" />
             <option value="$PROJECT_DIR$/utils/database" />

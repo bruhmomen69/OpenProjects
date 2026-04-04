@@ -2,8 +2,6 @@ package bruh.regionrestore.selection
 
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.itemapi.ItemAPI
-import bruh.zchat.utils.itemapi.TrackedItem
-import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import kotlinx.coroutines.runBlocking
@@ -68,7 +66,7 @@ class SelectionWandService(
             }
 
             // Right-click to set corners
-            onUse { ctx, _ ->
+            onUseDeny { ctx, _ ->
                 val player = ctx.player
                 val location = player.getTargetBlockExact(5)?.location ?: player.location
 
@@ -125,7 +123,6 @@ class SelectionWandService(
                     }
                 }
 
-                ClickResult.DENY
             }
         }
     }
