@@ -41,6 +41,7 @@ include(":RegionRestore:nms:PaperMC-1_21_8")
 include(":RegionRestore:nms:PaperMC-1_21_9")
 include(":RegionRestore:nms:PaperMC-1_21_10")
 include(":RegionRestore:nms:PaperMC-1_21_11")
+include(":RegionRestore:nms:PaperMC-26_1")
 include(":RegionRestore:plugin")
 // AuctionHouse
 include(":AuctionHouse")

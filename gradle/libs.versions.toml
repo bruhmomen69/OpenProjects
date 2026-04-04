@@ -12,7 +12,7 @@ caffeine = "3.1.8"
 
 # Gradle plugins
 shadow = "9.3.0"
-paperweightUserdev = "2.0.0-beta.19"
+paperweightUserdev = "2.0.0-beta.21"
 runPaper = "3.0.2"
 
 # Minecraft

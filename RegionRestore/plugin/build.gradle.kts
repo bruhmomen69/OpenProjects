@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":RegionRestore:nms:PaperMC-1_21_9"))
     implementation(project(":RegionRestore:nms:PaperMC-1_21_10"))
     implementation(project(":RegionRestore:nms:PaperMC-1_21_11"))
+    implementation(project(":RegionRestore:nms:PaperMC-26_1"))
     compileOnly(libs.paperApi)
     compileOnly(libs.placeholderapi)
     compileOnly(libs.miniplaceholders)
