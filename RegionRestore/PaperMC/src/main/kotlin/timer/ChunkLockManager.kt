@@ -8,7 +8,7 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
-import kotlin.math.roundToInt
+import kotlin.concurrent.atomics.update
 
 /**
  * Manages chunk-level locking to prevent concurrent modifications
@@ -18,6 +18,7 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalAtomicApi::class)
 class ChunkLockManager {
     private val cbcLocks = ConcurrentHashMap<Long, ChunkLock>()
+    private val spinCounter = AtomicInt(0)
 
     data class ChunkLock(
         val x: Int,
@@ -52,7 +53,7 @@ class ChunkLockManager {
     /**
      * Acquire the local lock and check neighbor locks.
      * Returns true if all locks were acquired successfully.
-     * Implements a spin-lock mechanism with randomized delays to avoid contention.
+     * Implements a spin-lock mechanism with deterministic delays to avoid contention.
      *
      * @param localLock The primary lock to acquire
      * @param neighbourLocks List of neighbor locks to check
@@ -64,7 +65,7 @@ class ChunkLockManager {
         neighbourLocks: List<ChunkLock>,
         logger: (String) -> Unit = {}
     ): Boolean {
-        val spinId = (Math.random() * 1000).roundToInt()
+        val spinId = spinCounter.update { it: Int -> if (it == Int.MAX_VALUE) 0 else it + 1 }
         var locked = false
 
         while (!locked) {
@@ -85,10 +86,10 @@ class ChunkLockManager {
                         val extraDelay = refCnt.decrementAndFetch().let { cnt ->
                             if (cnt > 0) cnt else 0
                         }
-                        // Delay by random amount to avoid lock contention
-                        delay((Math.random() * 3).roundToInt().toLong() + extraDelay)
+                        // Delay to avoid lock contention
+                        delay(extraDelay.toLong())
 
-                        // Delay for additional again, same reasons, this time is to just deal with randoms being random
+                        // Delay again for remaining references to drain
                         val newDelay = refCnt.load()
                         if (newDelay > 0) {
                             delay(newDelay.toLong())
