@@ -170,17 +170,16 @@ class SchedulerService(
         job: RestoreJob,
         audienceScope: AudienceScope
     ) {
-        if (job.isRunning) {
+        if (!job.tryStart()) {
             return
         }
 
         // Check concurrency limits
         if (activeRestores.load() >= restoreConfig.maxConcurrentRestores) {
+            job.finish()
             handleConcurrencyLimitReached(job, audienceScope)
             return
         }
-
-        job.isRunning = true
         activeRestores.incrementAndFetch()
 
         try {
@@ -213,7 +212,7 @@ class SchedulerService(
         } catch (e: Exception) {
             handleRestoreError(job, audienceScope, e)
         } finally {
-            job.isRunning = false
+            job.finish()
             activeRestores.decrementAndFetch()
 
             if (!job.future.isDone) {

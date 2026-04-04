@@ -32,7 +32,8 @@ class PlacementAllocator {
         pool: RegionPool,
         existingInstances: List<RegionInstance>,
         template: RegionTemplate,
-        neededCount: Int
+        neededCount: Int,
+        maxSearchZChunks: Int = 500_000
     ): List<RegionInstance> = withContext(Dispatchers.IO) {
         val newInstances = mutableListOf<RegionInstance>()
         val templateWidth = template.sizeXChunks
@@ -50,13 +51,29 @@ class PlacementAllocator {
         var allocated = 0
 
         while (allocated < neededCount) {
+            if (candidateZ > maxSearchZChunks) {
+                logger.error(
+                    "Allocator exceeded max search Z ($maxSearchZChunks) for template '${pool.templateName}' " +
+                    "in world '$worldName'. Allocated $allocated/$neededCount instances. " +
+                    "The world may be saturated or the search area too small."
+                )
+                break
+            }
             // Calculate bounds including separation buffer
             val minX = candidateX
             val minZ = candidateZ
             val maxX = candidateX + templateWidth - 1
             val maxZ = candidateZ + templateDepth - 1
 
-            // Check if this placement would overlap with existing instances
+            // Check if this placement would overlap with existing instances.
+            // Note: self-overlap between batch instances is impossible by construction.
+            // The X step is (templateWidth + separation) and Z step is (templateDepth + separation),
+            // which guarantees that any two consecutive candidates are separated by strictly more
+            // than their occupied range. For instance, two instances A and B along X:
+            //   A occupies [aX, aX + tw - 1], B occupies [aX + tw + s, aX + 2*tw + s - 1].
+            //   Overlap requires B_minX <= A_maxX + separation => tw + s <= tw - 1 + s => 0 <= -1 (false).
+            // The same holds for Z steps and row boundaries. Skipped candidates don't affect this
+            // because the step size is constant regardless of whether a position was accepted.
             if (!wouldOverlap(minX, minZ, maxX, maxZ, existingInstances, separation)) {
                 // Found a valid placement
                 val newInstance = RegionInstance.create(

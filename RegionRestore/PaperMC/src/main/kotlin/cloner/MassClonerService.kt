@@ -12,6 +12,7 @@ import org.bukkit.World
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.*
+import org.bukkit.event.HandlerList
 import org.bukkit.plugin.java.JavaPlugin
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import bruh.regionrestore.config.MassClonerConfig
@@ -165,6 +166,10 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
     private val playerStates = ConcurrentHashMap<UUID, PlayerState>()
     private val instanceOccupancy = ConcurrentHashMap<UUID, Int>()
 
+    @Volatile
+    var isShutdown = false
+        private set
+
     fun registerInstance(instance: RegionInstance) {
         for (x in instance.minBlockX..instance.maxBlockX step 16) {
             for (z in instance.minBlockZ..instance.maxBlockZ step 16) {
@@ -251,6 +256,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
 
     @EventHandler
     fun onPlayerMove(event: PlayerMoveEvent) {
+        if (isShutdown) return
         val fromChunk = event.from.chunk
         val toChunk = event.to.chunk
 
@@ -264,6 +270,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
 
     @EventHandler
     fun onPlayerTeleport(event: PlayerTeleportEvent) {
+        if (isShutdown) return
         val updates = updatePlayerOccupancy(event.player)
         for ((instanceId, newCount) in updates) {
             massClonerService?.onInstanceOccupancyChanged(instanceId, newCount)
@@ -272,6 +279,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
 
     @EventHandler
     fun onPlayerChangedWorld(event: PlayerChangedWorldEvent) {
+        if (isShutdown) return
         val updates = updatePlayerOccupancy(event.player)
         for ((instanceId, newCount) in updates) {
             massClonerService?.onInstanceOccupancyChanged(instanceId, newCount)
@@ -280,6 +288,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
 
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
+        if (isShutdown) return
         val updates = updatePlayerOccupancy(event.player)
         for ((instanceId, newCount) in updates) {
             massClonerService?.onInstanceOccupancyChanged(instanceId, newCount)
@@ -288,6 +297,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
+        if (isShutdown) return
         val playerId = event.player.uniqueId
         val playerState = playerStates[playerId] ?: return
 
@@ -308,6 +318,10 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
 
     fun getInstanceOccupancy(instanceId: UUID): Int {
         return instanceOccupancy[instanceId] ?: 0
+    }
+
+    fun markShutdown() {
+        isShutdown = true
     }
 
     fun clear() {
@@ -470,7 +484,7 @@ class MassClonerService(
         restoreIntervalSeconds: Int? = null,
         restoreAudienceScope: AudienceScope = AudienceScope.WORLD,
         updateLight: Boolean? = null
-    ): Int = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    ): Result<Int> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val pool = RegionPool(
             worldName = worldName,
             templateName = templateName,
@@ -487,18 +501,18 @@ class MassClonerService(
 
         pools[PoolKey(worldName, templateName)] = pool
 
-        // Snapshot existing instances for this pool
-        val existingInstances = synchronized(stateLock) {
-            registry.instances[worldName]
-                ?.filter { it.templateName == templateName }
-                ?: emptyList()
+        // Snapshot all existing instances for this world and count pool instances in a single lock
+        val allWorldInstances: List<RegionInstance>
+        val currentCount: Int
+        synchronized(stateLock) {
+            allWorldInstances = registry.instances[worldName]?.toList() ?: emptyList()
+            currentCount = allWorldInstances.count { it.templateName == templateName }
         }
 
-        val currentCount = existingInstances.size
         val targetCount = pool.count
 
         if (currentCount >= targetCount) {
-            return@withContext 0
+            return@withContext Result.success(0)
         }
 
         // Load template to get dimensions and resolve version
@@ -514,7 +528,9 @@ class MassClonerService(
 
         if (templateVersion == null) {
             slf4jLogger.error("Failed to load template '${pool.templateName}' for pool allocation")
-            return@withContext 0
+            return@withContext Result.failure(
+                StatePersistenceException("Failed to load template '${pool.templateName}'")
+            )
         }
 
         if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
@@ -526,24 +542,40 @@ class MassClonerService(
 
         val neededCount = targetCount - currentCount
 
-        // Allocate new instances (including ALL existing instances for overlap detection)
-        val allWorldInstances = synchronized(stateLock) {
-            registry.instances[pool.worldName] ?: emptyList()
-        }
+        // Allocate new instances using the snapshot (no second lock needed)
         val newInstances = allocator.allocateInstances(
             pool = pool,
             existingInstances = allWorldInstances,
             template = templateVersion.data,
-            neededCount = neededCount
+            neededCount = neededCount,
+            maxSearchZChunks = massClonerConfig.allocatorMaxSearchZChunks
         )
 
         if (newInstances.isEmpty()) {
             slf4jLogger.error("Failed to allocate any instances for pool '${pool.templateName}' in world '$worldName'")
-            return@withContext 0
+            return@withContext Result.failure(
+                StatePersistenceException("Failed to allocate instances for pool '${pool.templateName}'")
+            )
         }
 
-        // Commit new instances to the registries under the shared lock
+        if (newInstances.size != neededCount) {
+            slf4jLogger.warn(
+                "Allocated only ${newInstances.size}/$neededCount instances for pool '${pool.templateName}' in world '$worldName'. " +
+                "The world may be saturated or the search area too small."
+            )
+        }
+
+        // Re-validate pool count at commit time; if it changed, discard the batch
         synchronized(stateLock) {
+            val currentCountNow = registry.instances[worldName]
+                ?.count { it.templateName == templateName } ?: 0
+if (currentCountNow + newInstances.size > pool.count) {
+                    slf4jLogger.warn(
+                        "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
+                        "in world '$worldName': pool count changed during allocation (now $currentCountNow, was $currentCount)."
+                    )
+                    return@withContext Result.success(0)
+                }
             addInstancesLocked(newInstances)
         }
 
@@ -553,12 +585,13 @@ class MassClonerService(
         }
 
         saveState()
+            .onFailure { slf4jLogger.error("Failed to persist state after creating/updating pool", it) }
 
         slf4jLogger.info(
             "Created/updated pool '${pool.templateName}' in world '${pool.worldName}' with ${newInstances.size} new instances (target=$targetCount)."
         )
 
-        return@withContext newInstances.size
+        return@withContext Result.success(newInstances.size)
     }
 
     /**
@@ -571,63 +604,62 @@ class MassClonerService(
      * @return List of template references to preload
      */
     private fun collectRequiredTemplates(): List<TemplateRef> {
-        val refs = mutableListOf<TemplateRef>()
+        return synchronized(stateLock) {
+            val refs = mutableListOf<TemplateRef>()
 
-        // Collect from pools (all pools are active on the server)
-        for (pool in pools.values) {
-            refs.add(
-                TemplateRef(
-                    templateName = pool.templateName,
-                    versionId = if (pool.versionMode == VersionMode.PINNED) pool.pinnedVersionId else null
-                )
-            )
-        }
-
-        // Collect from instances with timers or boot restore
-        for ((_, instances) in registry.instances) {
-            for (instance in instances) {
-                val needsPreload = when (instance.instanceType) {
-                    InstanceType.POOLED -> {
-                        // Pooled instances: check pool config
-                        val pool = pools[PoolKey(instance.worldName, instance.templateName)]
-                        pool != null && (pool.restoreOnBoot || pool.restoreIntervalSeconds != null)
-                    }
-
-                    InstanceType.MANUAL -> {
-                        // Manual instances: check instance config
-                        val cfg = instance.config
-                        cfg != null && (cfg.restoreOnBoot || cfg.restoreIntervalSeconds != null)
-                    }
-                }
-
-                if (needsPreload) {
-                    refs.add(
-                        TemplateRef(
-                            templateName = instance.templateName,
-                            versionId = instance.versionId
-                        )
+            // Collect from pools (all pools are active on the server)
+            for (pool in pools.values) {
+                refs.add(
+                    TemplateRef(
+                        templateName = pool.templateName,
+                        versionId = if (pool.versionMode == VersionMode.PINNED) pool.pinnedVersionId else null
                     )
+                )
+            }
+
+            // Collect from instances with timers or boot restore
+            for ((_, instances) in registry.instances) {
+                for (instance in instances) {
+                    val needsPreload = when (instance.instanceType) {
+                        InstanceType.POOLED -> {
+                            val pool = pools[PoolKey(instance.worldName, instance.templateName)]
+                            pool != null && (pool.restoreOnBoot || pool.restoreIntervalSeconds != null)
+                        }
+
+                        InstanceType.MANUAL -> {
+                            val cfg = instance.config
+                            cfg != null && (cfg.restoreOnBoot || cfg.restoreIntervalSeconds != null)
+                        }
+                    }
+
+                    if (needsPreload) {
+                        refs.add(
+                            TemplateRef(
+                                templateName = instance.templateName,
+                                versionId = instance.versionId
+                            )
+                        )
+                    }
                 }
             }
-        }
 
-        return refs.distinctBy { "${it.templateName}:v${it.versionId ?: "active"}" }
+            refs.distinctBy { "${it.templateName}:v${it.versionId ?: "active"}" }
+        }
     }
 
     private suspend fun ensurePoolInstanceCounts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         for (pool in pools.values) {
-            // Snapshot existing instances for this pool
-            val existingInstances = synchronized(stateLock) {
-                registry.instances[pool.worldName]
-                    ?.filter { it.templateName == pool.templateName }
-                    ?: emptyList()
+            // Snapshot all world instances and count pool instances in a single lock
+            val allWorldInstances: List<RegionInstance>
+            val currentCount: Int
+            synchronized(stateLock) {
+                allWorldInstances = registry.instances[pool.worldName]?.toList() ?: emptyList()
+                currentCount = allWorldInstances.count { it.templateName == pool.templateName }
             }
 
-            val currentCount = existingInstances.size
             val targetCount = pool.count
 
             if (currentCount < targetCount) {
-                // Need to allocate more instances
                 slf4jLogger.info(
                     "Pool '${pool.templateName}' in world '${pool.worldName}': " +
                             "has $currentCount instances, needs $targetCount. Allocating ${targetCount - currentCount} new instances."
@@ -658,24 +690,33 @@ class MassClonerService(
 
                 val neededCount = targetCount - currentCount
 
-                // Allocate new instances (including ALL existing instances for overlap detection)
-                val allWorldInstances = synchronized(stateLock) {
-                    registry.instances[pool.worldName] ?: emptyList()
-                }
+                // Allocate new instances using the snapshot (no second lock needed)
                 val newInstances = allocator.allocateInstances(
                     pool = pool,
                     existingInstances = allWorldInstances,
                     template = templateVersion.data,
-                    neededCount = neededCount
+                    neededCount = neededCount,
+                    maxSearchZChunks = massClonerConfig.allocatorMaxSearchZChunks
                 )
 
                 if (newInstances.size != neededCount) {
-                    slf4jLogger.error("Failed to allocate enough instances. Needed $neededCount, got ${newInstances.size}")
-                    continue
+                    slf4jLogger.warn(
+                        "Allocated only ${newInstances.size}/$neededCount instances for pool '${pool.templateName}' in world '${pool.worldName}'. " +
+                        "The world may be saturated or the search area too small."
+                    )
                 }
 
-                // Commit new instances to the registries under the shared lock
+                // Re-validate pool count at commit time; if it changed, discard the batch
                 synchronized(stateLock) {
+                    val currentCountNow = registry.instances[pool.worldName]
+                        ?.count { it.templateName == pool.templateName } ?: 0
+                    if (currentCountNow + newInstances.size > pool.count) {
+                        slf4jLogger.warn(
+                            "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
+                            "in world '${pool.worldName}': pool count changed during allocation (now $currentCountNow, was $currentCount)."
+                        )
+                        continue
+                    }
                     addInstancesLocked(newInstances)
                 }
 
@@ -694,6 +735,7 @@ class MassClonerService(
         }
 
         saveState()
+            .onFailure { slf4jLogger.error("Failed to persist state after ensuring pool counts", it) }
     }
 
     private fun registerInstance(instance: RegionInstance) {
@@ -853,48 +895,47 @@ class MassClonerService(
         }
 
         if (shouldVacateRestore && newCount == 0) {
-            vacateTasks[instanceId]?.cancel()
+            vacateTasks.compute(instanceId) { _, oldJob ->
+                oldJob?.cancel()
+                plugin.launch(plugin.asyncDispatcher) {
+                    delay(massClonerConfig.vacateDelaySeconds.toLong().seconds)
 
-            vacateTasks[instanceId] = plugin.launch(plugin.asyncDispatcher) {
-                delay(massClonerConfig.vacateDelaySeconds.toLong().seconds)
-
-                if (occupancyTracker.getInstanceOccupancy(instanceId) == 0) {
-                    withContext(plugin.globalRegionDispatcher) {
-                        if (instance.instanceType == InstanceType.POOLED) {
-                            val pool = pools[PoolKey(instance.worldName, instance.templateName)]
-                            if (pool != null) {
-                                val world = Bukkit.getWorld(pool.worldName)
-                                if (world != null) {
-                                    scheduleRestore(pool, instance)
-                                }
-                            }
-                        } else {
-                            // Manual instance
-                            val world = Bukkit.getWorld(instance.worldName)
-                            if (world != null) {
-                                // Load template version
-                                val templateVersion = when {
-                                    instance.versionId != null ->
-                                        templateRepository.loadTemplateVersion(
-                                            instance.templateName,
-                                            instance.versionId
-                                        )
-
-                                    else ->
-                                        templateRepository.loadActiveTemplateVersion(instance.templateName)
-                                }
-
-                                if (templateVersion != null) {
-                                    if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
-                                        slf4jLogger.warn("Template version ${templateVersion.minecraftVersion} for instance '${instance.instanceId}' does not match server version ${nmsAdapter.minecraftVersion}. Please update the template or instance version to avoid errors during restore.")
+                    if (occupancyTracker.getInstanceOccupancy(instanceId) == 0) {
+                        withContext(plugin.globalRegionDispatcher) {
+                            if (instance.instanceType == InstanceType.POOLED) {
+                                val pool = pools[PoolKey(instance.worldName, instance.templateName)]
+                                if (pool != null) {
+                                    val world = Bukkit.getWorld(pool.worldName)
+                                    if (world != null) {
+                                        scheduleRestore(pool, instance)
                                     }
-                                    val job = createRestoreJob(instance, templateVersion, world)
-                                    schedulerService.scheduleRestore(
-                                        job,
-                                        null,
-                                        emptyList(),
-                                        instance.config?.restoreAudienceScope ?: AudienceScope.WORLD
-                                    )
+                                }
+                            } else {
+                                val world = Bukkit.getWorld(instance.worldName)
+                                if (world != null) {
+                                    val templateVersion = when {
+                                        instance.versionId != null ->
+                                            templateRepository.loadTemplateVersion(
+                                                instance.templateName,
+                                                instance.versionId
+                                            )
+
+                                        else ->
+                                            templateRepository.loadActiveTemplateVersion(instance.templateName)
+                                    }
+
+                                    if (templateVersion != null) {
+                                        if (templateVersion.minecraftVersion != nmsAdapter.minecraftVersion) {
+                                            slf4jLogger.warn("Template version ${templateVersion.minecraftVersion} for instance '${instance.instanceId}' does not match server version ${nmsAdapter.minecraftVersion}. Please update the template or instance version to avoid errors during restore.")
+                                        }
+                                        val job = createRestoreJob(instance, templateVersion, world)
+                                        schedulerService.scheduleRestore(
+                                            job,
+                                            null,
+                                            emptyList(),
+                                            instance.config?.restoreAudienceScope ?: AudienceScope.WORLD
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -904,8 +945,10 @@ class MassClonerService(
         }
 
         if (newCount > 0) {
-            vacateTasks[instanceId]?.cancel()
-            vacateTasks.remove(instanceId)
+            vacateTasks.compute(instanceId) { _, oldJob ->
+                oldJob?.cancel()
+                null
+            }
         }
     }
 
@@ -926,11 +969,12 @@ class MassClonerService(
 
         vacateTasks.values.forEach { it.cancel() }
         vacateTasks.clear()
+        occupancyTracker.markShutdown()
+        HandlerList.unregisterAll(occupancyTracker)
         occupancyTracker.clear()
     }
 
-    suspend fun saveState() {
-        // Take immutable snapshots under the state lock, then persist them off-thread.
+    suspend fun saveState(): Result<Unit> {
         val instancesByWorldSnapshot: Map<String, List<RegionInstance>>
         val instancesByIdSnapshot: Map<UUID, RegionInstance>
 
@@ -939,7 +983,13 @@ class MassClonerService(
             instancesByIdSnapshot = HashMap(instances)
         }
 
-        stateLoader.save(ClonerState(instancesByWorldSnapshot, instancesByIdSnapshot))
+        val result = stateLoader.save(ClonerState(instancesByWorldSnapshot, instancesByIdSnapshot))
+
+        result.exceptionOrNull()?.let {
+            slf4jLogger.error("CRITICAL: Failed to persist cloner state! Data may be lost on restart.", it)
+        }
+
+        return result
     }
 
     fun getInstancesForPool(worldName: String, templateName: String): List<RegionInstance> {
@@ -1089,43 +1139,50 @@ class MassClonerService(
     /**
      * Add a new manual instance to the registry.
      */
-    suspend fun addManualInstance(instance: RegionInstance) =
+    suspend fun addManualInstance(instance: RegionInstance): Result<Unit> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            // Update in-memory state under the shared lock
             synchronized(stateLock) {
                 addInstanceLocked(instance)
             }
 
-            // Wire into occupancy tracking and persist state outside the lock
             registerInstance(instance)
-            saveState()
+            val result = saveState()
+                .onFailure { slf4jLogger.error("Failed to persist state after adding manual instance", it) }
 
-            slf4jLogger.info(
-                "Added manual instance '${instance.instanceId}' for template '${instance.templateName}' " +
-                        "at (${instance.originChunkX}, ${instance.originChunkZ})"
-            )
+            if (result.isSuccess) {
+                slf4jLogger.info(
+                    "Added manual instance '${instance.instanceId}' for template '${instance.templateName}' " +
+                            "at (${instance.originChunkX}, ${instance.originChunkZ})"
+                )
+            }
+
+            result
         }
 
     /**
      * Remove an instance (manual or pooled).
      */
-    suspend fun removeInstance(instanceId: UUID): Boolean =
+    suspend fun removeInstance(instanceId: UUID): Result<Boolean> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            // Remove from in-memory registries under the shared lock
             val removed = synchronized(stateLock) {
                 removeInstanceLocked(instanceId)
-            } ?: return@withContext false
+            } ?: return@withContext Result.success(false)
 
-            // Cancel any scheduled tasks and unregister from occupancy outside the lock
             stopInstanceTriggers(removed)
             occupancyTracker.unregisterInstance(instanceId)
-            vacateTasks[instanceId]?.cancel()
-            vacateTasks.remove(instanceId)
+            vacateTasks.compute(instanceId) { _, oldJob ->
+                oldJob?.cancel()
+                null
+            }
 
-            saveState()
+            val result = saveState()
+                .onFailure { slf4jLogger.error("Failed to persist state after removing instance", it) }
 
-            slf4jLogger.info("Removed instance '$instanceId'")
-            return@withContext true
+            if (result.isSuccess) {
+                slf4jLogger.info("Removed instance '$instanceId'")
+            }
+
+            result.map { true }
         }
 
     /**
@@ -1143,7 +1200,7 @@ class MassClonerService(
      * @param worldNames List of world names to regenerate (empty = all configured worlds)
      * @return Pair of (total removed, total allocated)
      */
-    suspend fun regeneratePools(worldNames: List<String> = emptyList()): Pair<Int, Int> =
+    suspend fun regeneratePools(worldNames: List<String> = emptyList()): Result<Pair<Int, Int>> =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val worldsToRegen = if (worldNames.isEmpty()) {
                 massClonerConfig.worlds.map { it.name }
@@ -1173,8 +1230,10 @@ class MassClonerService(
                 for (instance in pooledInstances) {
                     stopInstanceTriggers(instance)
                     occupancyTracker.unregisterInstance(instance.instanceId)
-                    vacateTasks[instance.instanceId]?.cancel()
-                    vacateTasks.remove(instance.instanceId)
+                    vacateTasks.compute(instance.instanceId) { _, oldJob ->
+                        oldJob?.cancel()
+                        null
+                    }
                     totalRemoved++
                 }
 
@@ -1219,12 +1278,22 @@ class MassClonerService(
                         pool = pool,
                         existingInstances = allWorldInstances,
                         template = templateVersion.data,
-                        neededCount = pool.count
+                        neededCount = pool.count,
+                        maxSearchZChunks = massClonerConfig.allocatorMaxSearchZChunks
                     )
 
-                    // Commit and register new instances
+                    // Commit and register new instances with re-validation
                     synchronized(stateLock) {
-                        addInstancesLocked(newInstances)
+                        val currentCountNow = registry.instances[worldName]
+                            ?.count { it.templateName == pool.templateName } ?: 0
+                        if (currentCountNow + newInstances.size > pool.count) {
+                            slf4jLogger.warn(
+                                "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
+                                "in world '$worldName': pool count changed during regeneration (now $currentCountNow)."
+                            )
+                        } else {
+                            addInstancesLocked(newInstances)
+                        }
                     }
                     for (instance in newInstances) {
                         registerInstance(instance)
@@ -1234,23 +1303,26 @@ class MassClonerService(
             }
 
             saveState()
-            return@withContext Pair(totalRemoved, totalAllocated)
+                .onFailure { slf4jLogger.error("Failed to persist state after regenerating pools", it) }
+                .map { Pair(totalRemoved, totalAllocated) }
         }
 
     /**
      * List all instances (optionally filtered by world and type).
      */
     fun listInstances(worldName: String? = null, instanceType: InstanceType? = null): List<RegionInstance> {
-        val worlds = if (worldName != null) {
-            registry.instances.filterKeys { it == worldName }.values.flatten()
-        } else {
-            registry.instances.values.flatten()
-        }
+        return synchronized(stateLock) {
+            val worlds = if (worldName != null) {
+                registry.instances.filterKeys { it == worldName }.values.flatten()
+            } else {
+                registry.instances.values.flatten()
+            }
 
-        return if (instanceType != null) {
-            worlds.filter { it.instanceType == instanceType }
-        } else {
-            worlds
+            if (instanceType != null) {
+                worlds.filter { it.instanceType == instanceType }
+            } else {
+                worlds
+            }
         }
     }
 

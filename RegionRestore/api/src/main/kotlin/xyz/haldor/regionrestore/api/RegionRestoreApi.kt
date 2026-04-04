@@ -256,7 +256,7 @@ interface RestoreSchedulerApi {
 interface MassClonerApi {
     // Raw MassClonerService operations
 
-    suspend fun saveState()
+    suspend fun saveState(): Result<Unit>
 
     suspend fun shutdown()
 
@@ -266,9 +266,9 @@ interface MassClonerApi {
 
     fun getInstance(instanceId: UUID): RegionInstance?
 
-    suspend fun addManualInstance(instance: RegionInstance)
+    suspend fun addManualInstance(instance: RegionInstance): Result<Unit>
 
-    suspend fun removeInstance(instanceId: UUID): Boolean
+    suspend fun removeInstance(instanceId: UUID): Result<Boolean>
 
     suspend fun triggerInstanceRestore(instance: RegionInstance)
 
@@ -278,7 +278,7 @@ interface MassClonerApi {
 
     fun stopInstanceTriggers(instance: RegionInstance)
 
-    suspend fun regeneratePools(worldNames: List<String> = emptyList()): Pair<Int, Int>
+    suspend fun regeneratePools(worldNames: List<String> = emptyList()): Result<Pair<Int, Int>>
 
     // High-level helpers
 
@@ -295,7 +295,7 @@ interface MassClonerApi {
         versionId: Int? = null,
         config: InstanceConfig? = null,
         startTriggers: Boolean = true
-    ): RegionInstance
+    ): Result<RegionInstance>
 
     /**
      * Allocate positions for a pool without mutating internal state.

@@ -1,6 +1,7 @@
 package bruh.regionrestore.cloner
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.spongepowered.configurate.CommentedConfigurationNode
@@ -10,6 +11,8 @@ import org.spongepowered.configurate.kotlin.extensions.set
 import org.spongepowered.configurate.kotlin.objectMapperFactory
 import org.spongepowered.configurate.loader.ConfigurationLoader
 import java.nio.file.Path
+
+class StatePersistenceException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * Handles loading and saving MassClonerService state using Configurate.
@@ -69,16 +72,32 @@ class ClonerStateLoader(
     /**
      * Save state to HOCON file.
      */
-    suspend fun save(state: ClonerState) = withContext(Dispatchers.IO) {
-        try {
-            val rootNode = loader.load()
-            rootNode.set(state)
-            loader.save(rootNode)
+    suspend fun save(state: ClonerState): Result<Unit> = withContext(Dispatchers.IO) {
+        val maxAttempts = 3
+        var attempts = 0
+        var lastException: Exception? = null
 
-            val totalInstances = state.instances.values.sumOf { it.size }
-            logger.debug("Saved state: ${state.instances.size} world(s), $totalInstances instance(s)")
-        } catch (e: Exception) {
-            logger.error("Failed to save state: ${e.message}", e)
+        while (attempts < maxAttempts) {
+            try {
+                val rootNode = loader.load()
+                rootNode.set(state)
+                loader.save(rootNode)
+
+                val totalInstances = state.instances.values.sumOf { it.size }
+                logger.debug("Saved state: ${state.instances.size} world(s), $totalInstances instance(s)")
+                return@withContext Result.success(Unit)
+            } catch (e: Exception) {
+                lastException = e
+                attempts++
+                if (attempts == maxAttempts) {
+                    return@withContext Result.failure(
+                        StatePersistenceException("Failed to save state after $maxAttempts attempts", e)
+                    )
+                }
+                logger.warn("Save attempt $attempts failed, retrying: ${e.message}")
+                delay(500)
+            }
         }
+        Result.failure(StatePersistenceException("Failed to save state after $maxAttempts attempts"))
     }
 }

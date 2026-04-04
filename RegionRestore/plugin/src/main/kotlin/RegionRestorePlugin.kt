@@ -140,6 +140,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         slF4JLogger.info("Disabling RegionRestore...")
 
         massClonerService.saveState()
+            .onFailure { slF4JLogger.error("Failed to save state during shutdown", it) }
         schedulerService.cancelAll()
         massClonerService.shutdown()
         selectionWandService.close()

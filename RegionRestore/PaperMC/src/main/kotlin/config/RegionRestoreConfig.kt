@@ -89,6 +89,8 @@ data class RestoreConfig(
 data class MassClonerConfig(
     val allowOverwrite: Boolean = false,
     val vacateDelaySeconds: Int = 5,
+    @Comment("Maximum Z chunk distance to search when allocating new instance positions. Prevents infinite loops in saturated worlds.")
+    val allocatorMaxSearchZChunks: Int = 500_000,
     val worlds: List<MassClonerWorldConfig> = emptyList()
 )
 

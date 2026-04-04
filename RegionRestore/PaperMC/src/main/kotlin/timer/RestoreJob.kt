@@ -4,6 +4,7 @@ import bruh.regionrestore.nms.RegionTemplate
 import org.bukkit.World
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class RestoreJob(
     val id: UUID,
@@ -16,9 +17,10 @@ data class RestoreJob(
     val updateLight: Boolean = false,
     val future: CompletableFuture<RestoreJob> = CompletableFuture()
 ) {
-    var isRunning = false
-        @Synchronized get
-        @Synchronized set
+    private val _isRunning = AtomicBoolean(false)
+    val isRunning: Boolean get() = _isRunning.get()
+    fun tryStart(): Boolean = _isRunning.compareAndSet(false, true)
+    fun finish() { _isRunning.set(false) }
 
     /**
      * AABB block bounds of the region.

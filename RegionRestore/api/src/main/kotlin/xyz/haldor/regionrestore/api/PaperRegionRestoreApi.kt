@@ -368,9 +368,7 @@ private class PaperMassClonerApi(
     private val nmsAdapter: PaperNmsAdapter
 ) : MassClonerApi {
 
-    override suspend fun saveState() {
-        massClonerService.saveState()
-    }
+    override suspend fun saveState(): Result<Unit> = massClonerService.saveState()
 
     override suspend fun shutdown() {
         massClonerService.shutdown()
@@ -386,11 +384,10 @@ private class PaperMassClonerApi(
     override fun getInstance(instanceId: UUID): RegionInstance? =
         massClonerService.getInstance(instanceId)
 
-    override suspend fun addManualInstance(instance: RegionInstance) {
+    override suspend fun addManualInstance(instance: RegionInstance): Result<Unit> =
         massClonerService.addManualInstance(instance)
-    }
 
-    override suspend fun removeInstance(instanceId: UUID): Boolean =
+    override suspend fun removeInstance(instanceId: UUID): Result<Boolean> =
         massClonerService.removeInstance(instanceId)
 
     override suspend fun triggerInstanceRestore(instance: RegionInstance) {
@@ -410,7 +407,7 @@ private class PaperMassClonerApi(
         massClonerService.stopInstanceTriggers(instance)
     }
 
-    override suspend fun regeneratePools(worldNames: List<String>): Pair<Int, Int> =
+    override suspend fun regeneratePools(worldNames: List<String>): Result<Pair<Int, Int>> =
         massClonerService.regeneratePools(worldNames)
 
     override suspend fun createManualInstance(
@@ -423,7 +420,7 @@ private class PaperMassClonerApi(
         versionId: Int?,
         config: InstanceConfig?,
         startTriggers: Boolean
-    ): RegionInstance {
+    ): Result<RegionInstance> {
         val instance = RegionInstance.create(
             instanceId = UUID.randomUUID(),
             worldName = worldName,
@@ -437,13 +434,16 @@ private class PaperMassClonerApi(
             config = config
         )
 
-        massClonerService.addManualInstance(instance)
+        val result = massClonerService.addManualInstance(instance)
+        if (result.isFailure) {
+            return result.map { instance }
+        }
 
         if (startTriggers) {
             massClonerService.startInstanceTriggers(instance)
         }
 
-        return instance
+        return Result.success(instance)
     }
 
     override suspend fun allocateInstancesForPool(

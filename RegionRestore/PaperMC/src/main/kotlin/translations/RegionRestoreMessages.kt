@@ -48,6 +48,7 @@ enum class CommandMessages(
     INSTANCE_DELETED("instance_deleted", "<green>Deleted instance '<id>'"),
     INSTANCE_DELETE_CANCELLED("instance_delete_cancelled", "<gray>Instance deletion cancelled"),
     INSTANCE_RESTORE_TRIGGERED("instance_restore_triggered", "<green>Triggered restore for instance '<id>'"),
+    INSTANCE_SAVE_FAILED("instance_save_failed", "<red>Failed to save instance state. Check server logs for details."),
     INSTANCE_LIST_EMPTY("instance_list_empty", "<gray>No instances found"),
     INSTANCE_LIST_HEADER("instance_list_header", "<green>Instances (<count>):"),
     INSTANCE_LIST_ITEM("instance_list_item", "  <type_mark> <id> - <name> at (<chunk_x>, <chunk_z>) in <world>"),
@@ -89,10 +90,14 @@ enum class CommandMessages(
     CLONER_REGEN_REMOVED("cloner_regen_removed", "  Removed: <count> pooled instances"),
     CLONER_REGEN_ALLOCATED("cloner_regen_allocated", "  Allocated: <count> pooled instances"),
     CLONER_REGEN_MANUAL_PRESERVED("cloner_regen_manual_preserved", "<yellow>Manual instances were preserved."),
+    CLONER_SAVE_FAILED("cloner_save_failed", "<red>Failed to persist state. Check server logs for details."),
+    CLONER_REGEN_FAILED("cloner_regen_failed", "<red>Regeneration completed but failed to persist state. Check server logs."),
     
     // Pool creation messages
     POOL_CREATED("pool_created", "<green>Created/updated pool '<name>' in '<world>' with <count> new instance(s) (target=<target>)."),
     POOL_CREATION_CANCELLED("pool_creation_cancelled", "<gray>Pool creation cancelled"),
+    POOL_CREATION_FAILED("pool_creation_failed", "<red>Failed to create pool '<name>'. Check server logs for details."),
+    POOL_SAVE_FAILED("pool_save_failed", "<red>Pool created but failed to persist state. Check server logs."),
     POOL_NO_TEMPLATES("pool_no_templates", "<gray>No templates available for pool creation"),
     POOL_STATUS_HEADER("pool_status_header", "<green>Pool status for '<name>' in '<world>':"),
     POOL_INSTANCES_LINE("pool_instances_line", "  <gray>Instances: <active>/<target> (<status>)"),

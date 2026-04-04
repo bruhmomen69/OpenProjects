@@ -55,6 +55,7 @@ class RegionRestoreCommands(
     private val selectionService: SelectionService,
     private val selectionWandService: SelectionWandService
 ) {
+    private val log = org.slf4j.LoggerFactory.getLogger(RegionRestoreCommands::class.java)
     
     /** Gets a GUI string (for menu titles, lore, etc. that need strings) */
     private fun tGui(key: GuiMessages) = translations.getString(key)
@@ -260,6 +261,10 @@ class RegionRestoreCommands(
                                 )
 
                                 massClonerService.addManualInstance(instance)
+                                    .onFailure {
+                                        log.error("Failed to persist instance ${instance.instanceId}", it)
+                                        p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_SAVE_FAILED))
+                                    }
                                 massClonerService.triggerInstanceRestore(instance)
 
                                 p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_CREATED_ORIGINAL) {
@@ -412,10 +417,18 @@ class RegionRestoreCommands(
                                                 updateLight = null
                                             )
 
+                                            allocated.onFailure {
+                                                log.error("Failed to create pool '$tmplName' in world '${worldCfg.name}'", it)
+                                                pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_FAILED) {
+                                                    unparsed("name", tmplName)
+                                                })
+                                                return@action null
+                                            }
+
                                             pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATED) {
                                                 unparsed("name", tmplName)
                                                 unparsed("world", worldCfg.name)
-                                                unparsed("count", allocated.toString())
+                                                unparsed("count", allocated.getOrNull().toString())
                                                 unparsed("target", count.toString())
                                             })
                                             null
@@ -500,10 +513,18 @@ class RegionRestoreCommands(
                                                         updateLight = null
                                                     )
 
+                                                    allocated.onFailure {
+                                                        log.error("Failed to create pool '$tmplName' in world '${worldCfg.name}'", it)
+                                                        pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_FAILED) {
+                                                            unparsed("name", tmplName)
+                                                        })
+                                                        return@action null
+                                                    }
+
                                                     pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATED) {
                                                         unparsed("name", tmplName)
                                                         unparsed("world", worldCfg.name)
-                                                        unparsed("count", allocated.toString())
+                                                        unparsed("count", allocated.getOrNull().toString())
                                                         unparsed("target", count.toString())
                                                     })
                                                     null
@@ -583,15 +604,21 @@ class RegionRestoreCommands(
                                         listOf(tGui(GuiMessages.REGEN_POOL_DESC)),
                                         returnLevels = 1
                                     ) { p ->
-                                        val (removed, allocated) = massClonerService.regeneratePools(listOf(worldCfg.name))
-                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REGEN_HEADER) {
-                                            unparsed("world", worldCfg.name)
-                                        })
-                                        p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REGEN_STATS) {
-                                            unparsed("removed", removed.toString())
-                                            unparsed("allocated", allocated.toString())
-                                        })
-                                        p.sendMessage(translations.getComponentSync(CommandMessages.CLONER_REGEN_MANUAL_PRESERVED))
+                                        val result = massClonerService.regeneratePools(listOf(worldCfg.name))
+                                        result.onFailure {
+                                            log.error("Failed to persist state after regenerating pools for world '${worldCfg.name}'", it)
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.CLONER_SAVE_FAILED))
+                                        }
+                                        result.onSuccess { (removed, allocated) ->
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REGEN_HEADER) {
+                                                unparsed("world", worldCfg.name)
+                                            })
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.POOL_REGEN_STATS) {
+                                                unparsed("removed", removed.toString())
+                                                unparsed("allocated", allocated.toString())
+                                            })
+                                            p.sendMessage(translations.getComponentSync(CommandMessages.CLONER_REGEN_MANUAL_PRESERVED))
+                                        }
                                     }
 
                                     action(
@@ -725,6 +752,10 @@ class RegionRestoreCommands(
                                 )
 
                                 massClonerService.addManualInstance(instance)
+                                    .onFailure {
+                                        log.error("Failed to persist instance ${instance.instanceId}", it)
+                                        pp.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_SAVE_FAILED))
+                                    }
                                 massClonerService.triggerInstanceRestore(instance)
 
                                 pp.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_CREATED_ORIGINAL) {
@@ -1370,16 +1401,23 @@ class RegionRestoreCommands(
 
         // Call service to regenerate pools
         val worldsToRegen = if (world != null) listOf(world) else emptyList()
-        val (removed, allocated) = massClonerService.regeneratePools(worldsToRegen)
-
-        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_COMPLETE))
-        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_REMOVED) {
-            unparsed("count", removed.toString())
-        })
-        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_ALLOCATED) {
-            unparsed("count", allocated.toString())
-        })
-        actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_MANUAL_PRESERVED))
+        val result = massClonerService.regeneratePools(worldsToRegen)
+        
+        result.onFailure {
+            log.error("Failed to persist state after regenerating pools", it)
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_SAVE_FAILED))
+        }
+        
+        result.onSuccess { (removed, allocated) ->
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_COMPLETE))
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_REMOVED) {
+                unparsed("count", removed.toString())
+            })
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_ALLOCATED) {
+                unparsed("count", allocated.toString())
+            })
+            actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_MANUAL_PRESERVED))
+        }
     }
 
     @Subcommand("instance create")
@@ -1451,7 +1489,11 @@ class RegionRestoreCommands(
         )
 
         // Add to registry
-        massClonerService.addManualInstance(instance)
+        val result = massClonerService.addManualInstance(instance)
+        result.onFailure {
+            log.error("Failed to persist instance ${instance.instanceId}", it)
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+        }
 
         // Start triggers
         if (config.restoreOnBoot || config.restoreIntervalSeconds != null) {
@@ -1596,9 +1638,14 @@ class RegionRestoreCommands(
             return
         }
 
-        val deleted = massClonerService.removeInstance(id)
+        val result = massClonerService.removeInstance(id)
 
-        if (deleted) {
+        result.onFailure {
+            log.error("Failed to persist state after removing instance $id", it)
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+        }
+
+        if (result.getOrNull() == true) {
             actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_DELETED) {
                 unparsed("id", instanceId)
             })
@@ -1664,8 +1711,19 @@ class RegionRestoreCommands(
         massClonerService.stopInstanceTriggers(instance)
 
         // Update the instance in the registry (remove old, add updated)
-        massClonerService.removeInstance(instance.instanceId)
-        massClonerService.addManualInstance(updatedInstance)
+        val removeResult = massClonerService.removeInstance(instance.instanceId)
+        if (removeResult.isFailure) {
+            log.error("Failed to persist state after removing instance ${instance.instanceId} for timer update", removeResult.exceptionOrNull())
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+            return
+        }
+        
+        val addResult = massClonerService.addManualInstance(updatedInstance)
+        if (addResult.isFailure) {
+            log.error("Failed to persist state after adding updated instance ${updatedInstance.instanceId} for timer update", addResult.exceptionOrNull())
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+            return
+        }
 
         // Start new timers
         massClonerService.startInstanceTriggers(updatedInstance)
@@ -1735,6 +1793,10 @@ class RegionRestoreCommands(
         )
 
         massClonerService.addManualInstance(instance)
+            .onFailure {
+                log.error("Failed to persist timer instance ${instance.instanceId} for template '$templateName'", it)
+                actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+            }
         massClonerService.startInstanceTriggers(instance)
 
         actor.sendMessage(translations.getComponent(CommandMessages.TIMER_SET_TEMPLATE) {
@@ -1763,6 +1825,10 @@ class RegionRestoreCommands(
         }
 
         massClonerService.removeInstance(id)
+            .onFailure {
+                log.error("Failed to persist state after cancelling timer for instance $id", it)
+                actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+            }
         actor.sendMessage(translations.getComponent(CommandMessages.TIMER_CANCELLED) {
             unparsed("id", instanceId)
         })
@@ -1792,13 +1858,22 @@ class RegionRestoreCommands(
         }
 
         var cancelledCount = 0
+        var failedCount = 0
         for (instance in templateInstances) {
             if (instance.config?.restoreIntervalSeconds != null) {
-                massClonerService.removeInstance(instance.instanceId)
-                cancelledCount++
+                val result = massClonerService.removeInstance(instance.instanceId)
+                if (result.isSuccess) {
+                    cancelledCount++
+                } else {
+                    log.error("Failed to persist state after cancelling timer for instance ${instance.instanceId}", result.exceptionOrNull())
+                    failedCount++
+                }
             }
         }
 
+        if (failedCount > 0) {
+            actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
+        }
         actor.sendMessage(translations.getComponent(CommandMessages.TIMER_CANCELLED_TEMPLATE) {
             unparsed("count", cancelledCount.toString())
             unparsed("name", templateName)
@@ -1825,8 +1900,12 @@ class RegionRestoreCommands(
                     return@action null
                 }
 
-                val deleted = massClonerService.removeInstance(instance.instanceId)
-                if (deleted) {
+                val result = massClonerService.removeInstance(instance.instanceId)
+                result.onFailure {
+                    log.error("Failed to persist state after deleting instance ${instance.instanceId}", it)
+                    p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_SAVE_FAILED))
+                }
+                if (result.getOrNull() == true) {
                     p.sendMessage(translations.getComponentSync(CommandMessages.INSTANCE_DELETED) {
                         unparsed("id", instance.instanceId.toString())
                     })
