@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.runPaper)
 }
 
+version = "1.0.0"
+
 dependencies {
     implementation(project(":RegionRestore:api"))
     implementation(project(":RegionRestore:PaperMC"))
