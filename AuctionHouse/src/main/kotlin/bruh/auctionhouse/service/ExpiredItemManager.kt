@@ -4,9 +4,11 @@ import bruh.auctionhouse.database.ConsolidatedExpiredItemRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.model.ExpiredItem
 import bruh.auctionhouse.model.ExpiredItemType
+import bruh.zchat.utils.database.TransactionScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.inventory.ItemStack
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -56,21 +58,22 @@ class ExpiredItemManager(
             quantity = totalQuantity
         )
 
-        // Store individual items for inventory management
-        items.forEach { itemStack ->
-            val expiredItem = ExpiredItem(
+        // Store individual items for inventory management using batch insert
+        val now = Instant.now()
+        val expiredItems = items.map { itemStack ->
+            ExpiredItem(
                 id = UUID.randomUUID(),
                 ownerUuid = ownerUuid,
                 ownerName = ownerName,
                 itemType = itemType,
                 sourceId = sourceId,
-                consolidatedGroupId = consolidated.id, // Link to group
+                consolidatedGroupId = consolidated.id,
                 itemStack = itemStack,
                 reason = reason,
-                expiredAt = java.time.Instant.now()
+                expiredAt = now
             )
-            expiredItemRepository.create(expiredItem)
         }
+        expiredItemRepository.createBatch(expiredItems)
     }
 
     /**
@@ -93,5 +96,47 @@ class ExpiredItemManager(
             items = listOf(item),
             reason = reason
         )
+    }
+
+    /**
+     * Stores a single item stack as an expired item within a transaction scope.
+     * This allows atomic storage alongside other database operations.
+     * Both consolidated group and individual item are created atomically.
+     */
+    suspend fun storeExpiredItemWithinTransaction(
+        scope: TransactionScope,
+        ownerUuid: UUID,
+        ownerName: String,
+        itemType: ExpiredItemType,
+        sourceId: UUID,
+        item: ItemStack,
+        reason: String
+    ) {
+        val templateItem = item.clone().apply { amount = 1 }
+        val totalQuantity = item.amount
+
+        val consolidated = consolidatedRepository.addItemToGroup(
+            scope = scope,
+            ownerUuid = ownerUuid,
+            ownerName = ownerName,
+            itemType = itemType,
+            sourceId = sourceId,
+            itemStack = templateItem,
+            reason = reason,
+            quantity = totalQuantity
+        )
+
+        val expiredItem = ExpiredItem(
+            id = UUID.randomUUID(),
+            ownerUuid = ownerUuid,
+            ownerName = ownerName,
+            itemType = itemType,
+            sourceId = sourceId,
+            consolidatedGroupId = consolidated.id,
+            itemStack = item,
+            reason = reason,
+            expiredAt = Instant.now()
+        )
+        expiredItemRepository.create(scope, expiredItem)
     }
 }

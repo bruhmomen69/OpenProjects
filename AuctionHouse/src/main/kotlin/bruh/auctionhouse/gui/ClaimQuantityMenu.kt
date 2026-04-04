@@ -30,20 +30,20 @@ class ClaimQuantityMenu(
         // Item display showing available/total
         item(13, createItemDisplay())
 
-        // Quantity controls (bottom row)
-        item(29, createDecreaseButton(1))
-        item(30, createDecreaseButton(10))
-        item(31, createQuantityDisplay())
-        item(32, createIncreaseButton(10))
-        item(33, createIncreaseButton(1))
+        // Quantity controls (row 2, centered)
+        item(19, createDecreaseButton(1))
+        item(20, createDecreaseButton(10))
+        item(22, createQuantityDisplay())
+        item(24, createIncreaseButton(10))
+        item(25, createIncreaseButton(1))
 
-        // Quick select buttons
-        item(38, createQuickSelectButton(64))
-        item(39, createQuickSelectButton(576))
-        item(40, createMaxButton())
+        // Quick select buttons (row 3, centered)
+        item(29, createQuickSelectButton(64))
+        item(31, createQuickSelectButton(576))
+        item(33, createMaxButton())
 
-        // Confirm/Cancel
-        item(42, createConfirmButton())
+        // Confirm/Cancel (row 4)
+        item(40, createConfirmButton())
         item(43, createCancelButton())
     }
 

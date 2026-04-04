@@ -39,8 +39,16 @@ class OrderManageMenu(
             item(29, createEditPriceButton())
         }
 
-        item(if (canEditPrice) 31 else 29, createCancelButton())
-        item(33, createBackButton())
+        item(if (canEditPrice) 33 else 29, createCancelButton())
+
+        // Navigation (row 5 if 5 rows, row 4 if 4 rows)
+        if (canEditPrice) {
+            item(45, createBackButton())
+            item(53, createCloseButton())
+        } else {
+            item(36, createBackButton())
+            item(44, createCloseButton())
+        }
     }
 
     private fun createOrderDisplayItem(): VItem {
@@ -189,6 +197,12 @@ class OrderManageMenu(
             onClick { _, _ ->
                 ClickResult.SwitchMenu(parentMenu())
             }
+        }
+    }
+
+    private fun createCloseButton(): VItem {
+        return MenuUtils.closeButton(pctx.translationAPI).apply {
+            onClick { _, _ -> ClickResult.Close }
         }
     }
 }

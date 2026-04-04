@@ -2,6 +2,7 @@ package bruh.auctionhouse.listeners
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
+import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
 import bruh.auctionhouse.database.OrderFillRepository
 import bruh.auctionhouse.database.OrderRepository
@@ -10,13 +11,15 @@ import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.OrderMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import net.kyori.adventure.text.minimessage.MiniMessage
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import java.math.BigDecimal
-import java.time.Duration
 import java.lang.Runnable
 
 /**
@@ -27,6 +30,7 @@ class PlayerListener(
     private val config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
     private val auctionService: AuctionService,
+    private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
     private val orderRepository: OrderRepository,
     private val orderFillRepository: OrderFillRepository
@@ -36,6 +40,7 @@ class PlayerListener(
 
     /**
      * Handles player login and delivers queued notifications.
+     * Uses coroutine launch instead of runBlocking to avoid thread blocking.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     fun onPlayerJoin(event: PlayerJoinEvent) {
@@ -44,11 +49,11 @@ class PlayerListener(
 
         if (!config.notifications.alertOnLogin) return
 
-        // Run asynchronously to avoid blocking the join
-        plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
+        // Use coroutine scope instead of runBlocking to avoid blocking threads
+        plugin.launch {
             try {
-                kotlinx.coroutines.runBlocking {
-                    // Check for outbid notifications (bids that were outbid while player was offline)
+                withContext(Dispatchers.IO) {
+                    // Check for outbid notifications
                     if (config.notifications.alertOutbid) {
                         checkOutbidNotifications(playerId, player)
                     }
@@ -66,15 +71,13 @@ class PlayerListener(
             } catch (e: Exception) {
                 plugin.slF4JLogger.error("Error processing login notifications for ${player.name}", e)
             }
-        })
+        }
     }
 
     /**
      * Checks if the player was outbid on any auctions while offline.
      */
     private suspend fun checkOutbidNotifications(playerId: java.util.UUID, player: org.bukkit.entity.Player) {
-        // Get all bids by this player that are now outbid
-        // This is a simplified check - in production you'd want a dedicated notification table
         val outbidCount = bidRepository.getOutbidBidsForPlayer(playerId)
 
         if (outbidCount > 0) {
@@ -87,14 +90,12 @@ class PlayerListener(
     }
 
     /**
-     * Checks if the player has any sold auctions while offline.
+     * Checks if the player has any recently sold auctions while offline.
+     * Uses limited query to avoid loading all sold auctions.
      */
     private suspend fun checkSoldNotifications(playerId: java.util.UUID, player: org.bukkit.entity.Player) {
-        // Get player's sold auctions
-        val soldAuctions = auctionService.getPlayerAuctions(playerId, bruh.auctionhouse.model.AuctionStatus.SOLD)
-
-        // Filter to only show recently sold (could be improved with timestamp tracking)
-        val recentSold = soldAuctions.take(5) // Limit to 5 to avoid spam
+        // Use optimized query with LIMIT instead of loading all and taking 5
+        val recentSold = auctionRepository.getRecentSoldAuctions(playerId, 5)
 
         if (recentSold.isNotEmpty()) {
             player.sendMessage(
@@ -103,7 +104,6 @@ class PlayerListener(
                 }
             )
 
-            // Show details for each
             recentSold.forEach { auction ->
                 player.sendMessage(
                     mm.deserialize(
@@ -119,7 +119,6 @@ class PlayerListener(
      * Checks if any of the player's orders were filled while offline.
      */
     private suspend fun checkOrderFilledNotifications(playerId: java.util.UUID, player: org.bukkit.entity.Player) {
-        // Get player's orders that were filled
         val filledOrders = orderRepository.getPlayerFilledOrders(playerId)
 
         if (filledOrders.isNotEmpty()) {
@@ -129,7 +128,6 @@ class PlayerListener(
                 }
             )
 
-            // Show details for each
             filledOrders.take(5).forEach { order ->
                 player.sendMessage(
                     mm.deserialize(
@@ -141,9 +139,6 @@ class PlayerListener(
         }
     }
 
-    /**
-     * Formats a price using the economy provider.
-     */
     private fun formatPrice(amount: Double): String {
         return plugin.economy.format(BigDecimal.valueOf(amount))
     }

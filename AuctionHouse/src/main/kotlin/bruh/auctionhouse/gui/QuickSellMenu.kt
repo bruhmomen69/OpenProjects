@@ -50,10 +50,13 @@ class QuickSellMenu(
                 )
                 hideAllFlags()
             })
-            item(27, MenuUtils.backButton(pctx.translationAPI).apply {
+            item(36, MenuUtils.backButton(pctx.translationAPI).apply {
                 onClick { _, _ ->
                     ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
                 }
+            })
+            item(44, MenuUtils.closeButton(pctx.translationAPI).apply {
+                onClick { _, _ -> ClickResult.Close }
             })
             return
         }
@@ -84,7 +87,13 @@ class QuickSellMenu(
             hideAllFlags()
         })
 
-        item(31, VItem(if (confirmationPending) XMaterial.GOLD_BLOCK else XMaterial.EMERALD_BLOCK) {
+        item(36, MenuUtils.backButton(pctx.translationAPI).apply {
+            onClick { _, _ ->
+                ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
+            }
+        })
+
+        item(40, VItem(if (confirmationPending) XMaterial.GOLD_BLOCK else XMaterial.EMERALD_BLOCK) {
             name = pctx.mm.deserialize(if (confirmationPending) "<yellow>⚠ Click Again to Confirm" else "<green>Confirm Quick Sell")
             val loreList = mutableListOf<Component>()
             loreList.add(pctx.mm.deserialize("<gray>Quantity: <white>$sellQuantity"))
@@ -122,7 +131,9 @@ class QuickSellMenu(
                                     item.amount -= sellQuantity
                                 }
                             }
-                            is ServiceResult.Failure -> {}
+                            is ServiceResult.Failure -> {
+                                pctx.plugin.slF4JLogger.warn("QuickSell failed for ${pctx.player.name}: ${result.message}")
+                            }
                         }
                         pctx.player.sendMessage(result.message)
                         controls.close()
@@ -132,10 +143,8 @@ class QuickSellMenu(
             }
         })
 
-        item(27, MenuUtils.backButton(pctx.translationAPI).apply {
-            onClick { _, _ ->
-                ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
-            }
+        item(44, MenuUtils.closeButton(pctx.translationAPI).apply {
+            onClick { _, _ -> ClickResult.Close }
         })
     }
 }

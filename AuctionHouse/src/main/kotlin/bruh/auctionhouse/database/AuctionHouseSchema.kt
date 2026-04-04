@@ -574,6 +574,174 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                     ALTER TABLE watchlist ADD COLUMN order_type TEXT NULL
                 """)
             })
+        },
+        migration(8, "Add version columns for optimistic locking and SQLite indexes") {
+            // Add version column to auctions for optimistic locking
+            execute(sql {
+                mysql("""
+                    ALTER TABLE auctions ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                postgres("""
+                    ALTER TABLE auctions ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                sqlite("""
+                    ALTER TABLE auctions ADD COLUMN version INTEGER NOT NULL DEFAULT 1
+                """)
+            })
+
+            // Add version column to orders for optimistic locking
+            execute(sql {
+                mysql("""
+                    ALTER TABLE orders ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                postgres("""
+                    ALTER TABLE orders ADD COLUMN version INT NOT NULL DEFAULT 1
+                """)
+                sqlite("""
+                    ALTER TABLE orders ADD COLUMN version INTEGER NOT NULL DEFAULT 1
+                """)
+            })
+
+            // Add SQLite indexes (MySQL/PostgreSQL already have these from migration 1)
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_status ON auctions(status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_seller ON auctions(seller_uuid, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_ends_at ON auctions(ends_at, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_auctions_material ON auctions(item_material, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_bids_auction ON auction_bids(auction_id, bid_amount DESC)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_bids_bidder ON auction_bids(bidder_uuid)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_creator ON orders(creator_uuid, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_item ON orders(item_material, status, order_type)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_orders_expires ON orders(expires_at, status)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_order_fills_order ON order_fills(order_id)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_expired_items_owner ON expired_items(owner_uuid, claimed)
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    CREATE INDEX IF NOT EXISTS idx_expired_items_expired ON expired_items(expired_at)
+                """)
+            })
+        },
+        migration(9, "Make watchlist.auction_id nullable and add order unique constraint") {
+            // MySQL: Make auction_id nullable and add unique constraint for orders
+            execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist MODIFY COLUMN auction_id VARCHAR(36) NULL
+                """)
+            })
+            execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
+                """)
+            })
+
+            // Postgres: Make auction_id nullable and add unique constraint for orders
+            execute(sql {
+                postgres("""
+                    ALTER TABLE watchlist ALTER COLUMN auction_id DROP NOT NULL
+                """)
+            })
+            execute(sql {
+                postgres("""
+                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
+                """)
+            })
+
+            // SQLite: Table recreation (no direct ALTER COLUMN support)
+            // This preserves all data while making auction_id nullable
+            execute(sql {
+                sqlite("""
+                    -- Create new table with nullable auction_id and order unique constraint
+                    CREATE TABLE watchlist_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        player_uuid TEXT NOT NULL,
+                        auction_id TEXT NULL,
+                        order_id TEXT NULL,
+                        order_type TEXT NULL,
+                        added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        last_notified_at TIMESTAMP,
+                        has_new_activity INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE(player_uuid, auction_id),
+                        UNIQUE(player_uuid, order_id)
+                    )
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    -- Copy existing data (auction_id remains as-is, order_id/order_type are NULL for auction entries)
+                    INSERT INTO watchlist_new (id, player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity)
+                    SELECT id, player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity
+                    FROM watchlist
+                """)
+            })
+            execute(sql {
+                sqlite("""
+                    -- Drop old table and rename new one
+                    DROP TABLE watchlist;
+                    ALTER TABLE watchlist_new RENAME TO watchlist
+                """)
+            })
+        },
+        migration(10, "Add composite index for ending soon sort query") {
+            // This composite index optimizes the common query:
+            // WHERE status = 'ACTIVE' ... ORDER BY ends_at ASC
+            // Used by getActiveAuctions with AuctionSort.ENDING_SOON
+            execute(sql {
+                mysql("CREATE INDEX idx_auctions_status_ends_at ON auctions(status, ends_at)")
+            })
+            execute(sql {
+                postgres("CREATE INDEX IF NOT EXISTS idx_auctions_status_ends_at ON auctions(status, ends_at)")
+            })
+            execute(sql {
+                sqlite("CREATE INDEX IF NOT EXISTS idx_auctions_status_ends_at ON auctions(status, ends_at)")
+            })
         }
     )
 }

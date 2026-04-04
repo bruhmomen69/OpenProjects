@@ -2,6 +2,8 @@ package bruh.auctionhouse.database
 
 import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.model.WatchlistEntry
+import bruh.auctionhouse.util.safeValueOf
+import bruh.auctionhouse.util.safeValueOfOrNull
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
@@ -16,12 +18,9 @@ class WatchlistRepository(private val database: Database) {
 
     /**
      * Adds an auction to a player's watchlist.
+     * Uses INSERT OR IGNORE to prevent TOCTOU race conditions.
      */
     suspend fun add(playerUuid: UUID, auctionId: UUID): WatchlistEntry? = withContext(Dispatchers.IO) {
-        // Check if already watching
-        val existing = getByAuction(playerUuid, auctionId)
-        if (existing != null) return@withContext null
-
         val entry = WatchlistEntry(
             playerUuid = playerUuid,
             auctionId = auctionId
@@ -29,8 +28,9 @@ class WatchlistRepository(private val database: Database) {
 
         database.execute(
             sql {
-                mysql("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?)")
-                sqlite("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?)")
+                mysql("INSERT IGNORE INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?)")
+                sqlite("INSERT OR IGNORE INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?)")
+                postgres("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, ?, NULL, NULL, ?, ?, ?) ON CONFLICT (player_uuid, auction_id) DO NOTHING")
             },
             entry.playerUuid.toString(),
             entry.auctionId.toString(),
@@ -39,24 +39,15 @@ class WatchlistRepository(private val database: Database) {
             entry.hasNewActivity
         )
 
-        // Get the created entry with ID
-        val id = database.querySingle(
-            sql("SELECT id FROM watchlist WHERE player_uuid = ? AND auction_id = ?"),
-            playerUuid.toString(),
-            auctionId.toString()
-        ) { rs -> rs.getLong("id") }
-
-        entry.copy(id = id ?: 0)
+        // Get the entry (may have been inserted by us or already existed)
+        getByAuction(playerUuid, auctionId)
     }
 
     /**
      * Adds an order to a player's watchlist.
+     * Uses INSERT OR IGNORE to prevent TOCTOU race conditions.
      */
     suspend fun addOrder(playerUuid: UUID, orderId: UUID, orderType: OrderType): WatchlistEntry? = withContext(Dispatchers.IO) {
-        // Check if already watching
-        val existing = getByOrder(playerUuid, orderId)
-        if (existing != null) return@withContext null
-
         val entry = WatchlistEntry(
             playerUuid = playerUuid,
             orderId = orderId,
@@ -65,8 +56,9 @@ class WatchlistRepository(private val database: Database) {
 
         database.execute(
             sql {
-                mysql("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?)")
-                sqlite("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?)")
+                mysql("INSERT IGNORE INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?)")
+                sqlite("INSERT OR IGNORE INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO watchlist (player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity) VALUES (?, NULL, ?, ?, ?, ?, ?) ON CONFLICT (player_uuid, order_id) DO NOTHING")
             },
             entry.playerUuid.toString(),
             entry.orderId.toString(),
@@ -76,14 +68,8 @@ class WatchlistRepository(private val database: Database) {
             entry.hasNewActivity
         )
 
-        // Get the created entry with ID
-        val id = database.querySingle(
-            sql("SELECT id FROM watchlist WHERE player_uuid = ? AND order_id = ?"),
-            playerUuid.toString(),
-            orderId.toString()
-        ) { rs -> rs.getLong("id") }
-
-        entry.copy(id = id ?: 0)
+        // Get the entry (may have been inserted by us or already existed)
+        getByOrder(playerUuid, orderId)
     }
 
     /**
@@ -122,7 +108,7 @@ class WatchlistRepository(private val database: Database) {
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
                 auctionId = UUID.fromString(rs.getString("auction_id")),
                 orderId = rs.getString("order_id")?.let { UUID.fromString(it) },
-                orderType = rs.getString("order_type")?.let { OrderType.valueOf(it) },
+                orderType = rs.getString("order_type")?.let { safeValueOfOrNull<OrderType>(it) },
                 addedAt = rs.getTimestamp("added_at").toInstant(),
                 lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
                 hasNewActivity = rs.getBoolean("has_new_activity")
@@ -144,7 +130,7 @@ class WatchlistRepository(private val database: Database) {
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
                 auctionId = rs.getString("auction_id")?.let { UUID.fromString(it) },
                 orderId = UUID.fromString(rs.getString("order_id")),
-                orderType = rs.getString("order_type")?.let { OrderType.valueOf(it) },
+                orderType = rs.getString("order_type")?.let { safeValueOfOrNull<OrderType>(it) },
                 addedAt = rs.getTimestamp("added_at").toInstant(),
                 lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
                 hasNewActivity = rs.getBoolean("has_new_activity")
@@ -165,7 +151,7 @@ class WatchlistRepository(private val database: Database) {
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
                 auctionId = rs.getString("auction_id")?.let { UUID.fromString(it) },
                 orderId = rs.getString("order_id")?.let { UUID.fromString(it) },
-                orderType = rs.getString("order_type")?.let { OrderType.valueOf(it) },
+                orderType = rs.getString("order_type")?.let { safeValueOfOrNull<OrderType>(it) },
                 addedAt = rs.getTimestamp("added_at").toInstant(),
                 lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
                 hasNewActivity = rs.getBoolean("has_new_activity")
@@ -207,7 +193,7 @@ class WatchlistRepository(private val database: Database) {
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
                 auctionId = null,
                 orderId = UUID.fromString(rs.getString("order_id")),
-                orderType = OrderType.valueOf(rs.getString("order_type")),
+                orderType = safeValueOf<OrderType>(rs.getString("order_type"), OrderType.BUY_ORDER),
                 addedAt = rs.getTimestamp("added_at").toInstant(),
                 lastNotifiedAt = rs.getTimestamp("last_notified_at")?.toInstant(),
                 hasNewActivity = rs.getBoolean("has_new_activity")

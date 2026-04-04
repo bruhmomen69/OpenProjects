@@ -18,6 +18,7 @@ enum class AuctionMessages(
     AUCTION_CREATED("auction_created", "<green>Your auction has been created!"),
     AUCTION_CREATED_FEE("auction_created_fee", "<yellow>Listing fee: <gold><fee></gold> charged."),
     AUCTION_INVALID_ITEM("auction_invalid_item", "<red>You cannot auction this item."),
+    AUCTION_CREATION_FAILED("auction_creation_failed", "<red>Failed to create auction. Please try again later."),
     AUCTION_BLACKLISTED("auction_blacklisted", "<red>This item type is blacklisted."),
     AUCTION_PRICE_TOO_LOW("auction_price_too_low", "<red>Price must be at least <gold><min></gold>."),
     AUCTION_PRICE_TOO_HIGH("auction_price_too_high", "<red>Price cannot exceed <gold><max></gold>."),

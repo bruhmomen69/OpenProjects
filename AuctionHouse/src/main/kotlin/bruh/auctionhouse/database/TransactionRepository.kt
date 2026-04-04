@@ -2,7 +2,9 @@ package bruh.auctionhouse.database
 
 import bruh.auctionhouse.model.Transaction
 import bruh.auctionhouse.model.TransactionType
+import bruh.auctionhouse.util.safeValueOf
 import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.TransactionScope
 import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -22,6 +24,7 @@ class TransactionRepository(private val database: Database) {
             sql {
                 mysql("INSERT INTO transactions (transaction_type, from_uuid, from_name, to_uuid, to_name, amount, tax_amount, item_material, item_quantity, reference_id, timestamp, server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
                 sqlite("INSERT INTO transactions (transaction_type, from_uuid, from_name, to_uuid, to_name, amount, tax_amount, item_material, item_quantity, reference_id, timestamp, server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO transactions (transaction_type, from_uuid, from_name, to_uuid, to_name, amount, tax_amount, item_material, item_quantity, reference_id, timestamp, server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             },
             transaction.transactionType.name,
             transaction.fromUuid?.toString(),
@@ -39,6 +42,32 @@ class TransactionRepository(private val database: Database) {
     }
 
     /**
+     * Creates a new transaction record within an existing transaction scope.
+     * Uses the transaction's connection so the insert participates in the parent transaction.
+     */
+    suspend fun create(scope: TransactionScope, transaction: Transaction): Int {
+        return scope.execute(
+            sql {
+                mysql("INSERT INTO transactions (transaction_type, from_uuid, from_name, to_uuid, to_name, amount, tax_amount, item_material, item_quantity, reference_id, timestamp, server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                sqlite("INSERT INTO transactions (transaction_type, from_uuid, from_name, to_uuid, to_name, amount, tax_amount, item_material, item_quantity, reference_id, timestamp, server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO transactions (transaction_type, from_uuid, from_name, to_uuid, to_name, amount, tax_amount, item_material, item_quantity, reference_id, timestamp, server_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            },
+            transaction.transactionType.name,
+            transaction.fromUuid?.toString(),
+            transaction.fromName,
+            transaction.toUuid?.toString(),
+            transaction.toName,
+            transaction.amount,
+            transaction.taxAmount,
+            transaction.itemMaterial,
+            transaction.itemQuantity,
+            transaction.referenceId?.toString(),
+            transaction.timestamp,
+            transaction.serverId
+        )
+    }
+
+    /**
      * Gets transactions by reference ID (auction/order ID).
      */
     suspend fun getByReferenceId(referenceId: UUID): List<Transaction> = withContext(Dispatchers.IO) {
@@ -48,7 +77,7 @@ class TransactionRepository(private val database: Database) {
         ) { rs ->
             Transaction(
                 id = rs.getLong("id"),
-                transactionType = TransactionType.valueOf(rs.getString("transaction_type")),
+                transactionType = safeValueOf<TransactionType>(rs.getString("transaction_type"), TransactionType.AUCTION_SALE),
                 fromUuid = rs.getString("from_uuid")?.let { UUID.fromString(it) },
                 fromName = rs.getString("from_name"),
                 toUuid = rs.getString("to_uuid")?.let { UUID.fromString(it) },
@@ -76,7 +105,7 @@ class TransactionRepository(private val database: Database) {
         ) { rs ->
             Transaction(
                 id = rs.getLong("id"),
-                transactionType = TransactionType.valueOf(rs.getString("transaction_type")),
+                transactionType = safeValueOf<TransactionType>(rs.getString("transaction_type"), TransactionType.AUCTION_SALE),
                 fromUuid = rs.getString("from_uuid")?.let { UUID.fromString(it) },
                 fromName = rs.getString("from_name"),
                 toUuid = rs.getString("to_uuid")?.let { UUID.fromString(it) },
@@ -132,7 +161,7 @@ class TransactionRepository(private val database: Database) {
         ) { rs ->
             Transaction(
                 id = rs.getLong("id"),
-                transactionType = TransactionType.valueOf(rs.getString("transaction_type")),
+                transactionType = safeValueOf<TransactionType>(rs.getString("transaction_type"), TransactionType.AUCTION_SALE),
                 fromUuid = rs.getString("from_uuid")?.let { UUID.fromString(it) },
                 fromName = rs.getString("from_name"),
                 toUuid = rs.getString("to_uuid")?.let { UUID.fromString(it) },
@@ -198,7 +227,7 @@ class TransactionRepository(private val database: Database) {
         ) { rs ->
             Transaction(
                 id = rs.getLong("id"),
-                transactionType = TransactionType.valueOf(rs.getString("transaction_type")),
+                transactionType = safeValueOf<TransactionType>(rs.getString("transaction_type"), TransactionType.AUCTION_SALE),
                 fromUuid = rs.getString("from_uuid")?.let { UUID.fromString(it) },
                 fromName = rs.getString("from_name"),
                 toUuid = rs.getString("to_uuid")?.let { UUID.fromString(it) },

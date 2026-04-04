@@ -16,19 +16,16 @@ class PlayerBanRepository(private val database: Database) {
 
     /**
      * Adds a ban for a player.
+     * Uses INSERT OR IGNORE to prevent TOCTOU race conditions.
      *
      * @param ban The ban to add
      * @return true if the ban was added, false if a ban already exists
      */
     suspend fun addBan(ban: PlayerBan): Boolean = withContext(Dispatchers.IO) {
-        // Check if already banned
-        val existing = getByPlayerUuid(ban.playerUuid)
-        if (existing != null) return@withContext false
-
-        database.execute(
+        val rowsAffected = database.execute(
             sql {
                 mysql("""
-                    INSERT INTO player_bans (
+                    INSERT IGNORE INTO player_bans (
                         player_uuid, player_name, ban_reason,
                         banned_at, banned_by, banned_by_name
                     ) VALUES (?, ?, ?, ?, ?, ?)
@@ -38,9 +35,10 @@ class PlayerBanRepository(private val database: Database) {
                         player_uuid, player_name, ban_reason,
                         banned_at, banned_by, banned_by_name
                     ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (player_uuid) DO NOTHING
                 """)
                 sqlite("""
-                    INSERT INTO player_bans (
+                    INSERT OR IGNORE INTO player_bans (
                         player_uuid, player_name, ban_reason,
                         banned_at, banned_by, banned_by_name
                     ) VALUES (?, ?, ?, ?, ?, ?)
@@ -52,7 +50,8 @@ class PlayerBanRepository(private val database: Database) {
             ban.bannedAt,
             ban.bannedBy?.toString(),
             ban.bannedByName
-        ) > 0
+        )
+        rowsAffected > 0
     }
 
     /**

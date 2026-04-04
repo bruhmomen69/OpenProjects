@@ -24,12 +24,14 @@ import java.time.Instant
  * 20 - Stacks display (click to edit) (buy orders only)
  * 21 - Stack increment (buy orders only)
  * 22 - Order type toggle
- * 25 - Item decrement (buy orders only)
- * 26 - Items display (click to edit) (buy orders only)
- * 27 - Item increment (buy orders only)
- * 30 - Price per unit
- * 31 - Duration
- * 32 - Allow partial toggle (buy orders only)
+ * 28 - Item decrement (buy orders only)
+ * 29 - Items display (click to edit) (buy orders only)
+ * 30 - Item increment (buy orders only)
+ * 32 - Price per unit
+ * 33 - Duration
+ * 38 - Allow partial toggle (buy orders only)
+ * 39 - NBT match toggle (buy orders only)
+ * 41 - Lore match toggle (buy orders only)
  * 40 - Confirm
  * 45 - Back
  * 53 - Close
@@ -69,27 +71,27 @@ class OrderCreateMenu(
 
         // Buy order controls (only show for buy orders)
         if (orderType == OrderType.BUY_ORDER) {
+            // Stack controls
             item(19, createStackDecrement())
             item(20, createStacksDisplay())
             item(21, createStackIncrement())
 
-            item(25, createItemDecrement())
-            item(26, createItemsDisplay())
-            item(27, createItemIncrement())
+            // Item controls
+            item(28, createItemDecrement())
+            item(29, createItemsDisplay())
+            item(30, createItemIncrement())
 
-            item(32, createPartialToggle())
-            
-            // NBT/Lore matching options (row 4)
-            item(38, createNbtMatchToggle())
+            // Matching options
+            item(38, createPartialToggle())
+            item(39, createNbtMatchToggle())
             item(41, createLoreMatchToggle())
         }
 
-        item(30, createPriceButton())
-        item(31, createDurationButton())
-
-        item(40, createConfirmButton())
+        item(32, createPriceButton())
+        item(33, createDurationButton())
 
         item(45, createBackButton())
+        item(49, createConfirmButton())
         item(53, createCloseButton())
     }
 

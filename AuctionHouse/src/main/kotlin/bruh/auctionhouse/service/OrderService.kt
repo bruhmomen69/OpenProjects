@@ -19,6 +19,7 @@ import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.model.Transaction
 import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.translations.OrderMessages
+import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,7 @@ import java.util.UUID
 class OrderService(
     private val plugin: AuctionHousePlugin,
     private val config: AuctionHouseConfig,
+    private val database: Database,
     private val orderRepository: OrderRepository,
     private val orderFillRepository: OrderFillRepository,
     private val expiredItemRepository: ExpiredItemRepository,
@@ -153,6 +155,36 @@ class OrderService(
             return@withContext CreateOrderResult(
                 false, null, 0.0,
                 translationAPI.getComponentSync(OrderMessages.ORDER_SYSTEM_DISABLED)
+            )
+        }
+
+        // Validate positive values
+        if (quantity <= 0) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_QUANTITY) {
+                    unparsed("min", "1")
+                    unparsed("max", config.orders.maxQuantity.toString())
+                }
+            )
+        }
+        if (pricePerUnit <= 0) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(0.01)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
+            )
+        }
+        // Overflow guard
+        if (pricePerUnit > Double.MAX_VALUE / quantity) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(config.orders.minPricePerUnit)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
             )
         }
 
@@ -282,6 +314,34 @@ class OrderService(
         }
 
         val quantity = item.amount
+        if (quantity <= 0) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_QUANTITY) {
+                    unparsed("min", "1")
+                    unparsed("max", config.orders.maxQuantity.toString())
+                }
+            )
+        }
+        if (pricePerUnit <= 0) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(0.01)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
+            )
+        }
+        // Overflow guard
+        if (pricePerUnit > Double.MAX_VALUE / quantity) {
+            return@withContext CreateOrderResult(
+                false, null, 0.0,
+                translationAPI.getComponentSync(OrderMessages.ORDER_INVALID_PRICE) {
+                    unparsed("min", economy.format(BigDecimal.valueOf(config.orders.minPricePerUnit)))
+                    unparsed("max", economy.format(BigDecimal.valueOf(config.orders.maxPricePerUnit)))
+                }
+            )
+        }
 
         // Validate price
         if (pricePerUnit < config.orders.minPricePerUnit || pricePerUnit > config.orders.maxPricePerUnit) {
@@ -365,6 +425,7 @@ class OrderService(
 
     /**
      * Fulfills an order by providing items (for buy orders) or buying items (for sell orders).
+     * Uses a database transaction with optimistic locking to prevent concurrent overfilling.
      *
      * @param filler The player fulfilling the order
      * @param orderId The ID of the order
@@ -376,6 +437,7 @@ class OrderService(
         orderId: UUID,
         items: List<ItemStack>
     ): FulfillResult = withContext(Dispatchers.IO) {
+        // Pre-validate order (outside transaction)
         val order = orderRepository.getById(orderId)
             ?: return@withContext FulfillResult(
                 false, 0, 0.0,
@@ -396,7 +458,7 @@ class OrderService(
             )
         }
 
-        // Validate items match order requirements (NBT, lore, name based on config)
+        // Validate items match order requirements
         for (item in items) {
             val matchResult = itemMatchesOrder(item, order)
             if (matchResult != ItemMatchResult.Match) {
@@ -416,7 +478,6 @@ class OrderService(
             }
         }
 
-        // Validate items match order requirements
         val totalQuantity = items.sumOf { it.amount }
         val remaining = order.remainingQuantity()
 
@@ -454,8 +515,26 @@ class OrderService(
         val fillFee = calculateFee(fillPrice, config.orders.fillFee)
         val earnings = fillPrice - fillFee
 
+        // Helper to reverse economy operations if transaction fails
+        fun reverseEconomy() {
+            when (order.orderType) {
+                OrderType.BUY_ORDER -> {
+                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                    economy.deposit(creator, BigDecimal.valueOf(fillPrice))
+                    economy.withdraw(filler, BigDecimal.valueOf(earnings))
+                }
+                OrderType.SELL_ORDER -> {
+                    economy.deposit(filler, BigDecimal.valueOf(fillPrice))
+                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                    economy.withdraw(creator, BigDecimal.valueOf(earnings))
+                }
+            }
+        }
+
         // For buy orders: creator pays filler
         // For sell orders: filler pays creator
+        // Perform economy operations outside transaction (economy is external).
+        // Wrapped in try-catch so if the DB transaction throws, we reverse the economy ops.
         when (order.orderType) {
             OrderType.BUY_ORDER -> {
                 // Check creator still has funds
@@ -470,15 +549,114 @@ class OrderService(
                     )
                 }
 
-                // Transfer funds
+                // Transfer funds: creator pays filler
                 val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
                 economy.withdraw(creator, BigDecimal.valueOf(fillPrice))
                 economy.deposit(filler, BigDecimal.valueOf(earnings))
+            }
 
+            OrderType.SELL_ORDER -> {
+                if (!economy.has(filler, BigDecimal.valueOf(fillPrice))) {
+                    return@withContext FulfillResult(
+                        false, 0, 0.0,
+                        translationAPI.getComponent(OrderMessages.ORDER_FULFILL_NO_MONEY)
+                    )
+                }
+
+                // Transfer funds: filler pays creator
+                val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                economy.withdraw(filler, BigDecimal.valueOf(fillPrice))
+                economy.deposit(creator, BigDecimal.valueOf(earnings))
+            }
+        }
+
+        // Atomic database operations inside transaction with optimistic locking
+        data class FulfillTxResult(val rowsAffected: Int, val newFilledQuantity: Int, val newStatus: OrderStatus)
+
+        val txResult: FulfillTxResult
+        try {
+            txResult = database.transaction {
+                // Re-read order inside transaction for fresh state
+                val currentOrder = orderRepository.getById(this, orderId)
+                    ?: return@transaction FulfillTxResult(0, 0, OrderStatus.CANCELLED)
+
+                val newFilledQuantity = currentOrder.quantityFilled + totalQuantity
+                val newStatus = when {
+                    newFilledQuantity >= currentOrder.quantityRequested -> OrderStatus.FILLED
+                    else -> OrderStatus.PARTIAL
+                }
+
+                // Update with version check (returns 0 if version mismatch)
+                val updated = orderRepository.updateFillStatusWithVersion(
+                    this, orderId, newFilledQuantity, newStatus, currentOrder.version
+                )
+
+                if (updated == 0) {
+                    return@transaction FulfillTxResult(0, 0, OrderStatus.CANCELLED)
+                }
+
+                // Create fill record (uses transaction scope for atomicity)
+                val fill = OrderFill(
+                    orderId = orderId,
+                    fillerUuid = filler.uniqueId,
+                    fillerName = filler.name,
+                    quantity = totalQuantity,
+                    pricePerUnit = order.pricePerUnit,
+                    totalPrice = fillPrice,
+                    filledAt = Instant.now()
+                )
+                orderFillRepository.create(this, fill)
+
+                // Log transaction (uses transaction scope for atomicity)
+                transactionRepository.create(
+                    this,
+                    Transaction(
+                        transactionType = TransactionType.ORDER_FILL,
+                        fromUuid = if (order.orderType == OrderType.BUY_ORDER) order.creatorUuid else filler.uniqueId,
+                        fromName = if (order.orderType == OrderType.BUY_ORDER) order.creatorName else filler.name,
+                        toUuid = if (order.orderType == OrderType.BUY_ORDER) filler.uniqueId else order.creatorUuid,
+                        toName = if (order.orderType == OrderType.BUY_ORDER) filler.name else order.creatorName,
+                        amount = earnings,
+                        taxAmount = fillFee,
+                        itemMaterial = order.itemMaterial.name,
+                        itemQuantity = totalQuantity,
+                        referenceId = orderId,
+                        timestamp = Instant.now(),
+                        serverId = serverId
+                    )
+                )
+
+                FulfillTxResult(1, newFilledQuantity, newStatus)
+            }
+
+            // If optimistic lock failed (concurrent fill), reverse economy operations
+            if (txResult.rowsAffected == 0) {
+                reverseEconomy()
+                return@withContext FulfillResult(
+                    false, 0, 0.0,
+                    translationAPI.getComponentSync(OrderMessages.ORDER_ALREADY_FILLED)
+                )
+            }
+        } catch (e: Exception) {
+            // Transaction threw — reverse economy to prevent economic loss, then re-throw
+            logger.error("Transaction failed for order fulfillment $orderId by ${filler.name}, reversing economy", e)
+            try {
+                reverseEconomy()
+            } catch (reversalError: Exception) {
+                logger.error("CRITICAL: Failed to reverse economy for order $orderId (${order.orderType}) after transaction failure", reversalError)
+            }
+            throw e
+        }
+
+        // Item delivery (outside transaction - uses entity dispatcher)
+        val newFilledQuantity = txResult.newFilledQuantity
+        val newStatus = txResult.newStatus
+
+        when (order.orderType) {
+            OrderType.BUY_ORDER -> {
                 // Give items to creator (or store in expired items)
                 plugin.server.getPlayer(order.creatorUuid)?.let { creatorPlayer ->
                     if (config.orders.buyOrdersAlwaysToExpiredItems) {
-                        // Config option: always store in expired items
                         expiredItemManager.storeExpiredItems(
                             ownerUuid = order.creatorUuid,
                             ownerName = order.creatorName,
@@ -491,7 +669,6 @@ class OrderService(
                             translationAPI.getComponentSync(OrderMessages.ORDER_FILLED_NOTIFICATION)
                         )
                     } else {
-                        // Try to give items, store overflow in expired items
                         giveItemsOrStoreExpired(
                             creatorPlayer,
                             order.creatorUuid,
@@ -503,7 +680,6 @@ class OrderService(
                         )
                     }
                 } ?: run {
-                    // Creator offline - store items as expired
                     expiredItemManager.storeExpiredItems(
                         ownerUuid = order.creatorUuid,
                         ownerName = order.creatorName,
@@ -515,7 +691,6 @@ class OrderService(
                 }
 
                 // Remove items from filler AFTER successfully giving to creator
-                // This prevents item loss if any operation fails
                 withContext(plugin.entityDispatcher(filler)) {
                     items.forEach { item ->
                         filler.inventory.removeItemAnySlot(item)
@@ -524,19 +699,9 @@ class OrderService(
             }
 
             OrderType.SELL_ORDER -> {
-                // Filler buys items from creator
-                if (!economy.has(filler, BigDecimal.valueOf(fillPrice))) {
-                    return@withContext FulfillResult(
-                        false, 0, 0.0,
-                        translationAPI.getComponent(OrderMessages.ORDER_FULFILL_NO_MONEY)
-                    )
-                }
-
-                val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
-                economy.withdraw(filler, BigDecimal.valueOf(fillPrice))
-                economy.deposit(creator, BigDecimal.valueOf(earnings))
-
-                // Give items to filler (store overflow in expired items instead of dropping)
+                // Give items to the filler (who paid money to buy from the order creator).
+                // The creator deposited items when creating the sell order; items are delivered
+                // from the order's stored ItemStack. No removal from filler's inventory needed.
                 giveItemsOrStoreExpired(
                     filler,
                     filler.uniqueId,
@@ -546,50 +711,10 @@ class OrderService(
                     ExpiredItemType.ORDER_ITEM,
                     "ORDER_FILL"
                 )
-                // Note: Items are already removed from filler via giveItemsOrStoreExpired
-                // since filler is receiving items, not providing them for sell orders
             }
         }
 
-        // Create fill record
-        val fill = OrderFill(
-            orderId = orderId,
-            fillerUuid = filler.uniqueId,
-            fillerName = filler.name,
-            quantity = totalQuantity,
-            pricePerUnit = order.pricePerUnit,
-            totalPrice = fillPrice,
-            filledAt = Instant.now()
-        )
-        orderFillRepository.create(fill)
-
-        // Update order status
-        val newFilledQuantity = order.quantityFilled + totalQuantity
-        val newStatus = when {
-            newFilledQuantity >= order.quantityRequested -> OrderStatus.FILLED
-            else -> OrderStatus.PARTIAL
-        }
-        orderRepository.updateFillStatus(orderId, newFilledQuantity, newStatus)
-
-        // Log transaction
-        transactionRepository.create(
-            Transaction(
-                transactionType = TransactionType.ORDER_FILL,
-                fromUuid = if (order.orderType == OrderType.BUY_ORDER) order.creatorUuid else filler.uniqueId,
-                fromName = if (order.orderType == OrderType.BUY_ORDER) order.creatorName else filler.name,
-                toUuid = if (order.orderType == OrderType.BUY_ORDER) filler.uniqueId else order.creatorUuid,
-                toName = if (order.orderType == OrderType.BUY_ORDER) filler.name else order.creatorName,
-                amount = earnings,
-                taxAmount = fillFee,
-                itemMaterial = order.itemMaterial.name,
-                itemQuantity = totalQuantity,
-                referenceId = orderId,
-                timestamp = Instant.now(),
-                serverId = serverId
-            )
-        )
-
-        // Notify order creator
+        // Notify order creator (outside transaction)
         plugin.server.getPlayer(order.creatorUuid)?.let { creator ->
             if (newStatus == OrderStatus.FILLED) {
                 creator.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_FILLED))
@@ -792,14 +917,34 @@ class OrderService(
     }
 
     suspend fun processExpiredOrders() = withContext(Dispatchers.IO) {
-        val expiredOrders = orderRepository.getExpiredOrders()
+        // Process in batches to avoid loading too many records at once
+        // Break on too many consecutive errors to prevent infinite loops
+        var consecutiveErrors = 0
+        val maxConsecutiveErrors = 10
 
-        for (order in expiredOrders) {
-            try {
-                processExpiredOrder(order)
-            } catch (e: Exception) {
-                logger.error("Error processing expired order ${order.id}", e)
+        while (consecutiveErrors < maxConsecutiveErrors) {
+            val batch = orderRepository.getExpiredOrders()
+            if (batch.isEmpty()) break
+
+            var batchHadError = false
+            for (order in batch) {
+                try {
+                    processExpiredOrder(order)
+                } catch (e: Exception) {
+                    logger.error("Error processing expired order ${order.id}", e)
+                    batchHadError = true
+                }
             }
+
+            if (batchHadError) {
+                consecutiveErrors++
+            } else {
+                consecutiveErrors = 0
+            }
+        }
+
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+            logger.warn("Stopped processing expired orders after $maxConsecutiveErrors consecutive error batches")
         }
     }
 

@@ -135,16 +135,13 @@ class BulkListMenu(
         })
 
         // Row 3: Pricing and Settings
-        item(10, createStartPriceButton())
+        item(28, createStartPriceButton())
+        item(30, createBinPriceButton())
+        item(32, createDurationButton())
+        item(34, createAnonymousButton())
 
-        item(14, createBinPriceButton())
-
-        item(16, createDurationButton())
-
-        item(19, createAnonymousButton())
-
-        // Row 4: Fee Preview
-        item(22, VItem(XMaterial.GOLD_INGOT) {
+        // Row 4: Info & Action
+        item(39, VItem(XMaterial.GOLD_INGOT) {
             name = pctx.mm.deserialize("<yellow>Fee Preview")
             val loreList = mutableListOf<Component>()
             loreList.add(pctx.mm.deserialize("<gray>Fee per auction: <gold>${MenuUtils.formatPrice(feePerItem, pctx.economy)}"))
@@ -158,8 +155,8 @@ class BulkListMenu(
             hideAllFlags()
         })
 
-        // Row 5: Action Buttons
-        item(38, VItem(XMaterial.LIME_WOOL) {
+        // Row 4: Create Action
+        item(40, VItem(XMaterial.LIME_WOOL) {
             name = pctx.mm.deserialize("<green><bold>Create All Auctions")
             val loreList = mutableListOf<Component>()
             loreList.add(pctx.mm.deserialize("<gray>Creates $quantity auctions"))

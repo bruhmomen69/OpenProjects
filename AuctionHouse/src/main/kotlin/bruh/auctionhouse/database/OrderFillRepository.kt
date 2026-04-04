@@ -2,6 +2,7 @@ package bruh.auctionhouse.database
 
 import bruh.auctionhouse.model.OrderFill
 import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.TransactionScope
 import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,6 +21,7 @@ class OrderFillRepository(private val database: Database) {
             sql {
                 mysql("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
                 sqlite("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
             },
             fill.orderId.toString(),
             fill.fillerUuid.toString(),
@@ -31,6 +33,27 @@ class OrderFillRepository(private val database: Database) {
         ) ?: 0L
     }
     
+    /**
+     * Creates a new order fill record within an existing transaction scope.
+     * Uses the transaction's connection so the insert participates in the parent transaction.
+     */
+    suspend fun create(scope: TransactionScope, fill: OrderFill): Int {
+        return scope.execute(
+            sql {
+                mysql("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                sqlite("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO order_fills (order_id, filler_uuid, filler_name, quantity, price_per_unit, total_price, filled_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            },
+            fill.orderId.toString(),
+            fill.fillerUuid.toString(),
+            fill.fillerName,
+            fill.quantity,
+            fill.pricePerUnit,
+            fill.totalPrice,
+            fill.filledAt
+        )
+    }
+
     /**
      * Gets all fills for a specific order.
      */

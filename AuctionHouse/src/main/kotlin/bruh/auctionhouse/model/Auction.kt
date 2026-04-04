@@ -57,7 +57,8 @@ data class Auction(
     val bidCount: Int = 0,
     val isAnonymous: Boolean = false,
     val extensionCount: Int = 0,
-    val manualExtensionCount: Int = 0
+    val manualExtensionCount: Int = 0,
+    val version: Int = 1
 ) {
     val shortId: String get() = id.toString().take(8)
     

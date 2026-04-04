@@ -42,8 +42,13 @@ class AuctionCreateMenu(
         item(31, createBinPriceButton())
         item(32, createDurationButton())
         item(33, createAnonymousButton())
-        item(38, createConfirmButton())
-        item(42, MenuUtils.closeButton(pctx.translationAPI).apply {
+
+        // Row 5: Navigation
+        item(45, MenuUtils.backButton(pctx.translationAPI).apply {
+            onClick { _, _ -> ClickResult.SwitchMenu(AuctionHouseMenu(pctx)) }
+        })
+        item(49, createConfirmButton())
+        item(53, MenuUtils.closeButton(pctx.translationAPI).apply {
             onClick { _, _ -> ClickResult.Close }
         })
     }

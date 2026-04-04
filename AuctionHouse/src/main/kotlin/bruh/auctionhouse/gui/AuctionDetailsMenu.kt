@@ -30,7 +30,7 @@ class AuctionDetailsMenu(
     private var isWatching by menuState(false)
 
     init {
-        rows = 5
+        rows = 6
         title = pctx.mm.deserialize("<yellow>Auction ${auction.shortId}")
         background = MenuUtils.backgroundItem()
 
@@ -59,20 +59,9 @@ class AuctionDetailsMenu(
         // Display the auction item
         item(13, createAuctionDisplayItem())
 
-        // Bid button (if applicable)
-        if (auction.canBid()) {
-            item(29, createBidButton())
-        }
-
-        // Buy Now button (if applicable)
-        if (auction.canBuyNow()) {
-            item(33, createBuyNowButton())
-        }
-
-        // Cancel button (if owner or admin)
-        if (auction.sellerUuid == pctx.player.uniqueId || pctx.player.hasPermission("auctionhouse.admin.cancel")) {
-            item(31, createCancelButton())
-        }
+        // Row 2: Secondary actions (right side, avoiding column 4 below item)
+        // Watchlist button (heart icon)
+        item(20, createWatchlistButton())
 
         // Edit Price button (if owner, auction is active, and no bids)
         if (auction.sellerUuid == pctx.player.uniqueId && auction.isActive() && auction.bidCount == 0) {
@@ -86,21 +75,34 @@ class AuctionDetailsMenu(
 
         // Bid History button (if there are bids)
         if (auction.bidCount > 0 && pctx.config.auctions.display.showBidHistory) {
-            item(22, createBidHistoryButton())
+            item(24, createBidHistoryButton())
         }
 
-        // Watchlist button (heart icon)
-        item(20, createWatchlistButton())
+        // Row 3: Primary actions (centered at 31)
+        // Bid button (if applicable)
+        if (auction.canBid()) {
+            item(30, createBidButton())
+        }
+
+        // Cancel button (if owner or admin)
+        if (auction.sellerUuid == pctx.player.uniqueId || pctx.player.hasPermission("auctionhouse.admin.cancel")) {
+            item(31, createCancelButton())
+        }
+
+        // Buy Now button (if applicable)
+        if (auction.canBuyNow()) {
+            item(32, createBuyNowButton())
+        }
 
         // Back button
-        item(36, MenuUtils.backButton(pctx.translationAPI).apply {
+        item(45, MenuUtils.backButton(pctx.translationAPI).apply {
             onClick { _, _ ->
                 ClickResult.SwitchMenu(AuctionHouseMenu(pctx))
             }
         })
 
         // Close button
-        item(44, MenuUtils.closeButton(pctx.translationAPI).apply {
+        item(53, MenuUtils.closeButton(pctx.translationAPI).apply {
             onClick { _, _ -> ClickResult.Close }
         })
     }
@@ -258,7 +260,7 @@ class AuctionDetailsMenu(
 
     private fun createEditPriceMenu(): SimpleMenu {
         return SimpleMenu().apply {
-            rows = 5
+            rows = 6
             title = pctx.mm.deserialize("<yellow>Edit Auction Prices")
             background = MenuUtils.backgroundItem()
 
@@ -277,7 +279,7 @@ class AuctionDetailsMenu(
             })
 
             // Edit start price button
-            item(29, VItem(XMaterial.GOLD_NUGGET) {
+            item(30, VItem(XMaterial.GOLD_NUGGET) {
                 name = pctx.mm.deserialize("<yellow>Edit Start Price")
                 lore = mutableListOf(pctx.mm.deserialize("<gray>Current: ${MenuUtils.formatPrice(auction.startPrice, pctx.economy)}"))
                 hideAllFlags()
@@ -306,7 +308,7 @@ class AuctionDetailsMenu(
             })
 
             // Edit BIN price button
-            item(31, VItem(XMaterial.EMERALD) {
+            item(32, VItem(XMaterial.EMERALD) {
                 name = pctx.mm.deserialize("<yellow>Edit BIN Price")
                 val loreList = mutableListOf<Component>()
                 auction.buyNowPrice?.let { binPrice ->
@@ -364,7 +366,7 @@ class AuctionDetailsMenu(
             })
 
             // Back button
-            item(40, MenuUtils.backButton(pctx.translationAPI).apply {
+            item(45, MenuUtils.backButton(pctx.translationAPI).apply {
                 onClick { _, _ ->
                     ClickResult.SwitchMenu(this@AuctionDetailsMenu)
                 }
@@ -564,10 +566,15 @@ class AuctionDetailsMenu(
             }
 
             // Back button
-            item(49, MenuUtils.backButton(pctx.translationAPI).apply {
+            item(45, MenuUtils.backButton(pctx.translationAPI).apply {
                 onClick { _, _ ->
                     ClickResult.SwitchMenu(AuctionDetailsMenu(pctx, auction))
                 }
+            })
+
+            // Close button
+            item(53, MenuUtils.closeButton(pctx.translationAPI).apply {
+                onClick { _, _ -> ClickResult.Close }
             })
         }
     }

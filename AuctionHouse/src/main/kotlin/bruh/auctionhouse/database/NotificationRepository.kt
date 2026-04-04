@@ -2,6 +2,7 @@ package bruh.auctionhouse.database
 
 import bruh.auctionhouse.model.Notification
 import bruh.auctionhouse.model.NotificationType
+import bruh.auctionhouse.util.safeValueOf
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ class NotificationRepository(private val database: Database) {
             sql {
                 mysql("INSERT INTO notifications (player_uuid, type, title, message, related_auction_id, related_order_id, created_at, is_read, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
                 sqlite("INSERT INTO notifications (player_uuid, type, title, message, related_auction_id, related_order_id, created_at, is_read, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO notifications (player_uuid, type, title, message, related_auction_id, related_order_id, created_at, is_read, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
             },
             notification.playerUuid.toString(),
             notification.type.name,
@@ -48,7 +50,7 @@ class NotificationRepository(private val database: Database) {
             Notification(
                 id = rs.getLong("id"),
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
-                type = NotificationType.valueOf(rs.getString("type")),
+                type = safeValueOf<NotificationType>(rs.getString("type"), NotificationType.GENERAL),
                 title = rs.getString("title"),
                 message = rs.getString("message"),
                 relatedAuctionId = rs.getString("related_auction_id")?.let { UUID.fromString(it) },
@@ -87,7 +89,7 @@ class NotificationRepository(private val database: Database) {
             Notification(
                 id = rs.getLong("id"),
                 playerUuid = UUID.fromString(rs.getString("player_uuid")),
-                type = NotificationType.valueOf(rs.getString("type")),
+                type = safeValueOf<NotificationType>(rs.getString("type"), NotificationType.GENERAL),
                 title = rs.getString("title"),
                 message = rs.getString("message"),
                 relatedAuctionId = rs.getString("related_auction_id")?.let { UUID.fromString(it) },

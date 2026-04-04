@@ -166,24 +166,8 @@ class AdminDashboardMenu(
             }
         })
 
-        // Row 3: Purge data
-        item(37, VItem(XMaterial.TNT) {
-            name = pctx.translationAPI.getComponentSync(GuiMessages.ADMIN_PURGE_DATA)
-            lore = mutableListOf(
-                pctx.mm.deserialize("<red>Delete old records"),
-                Component.empty(),
-                pctx.mm.deserialize("<green>Click to purge")
-            )
-            hideAllFlags()
-
-            onClick { _, _ ->
-                pctx.player.performCommand("ahadmin purge 30")
-                ClickResult.Close
-            }
-        })
-
         // Row 3: Reload config
-        item(41, VItem(XMaterial.REPEATER) {
+        item(31, VItem(XMaterial.REPEATER) {
             name = pctx.translationAPI.getComponentSync(GuiMessages.ADMIN_RELOAD_CONFIG)
             lore = mutableListOf(
                 pctx.mm.deserialize("<yellow>Reload configuration"),
@@ -198,8 +182,24 @@ class AdminDashboardMenu(
             }
         })
 
+        // Row 4: Purge data (separated from safe actions above)
+        item(39, VItem(XMaterial.TNT) {
+            name = pctx.translationAPI.getComponentSync(GuiMessages.ADMIN_PURGE_DATA)
+            lore = mutableListOf(
+                pctx.mm.deserialize("<red>Delete old records"),
+                Component.empty(),
+                pctx.mm.deserialize("<green>Click to purge")
+            )
+            hideAllFlags()
+
+            onClick { _, _ ->
+                pctx.player.performCommand("ahadmin purge 30")
+                ClickResult.Close
+            }
+        })
+
         // Row 5: Close button
-        item(49, MenuUtils.closeButton(pctx.translationAPI).apply {
+        item(53, MenuUtils.closeButton(pctx.translationAPI).apply {
             onClick { _, _ -> ClickResult.Close }
         })
     }

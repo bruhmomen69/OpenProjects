@@ -51,7 +51,8 @@ data class Order(
     val filledAt: Instant? = null,
     
     val allowPartial: Boolean = true,
-    val minFillQuantity: Int? = null
+    val minFillQuantity: Int? = null,
+    val version: Int = 1
 ) {
     val shortId: String get() = id.toString().take(8)
     

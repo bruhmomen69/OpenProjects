@@ -21,6 +21,20 @@ import java.time.Instant
 import java.util.UUID
 
 /**
+ * Transaction isolation levels for concurrent access control.
+ */
+enum class TransactionIsolation {
+    /** Default isolation level (READ_COMMITTED for most databases). */
+    DEFAULT,
+    /**
+     * Serializable isolation - prevents phantom reads and ensures full transaction isolation.
+     * In SQLite, this is equivalent to BEGIN IMMEDIATE or BEGIN EXCLUSIVE.
+     * Use for critical operations that require strict consistency (e.g., auction bidding).
+     */
+    SERIALIZABLE
+}
+
+/**
  * Main database class providing connection pooling, query execution, and migration support.
  * 
  * Usage:
@@ -330,18 +344,33 @@ class Database private constructor(
      * Executes operations within a transaction.
      * All operations in the block share the same connection and will be committed
      * together, or rolled back if an exception occurs.
+     * @param isolation The transaction isolation level. Use SERIALIZABLE for operations
+     *                  that require strict consistency (e.g., auction bidding).
      * @param block The operations to execute
      * @return The result of the block
      */
     suspend fun <T> transaction(
+        isolation: TransactionIsolation = TransactionIsolation.DEFAULT,
         block: suspend TransactionScope.() -> T
     ): T = withContext(Dispatchers.IO) {
         ensureInitialized()
         
         dataSource.connection.use { connection ->
             val originalAutoCommit = connection.autoCommit
+            val originalIsolation = connection.transactionIsolation
             try {
                 connection.autoCommit = false
+                
+                // Set isolation level if not DEFAULT
+                when (isolation) {
+                    TransactionIsolation.SERIALIZABLE -> {
+                        connection.transactionIsolation = Connection.TRANSACTION_SERIALIZABLE
+                    }
+                    TransactionIsolation.DEFAULT -> {
+                        // Keep original isolation level
+                    }
+                }
+                
                 val scope = TransactionScope(connection, dialect)
                 val result = block(scope)
                 connection.commit()
@@ -351,6 +380,7 @@ class Database private constructor(
                 throw e
             } finally {
                 connection.autoCommit = originalAutoCommit
+                connection.transactionIsolation = originalIsolation
             }
         }
     }

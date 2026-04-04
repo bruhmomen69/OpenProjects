@@ -96,6 +96,16 @@ class OrderFulfillMenu(
         }
 
         item(33, createConfirmButton())
+
+        item(36, MenuUtils.backButton(pctx.translationAPI).apply {
+            onClick { _, _ ->
+                ClickResult.SwitchMenu(OrderBrowserMenu(pctx))
+            }
+        })
+
+        item(44, MenuUtils.closeButton(pctx.translationAPI).apply {
+            onClick { _, _ -> ClickResult.Close }
+        })
     }
 
     private fun buildConfirmOnlyLayout() {

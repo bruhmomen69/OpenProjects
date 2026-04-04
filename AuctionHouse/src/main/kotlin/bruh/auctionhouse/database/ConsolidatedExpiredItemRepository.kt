@@ -3,9 +3,11 @@ package bruh.auctionhouse.database
 import bruh.auctionhouse.model.ClaimResult
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.model.ExpiredItemType
+import bruh.auctionhouse.util.safeValueOf
 import bruh.auctionhouse.util.toBigInteger
 import bruh.auctionhouse.util.toUuid
 import bruh.zchat.utils.database.Database
+import bruh.zchat.utils.database.TransactionScope
 import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -65,7 +67,10 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 lastUpdatedAt = now
             )
         } else {
-            // Create new consolidated group
+            // Create new consolidated group.
+            // Use INSERT OR IGNORE to handle TOCTOU race: another thread may have
+            // inserted the same sourceId between our SELECT above and this INSERT.
+            // Always re-read from DB afterward to return the actual persisted entry.
             val newItem = ConsolidatedExpiredItem(
                 id = sourceId, // Use sourceId as the consolidated ID for simplicity
                 ownerUuid = ownerUuid,
@@ -86,14 +91,20 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
             database.execute(
                 sql {
                     mysql("""
-                        INSERT INTO consolidated_expired_items
+                        INSERT IGNORE INTO consolidated_expired_items
                         (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)
                     sqlite("""
+                        INSERT OR IGNORE INTO consolidated_expired_items
+                        (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """)
+                    postgres("""
                         INSERT INTO consolidated_expired_items
                         (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (id) DO NOTHING
                     """)
                 },
                 newItem.id.toBigInteger(),
@@ -112,7 +123,118 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 newItem.isFullyClaimed
             )
 
-            newItem
+            // Re-read to handle TOCTOU: if another thread inserted first,
+            // we return their committed entry (not our stale newItem).
+            getBySourceId(sourceId) ?: newItem
+        }
+    }
+
+    /**
+     * Gets a consolidated item by its source ID within a transaction scope.
+     */
+    suspend fun getBySourceId(scope: TransactionScope, sourceId: UUID): ConsolidatedExpiredItem? {
+        return scope.querySingle(
+            sql("SELECT * FROM consolidated_expired_items WHERE source_id = ?"),
+            sourceId.toBigInteger()
+        ) { rs ->
+            val id = rs.getObject("id", BigInteger::class.java)
+            val ownerUuid = rs.getObject("owner_uuid", BigInteger::class.java)
+            val srcId = rs.getObject("source_id", BigInteger::class.java)
+            ConsolidatedExpiredItem(
+                id = id.toUuid(),
+                ownerUuid = ownerUuid.toUuid(),
+                ownerName = rs.getString("owner_name"),
+                itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
+                sourceId = srcId.toUuid(),
+                itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
+                itemDisplayName = rs.getString("item_display_name"),
+                totalQuantity = rs.getInt("total_quantity"),
+                claimedQuantity = rs.getInt("claimed_quantity"),
+                itemStack = deserializeItem(rs.getBytes("item_stack")),
+                reason = rs.getString("reason"),
+                expiredAt = rs.getTimestamp("expired_at").toInstant(),
+                lastUpdatedAt = rs.getTimestamp("last_updated_at").toInstant(),
+                isFullyClaimed = rs.getBoolean("is_fully_claimed")
+            )
+        }
+    }
+
+    /**
+     * Adds an item to a consolidated group within a transaction scope.
+     * This allows atomic storage alongside other database operations.
+     */
+    suspend fun addItemToGroup(
+        scope: TransactionScope,
+        ownerUuid: UUID,
+        ownerName: String,
+        itemType: ExpiredItemType,
+        sourceId: UUID,
+        itemStack: ItemStack,
+        reason: String,
+        quantity: Int
+    ): ConsolidatedExpiredItem {
+        val existing = getBySourceId(scope, sourceId)
+
+        if (existing != null) {
+            val newQuantity = existing.totalQuantity + quantity
+            val now = Instant.now()
+
+            scope.execute(
+                sql("""
+                    UPDATE consolidated_expired_items
+                    SET total_quantity = ?, last_updated_at = ?
+                    WHERE id = ?
+                """),
+                newQuantity,
+                now,
+                existing.id.toBigInteger()
+            )
+
+            return existing.copy(
+                totalQuantity = newQuantity,
+                lastUpdatedAt = now
+            )
+        } else {
+            val newItem = ConsolidatedExpiredItem(
+                id = sourceId,
+                ownerUuid = ownerUuid,
+                ownerName = ownerName,
+                itemType = itemType,
+                sourceId = sourceId,
+                itemMaterial = itemStack.type,
+                itemDisplayName = itemStack.itemMeta?.displayName?.toString(),
+                totalQuantity = quantity,
+                claimedQuantity = 0,
+                itemStack = itemStack.clone().apply { amount = 1 },
+                reason = reason,
+                expiredAt = Instant.now(),
+                lastUpdatedAt = Instant.now(),
+                isFullyClaimed = false
+            )
+
+            scope.execute(
+                sql("""
+                    INSERT INTO consolidated_expired_items
+                    (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """),
+                newItem.id.toBigInteger(),
+                newItem.ownerUuid.toBigInteger(),
+                newItem.ownerName,
+                newItem.itemType.name,
+                newItem.sourceId.toBigInteger(),
+                newItem.itemMaterial.name,
+                newItem.itemDisplayName,
+                newItem.totalQuantity,
+                newItem.claimedQuantity,
+                serializeItem(newItem.itemStack),
+                newItem.reason,
+                newItem.expiredAt,
+                newItem.lastUpdatedAt,
+                newItem.isFullyClaimed
+            )
+
+            return newItem
         }
     }
 
@@ -131,9 +253,9 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 id = id.toUuid(),
                 ownerUuid = ownerUuid.toUuid(),
                 ownerName = rs.getString("owner_name"),
-                itemType = ExpiredItemType.valueOf(rs.getString("item_type")),
+                itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
                 sourceId = sourceId.toUuid(),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
                 claimedQuantity = rs.getInt("claimed_quantity"),
@@ -161,9 +283,9 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 id = id.toUuid(),
                 ownerUuid = ownerUuid.toUuid(),
                 ownerName = rs.getString("owner_name"),
-                itemType = ExpiredItemType.valueOf(rs.getString("item_type")),
+                itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
                 sourceId = sourceId.toUuid(),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
                 claimedQuantity = rs.getInt("claimed_quantity"),
@@ -191,9 +313,9 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 id = id.toUuid(),
                 ownerUuid = ownerUuid.toUuid(),
                 ownerName = rs.getString("owner_name"),
-                itemType = ExpiredItemType.valueOf(rs.getString("item_type")),
+                itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
                 sourceId = sourceId.toUuid(),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
                 claimedQuantity = rs.getInt("claimed_quantity"),
@@ -207,13 +329,15 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
     }
 
     /**
-     * Claims a specific quantity from a consolidated group.
+     * Claims a specific quantity from a consolidated group using an atomic SQL update.
+     * Uses a WHERE condition to prevent over-claiming if two players claim simultaneously.
      * Returns a ClaimResult with the actual quantity claimed.
      */
     suspend fun claimQuantity(
         groupId: UUID,
         quantityToClaim: Int
     ): ClaimResult = withContext(Dispatchers.IO) {
+        // First, check how much is available (best-effort pre-check)
         val consolidated = getById(groupId)
             ?: return@withContext ClaimResult(false, 0, "Consolidated item not found")
 
@@ -223,21 +347,63 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
         }
 
         val toClaim = minOf(quantityToClaim, available)
-        val newClaimedQuantity = consolidated.claimedQuantity + toClaim
         val now = Instant.now()
-        val isFullyClaimed = newClaimedQuantity >= consolidated.totalQuantity
 
-        database.execute(
+        // Atomic update: only succeeds if the new claimed quantity doesn't exceed total
+        // The WHERE condition (claimed_quantity + ?) <= total_quantity prevents over-claiming
+        val rowsAffected = database.execute(
             sql("""
                 UPDATE consolidated_expired_items
-                SET claimed_quantity = ?, last_updated_at = ?, is_fully_claimed = ?
-                WHERE id = ?
+                SET claimed_quantity = claimed_quantity + ?, last_updated_at = ?, is_fully_claimed = (claimed_quantity + ?) >= total_quantity
+                WHERE id = ? AND (claimed_quantity + ?) <= total_quantity
             """),
-            newClaimedQuantity,
+            toClaim,
             now,
-            isFullyClaimed,
-            groupId.toBigInteger()
+            toClaim,
+            groupId.toBigInteger(),
+            toClaim
         )
+
+        if (rowsAffected == 0) {
+            // Another player claimed items concurrently, try to re-check available
+            val rechecked = getById(groupId)
+            val recheckedAvailable = rechecked?.remainingQuantity() ?: 0
+            if (recheckedAvailable <= 0) {
+                return@withContext ClaimResult(false, 0, "No items remaining to claim")
+            }
+            // Retry with the remaining quantity
+            val retryClaim = minOf(quantityToClaim, recheckedAvailable)
+            val retryRows = database.execute(
+                sql("""
+                    UPDATE consolidated_expired_items
+                    SET claimed_quantity = claimed_quantity + ?, last_updated_at = ?, is_fully_claimed = (claimed_quantity + ?) >= total_quantity
+                    WHERE id = ? AND (claimed_quantity + ?) <= total_quantity
+                """),
+                retryClaim,
+                Instant.now(),
+                retryClaim,
+                groupId.toBigInteger(),
+                retryClaim
+            )
+            if (retryRows == 0) {
+                // Even after retry, atomic update failed. Check final state for a helpful message.
+                val finalCheck = getById(groupId)
+                val finalAvailable = finalCheck?.remainingQuantity() ?: 0
+                return@withContext ClaimResult(
+                    false, 0,
+                    if (finalAvailable > 0) {
+                        "Only $finalAvailable items remaining — try claiming fewer"
+                    } else {
+                        "No items remaining to claim"
+                    }
+                )
+            }
+            return@withContext ClaimResult(
+                success = true,
+                claimedQuantity = retryClaim,
+                message = "Successfully claimed $retryClaim items"
+            )
+        }
 
         ClaimResult(
             success = true,
@@ -304,9 +470,9 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 id = cId.toUuid(),
                 ownerUuid = cOwnerUuid.toUuid(),
                 ownerName = rs.getString("owner_name"),
-                itemType = ExpiredItemType.valueOf(rs.getString("item_type")),
+                itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
                 sourceId = cSourceId.toUuid(),
-                itemMaterial = Material.valueOf(rs.getString("item_material")),
+                itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
                 claimedQuantity = rs.getInt("claimed_quantity"),

@@ -198,7 +198,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         )
 
         orderService = OrderService(
-            this, config, orderRepository, orderFillRepository, expiredItemRepository,
+            this, config, database, orderRepository, orderFillRepository, expiredItemRepository,
             expiredItemManager, transactionRepository, economy, translations, serverId
         )
 
@@ -236,7 +236,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
         // Step 8.5: Register player listener for login notifications
         val playerListener = bruh.auctionhouse.listeners.PlayerListener(
-            this, config, translations, auctionService, bidRepository, orderRepository, orderFillRepository
+            this, config, translations, auctionService, auctionRepository, bidRepository, orderRepository, orderFillRepository
         )
         server.pluginManager.registerEvents(playerListener, this)
         slF4JLogger.info("Player listener registered for login notifications")
