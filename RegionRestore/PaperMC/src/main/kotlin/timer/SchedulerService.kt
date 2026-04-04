@@ -232,16 +232,18 @@ class SchedulerService(
     ) {
         val (activeTime, totalTime) = streamingExecutor.execute(job, audienceScope)
 
-        plugin.slF4JLogger.info(
-            "Restore Timer: ${activeTime}ms active " +
-                "(restore time + packet writing cpu-time aggregated), " +
-                "${totalTime}ms total " +
-                "(wall clock, includes active wall clock time, chunk loading, and more)."
-        )
-        plugin.slF4JLogger.info(
-            "Note that `streamingRestore` is on in your config, " +
-                "and causes a higher active time, but reduces memory usage and chunk load."
-        )
+        if (restoreConfig.logTimer) {
+            plugin.slF4JLogger.info(
+                "Restore Timer: ${activeTime}ms active " +
+                    "(restore time + packet writing cpu-time aggregated), " +
+                    "${totalTime}ms total " +
+                    "(wall clock, includes active wall clock time, chunk loading, and more)."
+            )
+            plugin.slF4JLogger.info(
+                "Note that `streamingRestore` is on in your config, " +
+                    "and causes a higher active time, but reduces memory usage and chunk load."
+            )
+        }
     }
 
     /**
@@ -253,7 +255,9 @@ class SchedulerService(
         start: Long
     ) {
         val duration = legacyExecutor.execute(job, audienceScope)
-        plugin.slF4JLogger.info("Restore took ${duration}ms")
+        if (restoreConfig.logTimer) {
+            plugin.slF4JLogger.info("Restore took ${duration}ms")
+        }
     }
 
     /**

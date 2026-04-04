@@ -80,7 +80,9 @@ data class RestoreConfig(
     @Comment("Do the restore fully async? May cause server instability. `null` here means enable when compatible.")
     val asyncRestore: Boolean? = null,
     @Comment("Stream large restores as chunks are loaded? Makes the restore use more time on CPU, but it will not load all chunks at once, which provides a performance improvement for large sections.")
-    val streamingRestore: Boolean = false
+    val streamingRestore: Boolean = false,
+    @Comment("Log restore timing information to console. Shows active time and total wall clock time for restores.")
+    val logTimer: Boolean = false
 )
 
 @ConfigSerializable
