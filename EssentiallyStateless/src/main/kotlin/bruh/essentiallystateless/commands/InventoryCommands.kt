@@ -2,7 +2,6 @@ package bruh.essentiallystateless.commands
 
 import bruh.essentiallystateless.EssentiallyStatelessPlugin
 import bruh.essentiallystateless.translations.CommandMessages
-import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import kotlinx.coroutines.withContext
@@ -20,8 +19,7 @@ import revxrsal.commands.bukkit.annotation.CommandPermission
  */
 class InventoryCommands(
     private val plugin: EssentiallyStatelessPlugin,
-    private val translations: TranslationAPI,
-    private val menuAPI: MenuAPI
+    private val translations: TranslationAPI
 ) {
 
     @Command("anvil")

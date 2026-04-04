@@ -60,8 +60,6 @@ class EssentiallyStatelessPlugin : SuspendingJavaPlugin(), CommandPlugin {
         translations.load()
         slF4JLogger.info("Translation system initialized")
 
-        menuAPI = MenuAPI(this)
-
         setupCommands()
 
         slF4JLogger.info("EssentiallyStateless enabled!")
