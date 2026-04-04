@@ -5,6 +5,7 @@ import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.GuiMessages
 import bruh.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.util.OrderItemMatching
 import bruh.zchat.utils.menuapi.AnvilInputResult
 import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.SimpleMenu
@@ -41,6 +42,10 @@ class OrderFulfillMenu(
     }
 
     private fun validateCanOpen(): Boolean {
+        if (order.orderType == OrderType.SELL_ORDER) {
+            return true
+        }
+
         if (inventoryCount == 0) {
             pctx.player.sendMessage(pctx.translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
                 unparsed("required", remainingQuantity.toString())
@@ -270,7 +275,7 @@ class OrderFulfillMenu(
                 controls.runAsync(
                     action = {
                         val currentInventoryCount = countMatchingItems()
-                        if (currentInventoryCount < quantity) {
+                        if (order.orderType == OrderType.BUY_ORDER && currentInventoryCount < quantity) {
                             pctx.player.sendMessage(pctx.translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
                                 unparsed("required", quantity.toString())
                                 unparsed("have", currentInventoryCount.toString())
@@ -281,7 +286,7 @@ class OrderFulfillMenu(
                         }
 
                         val items = findItemsInInventory()
-                        if (items.isEmpty() && order.orderType == OrderType.BUY_ORDER) {
+                        if (items.isEmpty()) {
                             pctx.player.sendMessage(pctx.translationAPI.getComponentSync(OrderMessages.ORDER_NOT_ENOUGH_ITEMS) {
                                 unparsed("required", quantity.toString())
                                 unparsed("have", "0")
@@ -313,21 +318,25 @@ class OrderFulfillMenu(
     }
 
     private fun findItemsInInventory(): List<ItemStack> {
+        if (order.orderType == OrderType.SELL_ORDER) {
+            val storedItem = order.itemStack ?: return emptyList()
+            return listOf(storedItem.clone().apply { amount = quantity })
+        }
+
         val items = mutableListOf<ItemStack>()
         var remaining = quantity
 
-        for (item in pctx.player.inventory.contents.filterNotNull()) {
+        for (item in pctx.player.inventory.storageContents.filterNotNull()) {
             if (remaining <= 0) break
 
             if (item.type == order.itemMaterial) {
-                val itemDisplayName = item.itemMeta?.displayName()?.let { pctx.mm.serialize(it) }
+                val itemDisplayName = OrderItemMatching.serializeDisplayName(item, pctx.mm)
                 if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
                     continue
                 }
 
                 if (order.itemNbtHash != null) {
-                    val itemNbtHash = computeItemNbtHash(item)
-                    if (order.itemNbtHash != itemNbtHash) {
+                    if (!OrderItemMatching.matchesStoredNbtHash(item, order.itemNbtHash)) {
                         continue
                     }
                 }
@@ -354,16 +363,19 @@ class OrderFulfillMenu(
      * Counts how many matching items the player has in their inventory.
      */
     private fun countMatchingItems(): Int {
-        return pctx.player.inventory.contents.filterNotNull().sumOf { item ->
+        if (order.orderType == OrderType.SELL_ORDER) {
+            return order.remainingQuantity()
+        }
+
+        return pctx.player.inventory.storageContents.filterNotNull().sumOf { item ->
             if (item.type == order.itemMaterial) {
-                val itemDisplayName = item.itemMeta?.displayName()?.let { pctx.mm.serialize(it) }
+                val itemDisplayName = OrderItemMatching.serializeDisplayName(item, pctx.mm)
                 if (order.itemDisplayName != null && order.itemDisplayName != itemDisplayName) {
                     return@sumOf 0
                 }
 
                 if (order.itemNbtHash != null) {
-                    val itemNbtHash = computeItemNbtHash(item)
-                    if (order.itemNbtHash != itemNbtHash) {
+                    if (!OrderItemMatching.matchesStoredNbtHash(item, order.itemNbtHash)) {
                         return@sumOf 0
                     }
                 }
@@ -383,27 +395,10 @@ class OrderFulfillMenu(
     }
 
     private fun computeItemNbtHash(item: ItemStack): String {
-        val meta = item.itemMeta ?: return ""
-        val sb = StringBuilder()
-        
-        meta.enchants.forEach { (enchant, level) ->
-            sb.append(enchant.key.key).append(":").append(level).append(";")
-        }
-        
-        if (meta.hasCustomModelData()) {
-            sb.append("cmd:").append(meta.customModelData).append(";")
-        }
-        
-        meta.itemFlags.forEach { flag ->
-            sb.append("flag:").append(flag.name).append(";")
-        }
-        
-        return sb.toString().hashCode().toString()
+        return OrderItemMatching.computeStoredNbtHash(item)
     }
 
     private fun computeItemLoreHash(item: ItemStack): String {
-        val meta = item.itemMeta ?: return ""
-        val lore = meta.lore ?: return ""
-        return lore.joinToString("|").hashCode().toString()
+        return OrderItemMatching.computeStoredLoreHash(item)
     }
 }

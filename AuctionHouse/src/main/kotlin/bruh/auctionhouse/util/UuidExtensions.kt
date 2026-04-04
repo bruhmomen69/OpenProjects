@@ -1,7 +1,10 @@
 package bruh.auctionhouse.util
 
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.nio.ByteBuffer
+import java.sql.Blob
+import java.sql.ResultSet
 import java.util.UUID
 
 /**
@@ -69,4 +72,29 @@ fun ByteArray.toUuid(): UUID {
 
     val buffer = ByteBuffer.wrap(this)
     return UUID(buffer.long, buffer.long)
+}
+
+/**
+ * Converts supported JDBC UUID representations into a UUID.
+ */
+fun Any?.toStoredUuidOrNull(): UUID? {
+    return when (this) {
+        null -> null
+        is UUID -> this
+        is ByteArray -> this.toUuid()
+        is BigInteger -> this.toUuid()
+        is BigDecimal -> this.toBigInteger().toUuid()
+        is String -> UUID.fromString(this)
+        is Blob -> this.getBytes(1, this.length().toInt()).toUuid()
+        else -> throw IllegalArgumentException("Unsupported UUID storage type: ${this::class.qualifiedName}")
+    }
+}
+
+fun ResultSet.getStoredUuid(columnLabel: String): UUID {
+    return getStoredUuidOrNull(columnLabel)
+        ?: throw IllegalArgumentException("Column '$columnLabel' does not contain a UUID value")
+}
+
+fun ResultSet.getStoredUuidOrNull(columnLabel: String): UUID? {
+    return getObject(columnLabel).toStoredUuidOrNull()
 }

@@ -84,9 +84,9 @@ class AuctionRepository(private val database: Database) {
     suspend fun create(auction: Auction) = withContext(Dispatchers.IO) {
         database.execute(
             sql {
-                mysql("INSERT INTO auctions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                sqlite("INSERT INTO auctions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                postgres("INSERT INTO auctions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                mysql("INSERT INTO auctions (id, seller_uuid, seller_name, item_stack, item_material, item_display_name, auction_type, start_price, buy_now_price, reserve_price, min_increment, status, created_at, ends_at, sold_at, sold_to_uuid, sold_to_name, final_price, view_count, bid_count, is_anonymous, extension_count, manual_extension_count, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                sqlite("INSERT INTO auctions (id, seller_uuid, seller_name, item_stack, item_material, item_display_name, auction_type, start_price, buy_now_price, reserve_price, min_increment, status, created_at, ends_at, sold_at, sold_to_uuid, sold_to_name, final_price, view_count, bid_count, is_anonymous, extension_count, manual_extension_count, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                postgres("INSERT INTO auctions (id, seller_uuid, seller_name, item_stack, item_material, item_display_name, auction_type, start_price, buy_now_price, reserve_price, min_increment, status, created_at, ends_at, sold_at, sold_to_uuid, sold_to_name, final_price, view_count, bid_count, is_anonymous, extension_count, manual_extension_count, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             },
             auction.id.toString(),
             auction.sellerUuid.toString(),
@@ -123,6 +123,7 @@ class AuctionRepository(private val database: Database) {
             sql {
                 mysql("SELECT * FROM auctions WHERE id = ?")
                 sqlite("SELECT * FROM auctions WHERE id = ?")
+                postgres("SELECT * FROM auctions WHERE id = ?")
             },
             id.toString()
         ) { rs -> mapAuction(rs) }
@@ -272,6 +273,14 @@ class AuctionRepository(private val database: Database) {
             sql("UPDATE auctions SET status = ? WHERE id = ?"),
             status.name,
             id.toString()
+        )
+    }
+
+    suspend fun cancelWithVersion(scope: TransactionScope, id: UUID, expectedVersion: Int): Int {
+        return scope.execute(
+            sql("UPDATE auctions SET status = 'CANCELLED', version = version + 1 WHERE id = ? AND status = 'ACTIVE' AND version = ?"),
+            id.toString(),
+            expectedVersion
         )
     }
 

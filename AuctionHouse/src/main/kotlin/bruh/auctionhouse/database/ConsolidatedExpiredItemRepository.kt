@@ -3,9 +3,10 @@ package bruh.auctionhouse.database
 import bruh.auctionhouse.model.ClaimResult
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
 import bruh.auctionhouse.model.ExpiredItemType
+import bruh.auctionhouse.util.getStoredUuid
+import bruh.auctionhouse.util.getStoredUuidOrNull
 import bruh.auctionhouse.util.safeValueOf
-import bruh.auctionhouse.util.toBigInteger
-import bruh.auctionhouse.util.toUuid
+import bruh.auctionhouse.util.toBytes
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.TransactionScope
 import bruh.zchat.utils.database.sql
@@ -13,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
-import java.math.BigInteger
 import java.time.Instant
 import java.util.UUID
 
@@ -59,7 +59,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 """),
                 newQuantity,
                 now,
-                existing.id.toBigInteger()
+                existing.id.toBytes()
             )
 
             existing.copy(
@@ -107,11 +107,11 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                         ON CONFLICT (id) DO NOTHING
                     """)
                 },
-                newItem.id.toBigInteger(),
-                newItem.ownerUuid.toBigInteger(),
+                newItem.id.toBytes(),
+                newItem.ownerUuid.toBytes(),
                 newItem.ownerName,
                 newItem.itemType.name,
-                newItem.sourceId.toBigInteger(),
+                newItem.sourceId.toBytes(),
                 newItem.itemMaterial.name,
                 newItem.itemDisplayName,
                 newItem.totalQuantity,
@@ -135,17 +135,14 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
     suspend fun getBySourceId(scope: TransactionScope, sourceId: UUID): ConsolidatedExpiredItem? {
         return scope.querySingle(
             sql("SELECT * FROM consolidated_expired_items WHERE source_id = ?"),
-            sourceId.toBigInteger()
+            sourceId.toBytes()
         ) { rs ->
-            val id = rs.getObject("id", BigInteger::class.java)
-            val ownerUuid = rs.getObject("owner_uuid", BigInteger::class.java)
-            val srcId = rs.getObject("source_id", BigInteger::class.java)
             ConsolidatedExpiredItem(
-                id = id.toUuid(),
-                ownerUuid = ownerUuid.toUuid(),
+                id = rs.getStoredUuid("id"),
+                ownerUuid = rs.getStoredUuid("owner_uuid"),
                 ownerName = rs.getString("owner_name"),
                 itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
-                sourceId = srcId.toUuid(),
+                sourceId = rs.getStoredUuid("source_id"),
                 itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
@@ -187,7 +184,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 """),
                 newQuantity,
                 now,
-                existing.id.toBigInteger()
+                existing.id.toBytes()
             )
 
             return existing.copy(
@@ -218,11 +215,11 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                     (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """),
-                newItem.id.toBigInteger(),
-                newItem.ownerUuid.toBigInteger(),
+                newItem.id.toBytes(),
+                newItem.ownerUuid.toBytes(),
                 newItem.ownerName,
                 newItem.itemType.name,
-                newItem.sourceId.toBigInteger(),
+                newItem.sourceId.toBytes(),
                 newItem.itemMaterial.name,
                 newItem.itemDisplayName,
                 newItem.totalQuantity,
@@ -244,17 +241,14 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
     suspend fun getPlayerConsolidatedItems(ownerUuid: UUID): List<ConsolidatedExpiredItem> = withContext(Dispatchers.IO) {
         database.query(
             sql("SELECT * FROM consolidated_expired_items WHERE owner_uuid = ? AND is_fully_claimed = FALSE ORDER BY expired_at DESC"),
-            ownerUuid.toBigInteger()
+            ownerUuid.toBytes()
         ) { rs ->
-            val id = rs.getObject("id", BigInteger::class.java)
-            val ownerUuid = rs.getObject("owner_uuid", BigInteger::class.java)
-            val sourceId = rs.getObject("source_id", BigInteger::class.java)
             ConsolidatedExpiredItem(
-                id = id.toUuid(),
-                ownerUuid = ownerUuid.toUuid(),
+                id = rs.getStoredUuid("id"),
+                ownerUuid = rs.getStoredUuid("owner_uuid"),
                 ownerName = rs.getString("owner_name"),
                 itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
-                sourceId = sourceId.toUuid(),
+                sourceId = rs.getStoredUuid("source_id"),
                 itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
@@ -274,17 +268,14 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
     suspend fun getById(id: UUID): ConsolidatedExpiredItem? = withContext(Dispatchers.IO) {
         database.querySingle(
             sql("SELECT * FROM consolidated_expired_items WHERE id = ?"),
-            id.toBigInteger()
+            id.toBytes()
         ) { rs ->
-            val id = rs.getObject("id", BigInteger::class.java)
-            val ownerUuid = rs.getObject("owner_uuid", BigInteger::class.java)
-            val sourceId = rs.getObject("source_id", BigInteger::class.java)
             ConsolidatedExpiredItem(
-                id = id.toUuid(),
-                ownerUuid = ownerUuid.toUuid(),
+                id = rs.getStoredUuid("id"),
+                ownerUuid = rs.getStoredUuid("owner_uuid"),
                 ownerName = rs.getString("owner_name"),
                 itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
-                sourceId = sourceId.toUuid(),
+                sourceId = rs.getStoredUuid("source_id"),
                 itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
@@ -304,17 +295,14 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
     suspend fun getBySourceId(sourceId: UUID): ConsolidatedExpiredItem? = withContext(Dispatchers.IO) {
         database.querySingle(
             sql("SELECT * FROM consolidated_expired_items WHERE source_id = ?"),
-            sourceId.toBigInteger()
+            sourceId.toBytes()
         ) { rs ->
-            val id = rs.getObject("id", BigInteger::class.java)
-            val ownerUuid = rs.getObject("owner_uuid", BigInteger::class.java)
-            val sourceId = rs.getObject("source_id", BigInteger::class.java)
             ConsolidatedExpiredItem(
-                id = id.toUuid(),
-                ownerUuid = ownerUuid.toUuid(),
+                id = rs.getStoredUuid("id"),
+                ownerUuid = rs.getStoredUuid("owner_uuid"),
                 ownerName = rs.getString("owner_name"),
                 itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
-                sourceId = sourceId.toUuid(),
+                sourceId = rs.getStoredUuid("source_id"),
                 itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
@@ -360,7 +348,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
             toClaim,
             now,
             toClaim,
-            groupId.toBigInteger(),
+            groupId.toBytes(),
             toClaim
         )
 
@@ -382,7 +370,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 retryClaim,
                 Instant.now(),
                 retryClaim,
-                groupId.toBigInteger(),
+                groupId.toBytes(),
                 retryClaim
             )
             if (retryRows == 0) {
@@ -423,7 +411,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 WHERE id = ?
             """),
             Instant.now(),
-            groupId.toBigInteger()
+            groupId.toBytes()
         )
     }
 
@@ -433,7 +421,7 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
     suspend fun countPlayerConsolidatedItems(ownerUuid: UUID): Int = withContext(Dispatchers.IO) {
         database.querySingle(
             sql("SELECT COUNT(*) as count FROM consolidated_expired_items WHERE owner_uuid = ? AND is_fully_claimed = FALSE"),
-            ownerUuid.toBigInteger()
+            ownerUuid.toBytes()
         ) { rs ->
             rs.getInt("count")
         } ?: 0
@@ -460,18 +448,14 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
                 WHERE c.owner_uuid = ? AND c.is_fully_claimed = FALSE
                 ORDER BY c.expired_at DESC, e.expired_at DESC
             """),
-            ownerUuid.toBigInteger()
+            ownerUuid.toBytes()
         ) { rs ->
-            val cId = rs.getObject("c_id", BigInteger::class.java)
-            val cOwnerUuid = rs.getObject("c_owner_uuid", BigInteger::class.java)
-            val cSourceId = rs.getObject("c_source_id", BigInteger::class.java)
-            
             val consolidated = ConsolidatedExpiredItem(
-                id = cId.toUuid(),
-                ownerUuid = cOwnerUuid.toUuid(),
+                id = rs.getStoredUuid("c_id"),
+                ownerUuid = rs.getStoredUuid("c_owner_uuid"),
                 ownerName = rs.getString("owner_name"),
                 itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
-                sourceId = cSourceId.toUuid(),
+                sourceId = rs.getStoredUuid("c_source_id"),
                 itemMaterial = safeValueOf<Material>(rs.getString("item_material"), Material.AIR),
                 itemDisplayName = rs.getString("item_display_name"),
                 totalQuantity = rs.getInt("total_quantity"),
@@ -484,20 +468,15 @@ class ConsolidatedExpiredItemRepository(private val database: Database) {
             )
             
             // Check if there's an expired item in this row
-            val eIdObj = rs.getObject("e_id", BigInteger::class.java)
+            val eIdObj = rs.getStoredUuidOrNull("e_id")
             val expiredItem = if (eIdObj != null) {
-                val eId = eIdObj
-                val eOwnerUuid = rs.getObject("e_owner_uuid", BigInteger::class.java)
-                val eSourceId = rs.getObject("e_source_id", BigInteger::class.java)
-                val eGroupId = rs.getObject("consolidated_group_id", BigInteger::class.java)
-                
                 bruh.auctionhouse.model.ExpiredItem(
-                    id = eId.toUuid(),
-                    ownerUuid = eOwnerUuid.toUuid(),
+                    id = eIdObj,
+                    ownerUuid = rs.getStoredUuid("e_owner_uuid"),
                     ownerName = rs.getString("owner_name"),
                     itemType = ExpiredItemType.valueOf(rs.getString("e_item_type")),
-                    sourceId = eSourceId.toUuid(),
-                    consolidatedGroupId = eGroupId?.toUuid(),
+                    sourceId = rs.getStoredUuid("e_source_id"),
+                    consolidatedGroupId = rs.getStoredUuidOrNull("consolidated_group_id"),
                     itemStack = deserializeItem(rs.getBytes("e_item_stack")),
                     reason = rs.getString("e_reason"),
                     expiredAt = rs.getTimestamp("e_expired_at").toInstant(),

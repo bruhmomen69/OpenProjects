@@ -2,16 +2,16 @@ package bruh.auctionhouse.database
 
 import bruh.auctionhouse.model.ExpiredItem
 import bruh.auctionhouse.model.ExpiredItemType
+import bruh.auctionhouse.util.getStoredUuid
+import bruh.auctionhouse.util.getStoredUuidOrNull
 import bruh.auctionhouse.util.safeValueOf
-import bruh.auctionhouse.util.toBigInteger
-import bruh.auctionhouse.util.toUuid
+import bruh.auctionhouse.util.toBytes
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.database.TransactionScope
 import bruh.zchat.utils.database.sql
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.inventory.ItemStack
-import java.math.BigInteger
 import java.sql.ResultSet
 import java.time.Instant
 import java.util.UUID
@@ -25,12 +25,12 @@ class ExpiredItemRepository(private val database: Database) {
     private fun deserializeItem(bytes: ByteArray): ItemStack = ItemStack.deserializeBytes(bytes)
 
     private fun mapExpiredItem(rs: ResultSet): ExpiredItem = ExpiredItem(
-        id = rs.getObject("id", BigInteger::class.java).toUuid(),
-        ownerUuid = rs.getObject("owner_uuid", BigInteger::class.java).toUuid(),
+        id = rs.getStoredUuid("id"),
+        ownerUuid = rs.getStoredUuid("owner_uuid"),
         ownerName = rs.getString("owner_name"),
         itemType = safeValueOf<ExpiredItemType>(rs.getString("item_type"), ExpiredItemType.AUCTION_ITEM),
-        sourceId = rs.getObject("source_id", BigInteger::class.java).toUuid(),
-        consolidatedGroupId = rs.getObject("consolidated_group_id", BigInteger::class.java)?.toUuid(),
+        sourceId = rs.getStoredUuid("source_id"),
+        consolidatedGroupId = rs.getStoredUuidOrNull("consolidated_group_id"),
         itemStack = deserializeItem(rs.getBytes("item_stack")),
         reason = rs.getString("reason"),
         expiredAt = rs.getTimestamp("expired_at").toInstant(),
@@ -48,17 +48,17 @@ class ExpiredItemRepository(private val database: Database) {
                 sqlite("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
                 postgres("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             },
-            expiredItem.id.toBigInteger(),
-            expiredItem.ownerUuid.toBigInteger(),
+            expiredItem.id.toBytes(),
+            expiredItem.ownerUuid.toBytes(),
             expiredItem.ownerName,
             expiredItem.itemType.name,
-            expiredItem.sourceId.toBigInteger(),
+            expiredItem.sourceId.toBytes(),
             serializeItem(expiredItem.itemStack),
             expiredItem.reason,
             expiredItem.expiredAt,
             expiredItem.claimed,
             expiredItem.claimedAt,
-            expiredItem.consolidatedGroupId?.toBigInteger()
+            expiredItem.consolidatedGroupId?.toBytes()
         )
     }
 
@@ -69,17 +69,17 @@ class ExpiredItemRepository(private val database: Database) {
     suspend fun create(scope: TransactionScope, expiredItem: ExpiredItem): Int {
         return scope.execute(
             sql("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
-            expiredItem.id.toBigInteger(),
-            expiredItem.ownerUuid.toBigInteger(),
+            expiredItem.id.toBytes(),
+            expiredItem.ownerUuid.toBytes(),
             expiredItem.ownerName,
             expiredItem.itemType.name,
-            expiredItem.sourceId.toBigInteger(),
+            expiredItem.sourceId.toBytes(),
             serializeItem(expiredItem.itemStack),
             expiredItem.reason,
             expiredItem.expiredAt,
             expiredItem.claimed,
             expiredItem.claimedAt,
-            expiredItem.consolidatedGroupId?.toBigInteger()
+            expiredItem.consolidatedGroupId?.toBytes()
         )
     }
 
@@ -90,17 +90,17 @@ class ExpiredItemRepository(private val database: Database) {
         if (items.isEmpty()) return@withContext
         val paramSets = items.map { item ->
             arrayOf(
-                item.id.toBigInteger(),
-                item.ownerUuid.toBigInteger(),
+                item.id.toBytes(),
+                item.ownerUuid.toBytes(),
                 item.ownerName,
                 item.itemType.name,
-                item.sourceId.toBigInteger(),
+                item.sourceId.toBytes(),
                 serializeItem(item.itemStack),
                 item.reason,
                 item.expiredAt,
                 item.claimed,
                 item.claimedAt,
-                item.consolidatedGroupId?.toBigInteger()
+                item.consolidatedGroupId?.toBytes()
             )
         }
         database.executeBatch(
@@ -115,7 +115,7 @@ class ExpiredItemRepository(private val database: Database) {
     suspend fun getById(id: UUID): ExpiredItem? = withContext(Dispatchers.IO) {
         database.querySingle(
             sql("SELECT * FROM expired_items WHERE id = ?"),
-            id.toBigInteger()
+            id.toBytes()
         ) { rs -> mapExpiredItem(rs) }
     }
     
@@ -125,7 +125,7 @@ class ExpiredItemRepository(private val database: Database) {
     suspend fun getPlayerExpiredItems(ownerUuid: UUID): List<ExpiredItem> = withContext(Dispatchers.IO) {
         database.query(
             sql("SELECT * FROM expired_items WHERE owner_uuid = ? AND claimed = FALSE ORDER BY expired_at DESC"),
-            ownerUuid.toBigInteger()
+            ownerUuid.toBytes()
         ) { rs -> mapExpiredItem(rs) }
     }
     
@@ -136,7 +136,7 @@ class ExpiredItemRepository(private val database: Database) {
         database.execute(
             sql("UPDATE expired_items SET claimed = TRUE, claimed_at = ? WHERE id = ? AND claimed = FALSE"),
             Instant.now(),
-            id.toBigInteger()
+            id.toBytes()
         )
     }
     
@@ -150,6 +150,14 @@ class ExpiredItemRepository(private val database: Database) {
             Instant.now().minusSeconds(days * 86400L)
         )
     }
+
+    suspend fun deleteOldItems(days: Int, itemType: ExpiredItemType): Int = withContext(Dispatchers.IO) {
+        database.execute(
+            sql("DELETE FROM expired_items WHERE expired_at < ? AND item_type = ?"),
+            Instant.now().minusSeconds(days * 86400L),
+            itemType.name
+        )
+    }
     
     /**
      * Counts unclaimed expired items for a specific player.
@@ -157,7 +165,7 @@ class ExpiredItemRepository(private val database: Database) {
     suspend fun countPlayerExpiredItems(ownerUuid: UUID): Int = withContext(Dispatchers.IO) {
         database.querySingle(
             sql("SELECT COUNT(*) as count FROM expired_items WHERE owner_uuid = ? AND claimed = FALSE"),
-            ownerUuid.toBigInteger()
+            ownerUuid.toBytes()
         ) { rs ->
             rs.getInt("count")
         } ?: 0
@@ -169,14 +177,14 @@ class ExpiredItemRepository(private val database: Database) {
     suspend fun getItemsByGroup(consolidatedGroupId: UUID): List<ExpiredItem> = withContext(Dispatchers.IO) {
         database.query(
             sql("SELECT * FROM expired_items WHERE consolidated_group_id = ? AND claimed = FALSE ORDER BY expired_at DESC"),
-            consolidatedGroupId.toBigInteger()
+            consolidatedGroupId.toBytes()
         ) { rs -> mapExpiredItem(rs) }
     }
 
     private suspend fun getItemsByGroup(scope: TransactionScope, consolidatedGroupId: UUID): List<ExpiredItem> {
         return scope.query(
             sql("SELECT * FROM expired_items WHERE consolidated_group_id = ? AND claimed = FALSE ORDER BY expired_at DESC"),
-            consolidatedGroupId.toBigInteger()
+            consolidatedGroupId.toBytes()
         ) { rs -> mapExpiredItem(rs) }
     }
 
@@ -208,7 +216,7 @@ class ExpiredItemRepository(private val database: Database) {
                 val affected = scope.execute(
                     sql("UPDATE expired_items SET claimed = TRUE, claimed_at = ? WHERE id = ? AND claimed = FALSE"),
                     Instant.now(),
-                    item.id.toBigInteger()
+                    item.id.toBytes()
                 )
                 if (affected > 0) {
                     totalMarked += item.itemStack.amount
@@ -223,7 +231,7 @@ class ExpiredItemRepository(private val database: Database) {
                 val affected = scope.execute(
                     sql("UPDATE expired_items SET claimed = TRUE, claimed_at = ? WHERE id = ? AND claimed = FALSE"),
                     Instant.now(),
-                    item.id.toBigInteger()
+                    item.id.toBytes()
                 )
                 if (affected > 0) {
                     // Create remainder entry
@@ -235,17 +243,17 @@ class ExpiredItemRepository(private val database: Database) {
                     // Insert remainder (should not conflict because UUID is random)
                     scope.execute(
                         sql("INSERT INTO expired_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
-                        remainderItem.id.toBigInteger(),
-                        remainderItem.ownerUuid.toBigInteger(),
+                        remainderItem.id.toBytes(),
+                        remainderItem.ownerUuid.toBytes(),
                         remainderItem.ownerName,
                         remainderItem.itemType.name,
-                        remainderItem.sourceId.toBigInteger(),
+                        remainderItem.sourceId.toBytes(),
                         serializeItem(remainderItem.itemStack),
                         remainderItem.reason,
                         remainderItem.expiredAt,
                         remainderItem.claimed,
                         remainderItem.claimedAt,
-                        remainderItem.consolidatedGroupId?.toBigInteger()
+                        remainderItem.consolidatedGroupId?.toBytes()
                     )
                     totalMarked += claimedAmount
                     remainingToMark = 0

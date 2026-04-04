@@ -1,9 +1,11 @@
 package bruh.auctionhouse.service
 
+import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.database.ConsolidatedExpiredItemRepository
 import bruh.auctionhouse.database.ExpiredItemRepository
 import bruh.auctionhouse.model.ClaimResult
 import bruh.auctionhouse.model.ConsolidatedExpiredItem
+import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.entity.Player
@@ -14,6 +16,7 @@ import org.bukkit.inventory.ItemStack
  * Handles inventory space calculation and partial claiming.
  */
 class ConsolidatedExpiredItemService(
+    private val plugin: AuctionHousePlugin,
     private val consolidatedRepository: ConsolidatedExpiredItemRepository,
     private val expiredItemRepository: ExpiredItemRepository
 ) {
@@ -31,10 +34,10 @@ class ConsolidatedExpiredItemService(
         player: Player,
         consolidatedItem: ConsolidatedExpiredItem,
         requestedQuantity: Int
-    ): ClaimResult = withContext(Dispatchers.IO) {
+    ): ClaimResult {
         val remaining = consolidatedItem.remainingQuantity()
         if (remaining <= 0) {
-            return@withContext ClaimResult(
+            return ClaimResult(
                 success = false,
                 claimedQuantity = 0,
                 message = "No items remaining to claim"
@@ -43,59 +46,62 @@ class ConsolidatedExpiredItemService(
 
         val toClaim = requestedQuantity.coerceIn(1, remaining)
 
-        // Calculate how many items can actually fit in inventory
-        val availableSpace = calculateAvailableSpace(player, consolidatedItem.itemStack)
+        val availableSpace = withContext(plugin.entityDispatcher(player)) {
+            calculateAvailableSpace(player, consolidatedItem.itemStack)
+        }
         val actualClaim = minOf(toClaim, availableSpace)
 
         if (actualClaim <= 0) {
-            return@withContext ClaimResult(
+            return ClaimResult(
                 success = false,
                 claimedQuantity = 0,
                 message = "Inventory full"
             )
         }
 
-        // Get individual item stacks from repository
-        val itemStacks = expiredItemRepository.getItemsByGroup(consolidatedItem.id)
+        val itemStacks = withContext(Dispatchers.IO) {
+            expiredItemRepository.getItemsByGroup(consolidatedItem.id)
+        }
 
-        // Give items to player, tracking how many were actually given
-        var given = 0
-        for (item in itemStacks) {
-            if (given >= actualClaim) break
+        val given = withContext(plugin.entityDispatcher(player)) {
+            var delivered = 0
+            for (item in itemStacks) {
+                if (delivered >= actualClaim) break
 
-            val toGive = minOf(item.itemStack.amount, actualClaim - given)
-            val giveStack = item.itemStack.clone().apply { amount = toGive }
+                val toGive = minOf(item.itemStack.amount, actualClaim - delivered)
+                val giveStack = item.itemStack.clone().apply { amount = toGive }
 
-            val remainder = player.inventory.addItem(giveStack)
-            if (remainder.isEmpty()) {
-                given += toGive
-                // Mark individual item as claimed (will be fully marked by repository method)
-            } else {
-                // Couldn't fit - stop here
-                break
+                val remainder = player.inventory.addItem(giveStack)
+                if (remainder.isEmpty()) {
+                    delivered += toGive
+                } else {
+                    break
+                }
             }
+            delivered
         }
 
         if (given <= 0) {
-            return@withContext ClaimResult(
+            return ClaimResult(
                 success = false,
                 claimedQuantity = 0,
                 message = "Failed to add items to inventory"
             )
         }
 
-        // Mark items as claimed in repository
-        val markedQuantity = expiredItemRepository.markItemsAsClaimedByGroup(consolidatedItem.id, given)
-
-        // Update consolidated record
-        val claimResult = consolidatedRepository.claimQuantity(consolidatedItem.id, markedQuantity)
-
-        if (markedQuantity >= remaining) {
-            // All items claimed, mark as fully claimed
-            consolidatedRepository.markFullyClaimed(consolidatedItem.id)
+        val markedQuantity = withContext(Dispatchers.IO) {
+            expiredItemRepository.markItemsAsClaimedByGroup(consolidatedItem.id, given)
         }
 
-        ClaimResult(
+        withContext(Dispatchers.IO) {
+            consolidatedRepository.claimQuantity(consolidatedItem.id, markedQuantity)
+
+            if (markedQuantity >= remaining) {
+                consolidatedRepository.markFullyClaimed(consolidatedItem.id)
+            }
+        }
+
+        return ClaimResult(
             success = true,
             claimedQuantity = markedQuantity,
             message = "Successfully claimed $markedQuantity items"

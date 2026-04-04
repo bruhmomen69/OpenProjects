@@ -187,6 +187,29 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                         min_fill_quantity INTEGER
                     )
                 """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id VARCHAR(36) PRIMARY KEY,
+                        creator_uuid VARCHAR(36) NOT NULL,
+                        creator_name VARCHAR(16) NOT NULL,
+                        order_type VARCHAR(20) NOT NULL,
+                        item_material VARCHAR(64) NOT NULL,
+                        item_display_name TEXT,
+                        item_lore_hash TEXT,
+                        item_nbt_hash TEXT,
+                        item_stack BYTEA,
+                        quantity_requested INT NOT NULL,
+                        quantity_filled INT NOT NULL DEFAULT 0,
+                        price_per_unit DECIMAL(19, 4) NOT NULL,
+                        total_price DECIMAL(19, 4) NOT NULL,
+                        status VARCHAR(20) NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        filled_at TIMESTAMP,
+                        allow_partial BOOLEAN NOT NULL DEFAULT TRUE,
+                        min_fill_quantity INT
+                    )
+                """)
             })
             
             // order_fills table
@@ -216,17 +239,29 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                         filled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                     )
                 """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS order_fills (
+                        id BIGSERIAL PRIMARY KEY,
+                        order_id VARCHAR(36) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                        filler_uuid VARCHAR(36) NOT NULL,
+                        filler_name VARCHAR(16) NOT NULL,
+                        quantity INT NOT NULL,
+                        price_per_unit DECIMAL(19, 4) NOT NULL,
+                        total_price DECIMAL(19, 4) NOT NULL,
+                        filled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
             })
             
             // expired_items table
             execute(sql {
                 mysql("""
                     CREATE TABLE IF NOT EXISTS expired_items (
-                        id VARCHAR(36) PRIMARY KEY,
-                        owner_uuid VARCHAR(36) NOT NULL,
+                        id BINARY(16) PRIMARY KEY,
+                        owner_uuid BINARY(16) NOT NULL,
                         owner_name VARCHAR(16) NOT NULL,
                         item_type VARCHAR(20) NOT NULL,
-                        source_id VARCHAR(36) NOT NULL,
+                        source_id BINARY(16) NOT NULL,
                         item_stack BLOB NOT NULL,
                         reason VARCHAR(50) NOT NULL,
                         expired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -236,13 +271,27 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                         INDEX idx_expired (expired_at)
                     )
                 """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS expired_items (
+                        id BYTEA PRIMARY KEY,
+                        owner_uuid BYTEA NOT NULL,
+                        owner_name VARCHAR(16) NOT NULL,
+                        item_type VARCHAR(20) NOT NULL,
+                        source_id BYTEA NOT NULL,
+                        item_stack BYTEA NOT NULL,
+                        reason VARCHAR(50) NOT NULL,
+                        expired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        claimed BOOLEAN NOT NULL DEFAULT FALSE,
+                        claimed_at TIMESTAMP
+                    )
+                """)
                 sqlite("""
                     CREATE TABLE IF NOT EXISTS expired_items (
-                        id TEXT PRIMARY KEY,
-                        owner_uuid TEXT NOT NULL,
+                        id BLOB(16) PRIMARY KEY,
+                        owner_uuid BLOB(16) NOT NULL,
                         owner_name TEXT NOT NULL,
                         item_type TEXT NOT NULL,
-                        source_id TEXT NOT NULL,
+                        source_id BLOB(16) NOT NULL,
                         item_stack BLOB NOT NULL,
                         reason TEXT NOT NULL,
                         expired_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -291,6 +340,23 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                         server_id TEXT
                     )
                 """)
+                postgres("""
+                    CREATE TABLE IF NOT EXISTS transactions (
+                        id BIGSERIAL PRIMARY KEY,
+                        transaction_type VARCHAR(30) NOT NULL,
+                        from_uuid VARCHAR(36),
+                        from_name VARCHAR(16),
+                        to_uuid VARCHAR(36),
+                        to_name VARCHAR(16),
+                        amount DECIMAL(19, 4) NOT NULL,
+                        tax_amount DECIMAL(19, 4) NOT NULL DEFAULT 0,
+                        item_material VARCHAR(64),
+                        item_quantity INT,
+                        reference_id VARCHAR(36),
+                        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        server_id VARCHAR(64)
+                    )
+                """)
             })
         },
         migration(2, "Add consolidated expired items") {
@@ -320,11 +386,11 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
             execute(sql {
                 mysql("""
                     CREATE TABLE IF NOT EXISTS consolidated_expired_items (
-                        id DECIMAL(39,0) PRIMARY KEY,
-                        owner_uuid DECIMAL(39,0) NOT NULL,
+                        id BINARY(16) PRIMARY KEY,
+                        owner_uuid BINARY(16) NOT NULL,
                         owner_name VARCHAR(32) NOT NULL,
                         item_type VARCHAR(20) NOT NULL,
-                        source_id DECIMAL(39,0) NOT NULL,
+                        source_id BINARY(16) NOT NULL,
                         item_material VARCHAR(50) NOT NULL,
                         item_display_name TEXT,
                         total_quantity INT NOT NULL DEFAULT 0,
@@ -341,11 +407,11 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                 """)
                 postgres("""
                     CREATE TABLE IF NOT EXISTS consolidated_expired_items (
-                        id NUMERIC(39,0) PRIMARY KEY,
-                        owner_uuid NUMERIC(39,0) NOT NULL,
+                        id BYTEA PRIMARY KEY,
+                        owner_uuid BYTEA NOT NULL,
                         owner_name VARCHAR(32) NOT NULL,
                         item_type VARCHAR(20) NOT NULL,
-                        source_id NUMERIC(39,0) NOT NULL,
+                        source_id BYTEA NOT NULL,
                         item_material VARCHAR(50) NOT NULL,
                         item_display_name TEXT,
                         total_quantity INT NOT NULL DEFAULT 0,
@@ -380,10 +446,10 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
             // Add consolidated_group_id column to expired_items table
             execute(sql {
                 mysql("""
-                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id DECIMAL(39,0) NULL
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id BINARY(16) NULL
                 """)
                 postgres("""
-                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id NUMERIC(39,0) NULL
+                    ALTER TABLE expired_items ADD COLUMN consolidated_group_id BYTEA NULL
                 """)
                 sqlite("""
                     ALTER TABLE expired_items ADD COLUMN consolidated_group_id BLOB(16)
@@ -558,18 +624,22 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
         migration(7, "Add order_id and order_type columns to watchlist table") {
             execute(sql {
                 mysql("""
-                    ALTER TABLE watchlist ADD COLUMN order_id VARCHAR(36) NULL,
-                    ALTER TABLE watchlist ADD COLUMN order_type VARCHAR(20) NULL
+                    ALTER TABLE watchlist
+                    ADD COLUMN order_id VARCHAR(36) NULL,
+                    ADD COLUMN order_type VARCHAR(20) NULL
                 """)
                 postgres("""
-                    ALTER TABLE watchlist ADD COLUMN order_id VARCHAR(36) NULL,
-                    ALTER TABLE watchlist ADD COLUMN order_type VARCHAR(20) NULL
+                    ALTER TABLE watchlist
+                    ADD COLUMN order_id VARCHAR(36) NULL,
+                    ADD COLUMN order_type VARCHAR(20) NULL
                 """)
                 sqlite("""
                     ALTER TABLE watchlist ADD COLUMN order_id TEXT NULL
                 """)
             })
             execute(sql {
+                mysql("SELECT 1")
+                postgres("SELECT 1")
                 sqlite("""
                     ALTER TABLE watchlist ADD COLUMN order_type TEXT NULL
                 """)
@@ -670,35 +740,16 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
             })
         },
         migration(9, "Make watchlist.auction_id nullable and add order unique constraint") {
-            // MySQL: Make auction_id nullable and add unique constraint for orders
+            // MySQL/Postgres: alter the existing column and add a second unique constraint.
+            // SQLite recreates the table because it cannot alter nullability in place.
             execute(sql {
                 mysql("""
                     ALTER TABLE watchlist MODIFY COLUMN auction_id VARCHAR(36) NULL
                 """)
-            })
-            execute(sql {
-                mysql("""
-                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
-                """)
-            })
-
-            // Postgres: Make auction_id nullable and add unique constraint for orders
-            execute(sql {
                 postgres("""
                     ALTER TABLE watchlist ALTER COLUMN auction_id DROP NOT NULL
                 """)
-            })
-            execute(sql {
-                postgres("""
-                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
-                """)
-            })
-
-            // SQLite: Table recreation (no direct ALTER COLUMN support)
-            // This preserves all data while making auction_id nullable
-            execute(sql {
                 sqlite("""
-                    -- Create new table with nullable auction_id and order unique constraint
                     CREATE TABLE watchlist_new (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         player_uuid TEXT NOT NULL,
@@ -714,17 +765,29 @@ object AuctionHouseSchema : DatabaseSchema("auctionhouse") {
                 """)
             })
             execute(sql {
+                mysql("""
+                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
+                """)
+                postgres("""
+                    ALTER TABLE watchlist ADD CONSTRAINT unique_player_order UNIQUE (player_uuid, order_id)
+                """)
                 sqlite("""
-                    -- Copy existing data (auction_id remains as-is, order_id/order_type are NULL for auction entries)
                     INSERT INTO watchlist_new (id, player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity)
                     SELECT id, player_uuid, auction_id, order_id, order_type, added_at, last_notified_at, has_new_activity
                     FROM watchlist
                 """)
             })
             execute(sql {
+                mysql("SELECT 1")
+                postgres("SELECT 1")
                 sqlite("""
-                    -- Drop old table and rename new one
-                    DROP TABLE watchlist;
+                    DROP TABLE watchlist
+                """)
+            })
+            execute(sql {
+                mysql("SELECT 1")
+                postgres("SELECT 1")
+                sqlite("""
                     ALTER TABLE watchlist_new RENAME TO watchlist
                 """)
             })

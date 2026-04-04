@@ -25,6 +25,7 @@ import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
 import bruh.auctionhouse.service.ConsolidatedExpiredItemsMigration
 import bruh.auctionhouse.service.ExpiredItemManager
+import bruh.auctionhouse.service.ExpiredItemsUuidStorageMigration
 import bruh.auctionhouse.service.ExpirationService
 import bruh.auctionhouse.service.OrderService
 import bruh.auctionhouse.translations.AuctionMessages
@@ -161,6 +162,10 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         val migrationReport = database.initialize()
         slF4JLogger.info("Database initialized: ${migrationReport.totalApplied} migrations applied")
 
+        // Step 4.5: Normalize expired-item UUID storage before repositories touch the tables
+        ExpiredItemsUuidStorageMigration(database, slF4JLogger).migrateIfNeeded()
+        slF4JLogger.info("Expired-item UUID storage validated")
+
         // Step 5: Create repositories
         auctionRepository = AuctionRepository(database)
         bidRepository = BidRepository(database)
@@ -189,7 +194,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         )
 
         consolidatedExpiredItemService = ConsolidatedExpiredItemService(
-            consolidatedExpiredItemRepository, expiredItemRepository
+            this, consolidatedExpiredItemRepository, expiredItemRepository
         )
 
         auctionService = AuctionService(
@@ -222,7 +227,6 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
             consolidatedExpiredItemRepository = consolidatedExpiredItemRepository,
             transactionRepository = transactionRepository,
             playerBanRepository = playerBanRepository,
-            config = config,
             translationAPI = translations,
             plugin = this,
             economy = economy
@@ -236,7 +240,7 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
 
         // Step 8.5: Register player listener for login notifications
         val playerListener = bruh.auctionhouse.listeners.PlayerListener(
-            this, config, translations, auctionService, auctionRepository, bidRepository, orderRepository, orderFillRepository
+            this, config, translations, auctionRepository, bidRepository, orderRepository
         )
         server.pluginManager.registerEvents(playerListener, this)
         slF4JLogger.info("Player listener registered for login notifications")
@@ -308,6 +312,12 @@ class AuctionHousePlugin : SuspendingJavaPlugin() {
         translations.switchLanguage(config.language)
         translations.load()
         slF4JLogger.info("Configuration reloaded")
+    }
+
+    suspend fun savePluginConfig(newConfig: AuctionHouseConfig) {
+        configLoader.save(newConfig)
+        config = newConfig
+        slF4JLogger.info("Configuration saved")
     }
 
     /**

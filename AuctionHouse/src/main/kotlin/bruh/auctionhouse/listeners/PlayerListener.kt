@@ -4,13 +4,12 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
 import bruh.auctionhouse.database.AuctionRepository
 import bruh.auctionhouse.database.BidRepository
-import bruh.auctionhouse.database.OrderFillRepository
 import bruh.auctionhouse.database.OrderRepository
-import bruh.auctionhouse.model.OrderStatus
-import bruh.auctionhouse.service.AuctionService
 import bruh.auctionhouse.translations.AuctionMessages
 import bruh.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.util.PlayerStateManager
 import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,24 +18,25 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import java.math.BigDecimal
-import java.lang.Runnable
+import java.util.UUID
 
 /**
  * Listener for player events, handling login notifications for auction/order events.
  */
 class PlayerListener(
     private val plugin: AuctionHousePlugin,
-    private val config: AuctionHouseConfig,
+    config: AuctionHouseConfig,
     private val translationAPI: TranslationAPI,
-    private val auctionService: AuctionService,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
-    private val orderRepository: OrderRepository,
-    private val orderFillRepository: OrderFillRepository
+    private val orderRepository: OrderRepository
 ) : Listener {
 
     private val mm = MiniMessage.miniMessage()
+    private val config: AuctionHouseConfig
+        get() = plugin.config
 
     /**
      * Handles player login and delivers queued notifications.
@@ -52,20 +52,51 @@ class PlayerListener(
         // Use coroutine scope instead of runBlocking to avoid blocking threads
         plugin.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    // Check for outbid notifications
-                    if (config.notifications.alertOutbid) {
-                        checkOutbidNotifications(playerId, player)
+                val notifications = withContext(Dispatchers.IO) {
+                    buildLoginNotifications(playerId)
+                }
+
+                withContext(plugin.entityDispatcher(player)) {
+                    notifications.outbidCount?.let { outbidCount ->
+                        player.sendMessage(
+                            translationAPI.getComponentSync(AuctionMessages.BID_OUTBID_LOGIN) {
+                                unparsed("count", outbidCount.toString())
+                            }
+                        )
                     }
 
-                    // Check for sold auction notifications
-                    if (config.notifications.alertSold) {
-                        checkSoldNotifications(playerId, player)
+                    if (notifications.recentSold.isNotEmpty()) {
+                        player.sendMessage(
+                            translationAPI.getComponentSync(AuctionMessages.AUCTION_SOLD_LOGIN) {
+                                unparsed("count", notifications.recentSold.size.toString())
+                            }
+                        )
+
+                        notifications.recentSold.forEach { auction ->
+                            player.sendMessage(
+                                mm.deserialize(
+                                    "<green>Sold: <white>${auction.itemDisplayName ?: auction.itemMaterial} " +
+                                        "<gold>for ${formatPrice(auction.finalPrice ?: 0.0)}"
+                                )
+                            )
+                        }
                     }
 
-                    // Check for order filled notifications
-                    if (config.notifications.alertOrderFilled) {
-                        checkOrderFilledNotifications(playerId, player)
+                    if (notifications.filledOrders.isNotEmpty()) {
+                        player.sendMessage(
+                            translationAPI.getComponentSync(OrderMessages.ORDER_FILLED_LOGIN) {
+                                unparsed("count", notifications.filledOrders.size.toString())
+                            }
+                        )
+
+                        notifications.filledOrders.take(5).forEach { order ->
+                            player.sendMessage(
+                                mm.deserialize(
+                                    "<green>Order Filled: <white>${order.itemMaterial.name} " +
+                                        "<yellow>x${order.quantityFilled} <gold>for ${formatPrice(order.totalPrice)}"
+                                )
+                            )
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -74,72 +105,40 @@ class PlayerListener(
         }
     }
 
-    /**
-     * Checks if the player was outbid on any auctions while offline.
-     */
-    private suspend fun checkOutbidNotifications(playerId: java.util.UUID, player: org.bukkit.entity.Player) {
-        val outbidCount = bidRepository.getOutbidBidsForPlayer(playerId)
-
-        if (outbidCount > 0) {
-            player.sendMessage(
-                translationAPI.getComponentSync(AuctionMessages.BID_OUTBID_LOGIN) {
-                    unparsed("count", outbidCount.toString())
-                }
-            )
-        }
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        PlayerStateManager.clearState(event.player.uniqueId)
     }
 
-    /**
-     * Checks if the player has any recently sold auctions while offline.
-     * Uses limited query to avoid loading all sold auctions.
-     */
-    private suspend fun checkSoldNotifications(playerId: java.util.UUID, player: org.bukkit.entity.Player) {
-        // Use optimized query with LIMIT instead of loading all and taking 5
-        val recentSold = auctionRepository.getRecentSoldAuctions(playerId, 5)
-
-        if (recentSold.isNotEmpty()) {
-            player.sendMessage(
-                translationAPI.getComponentSync(AuctionMessages.AUCTION_SOLD_LOGIN) {
-                    unparsed("count", recentSold.size.toString())
-                }
-            )
-
-            recentSold.forEach { auction ->
-                player.sendMessage(
-                    mm.deserialize(
-                        "<green>Sold: <white>${auction.itemDisplayName ?: auction.itemMaterial} " +
-                        "<gold>for ${formatPrice(auction.finalPrice ?: 0.0)}"
-                    )
-                )
-            }
+    private suspend fun buildLoginNotifications(playerId: UUID): LoginNotifications {
+        val outbidCount = if (config.notifications.alertOutbid) {
+            bidRepository.getOutbidBidsForPlayer(playerId).takeIf { it > 0 }
+        } else {
+            null
         }
-    }
 
-    /**
-     * Checks if any of the player's orders were filled while offline.
-     */
-    private suspend fun checkOrderFilledNotifications(playerId: java.util.UUID, player: org.bukkit.entity.Player) {
-        val filledOrders = orderRepository.getPlayerFilledOrders(playerId)
-
-        if (filledOrders.isNotEmpty()) {
-            player.sendMessage(
-                translationAPI.getComponentSync(OrderMessages.ORDER_FILLED_LOGIN) {
-                    unparsed("count", filledOrders.size.toString())
-                }
-            )
-
-            filledOrders.take(5).forEach { order ->
-                player.sendMessage(
-                    mm.deserialize(
-                        "<green>Order Filled: <white>${order.itemMaterial.name} " +
-                        "<yellow>x${order.quantityFilled} <gold>for ${formatPrice(order.totalPrice)}"
-                    )
-                )
-            }
+        val recentSold = if (config.notifications.alertSold) {
+            auctionRepository.getRecentSoldAuctions(playerId, 5)
+        } else {
+            emptyList()
         }
+
+        val filledOrders = if (config.notifications.alertOrderFilled) {
+            orderRepository.getPlayerFilledOrders(playerId)
+        } else {
+            emptyList()
+        }
+
+        return LoginNotifications(outbidCount, recentSold, filledOrders)
     }
 
     private fun formatPrice(amount: Double): String {
         return plugin.economy.format(BigDecimal.valueOf(amount))
     }
+
+    private data class LoginNotifications(
+        val outbidCount: Int?,
+        val recentSold: List<bruh.auctionhouse.model.Auction>,
+        val filledOrders: List<bruh.auctionhouse.model.Order>
+    )
 }

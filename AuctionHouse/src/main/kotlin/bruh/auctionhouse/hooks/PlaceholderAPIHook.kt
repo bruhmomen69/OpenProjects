@@ -6,9 +6,12 @@ import bruh.auctionhouse.database.OrderRepository
 import bruh.auctionhouse.model.AuctionStatus
 import bruh.auctionhouse.model.OrderStatus
 import bruh.auctionhouse.service.ConsolidatedExpiredItemService
-import kotlinx.coroutines.runBlocking
+import com.github.shynixn.mccoroutine.folia.launch
 import me.clip.placeholderapi.expansion.PlaceholderExpansion
 import org.bukkit.entity.Player
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * PlaceholderAPI expansion for AuctionHouse.
@@ -20,6 +23,12 @@ class PlaceholderAPIHook(
     private val orderRepository: OrderRepository,
     private val consolidatedExpiredItemService: ConsolidatedExpiredItemService
 ) : PlaceholderExpansion() {
+    private val playerSnapshots = ConcurrentHashMap<UUID, PlayerSnapshot>()
+    private val refreshingPlayers = ConcurrentHashMap.newKeySet<UUID>()
+    private val refreshingTotalAuctions = AtomicBoolean(false)
+
+    @Volatile
+    private var totalAuctionsSnapshot = CountSnapshot(0, 0L)
 
     override fun getIdentifier(): String = "auctionhouse"
 
@@ -46,35 +55,88 @@ class PlaceholderAPIHook(
         return when (params.lowercase()) {
             "active_auctions" -> {
                 player?.let {
-                    runBlocking {
-                        auctionRepository.countPlayerAuctions(it.uniqueId, AuctionStatus.ACTIVE).toString()
-                    }
+                    refreshPlayerSnapshotIfNeeded(it.uniqueId)
+                    playerSnapshots[it.uniqueId]?.activeAuctions?.value?.toString() ?: "0"
                 } ?: "0"
             }
             "active_orders" -> {
                 player?.let {
-                    runBlocking {
-                        orderRepository.countPlayerOrders(it.uniqueId, OrderStatus.PENDING).toString()
-                    }
+                    refreshPlayerSnapshotIfNeeded(it.uniqueId)
+                    playerSnapshots[it.uniqueId]?.activeOrders?.value?.toString() ?: "0"
                 } ?: "0"
             }
             "total_auctions" -> {
-                // Count all active auctions globally
-                runBlocking {
-                    // Note: We could add a dedicated method for this, but for now we'll use 0
-                    // as a placeholder. A full implementation would add countAllActiveAuctions() to repository.
-                    "0"
-                }
+                refreshTotalAuctionsIfNeeded()
+                totalAuctionsSnapshot.value.toString()
             }
             "expired_items" -> {
                 player?.let {
-                    runBlocking {
-                        consolidatedExpiredItemService.countPlayerConsolidatedItems(it.uniqueId).toString()
-                    }
+                    refreshPlayerSnapshotIfNeeded(it.uniqueId)
+                    playerSnapshots[it.uniqueId]?.expiredItems?.value?.toString() ?: "0"
                 } ?: "0"
             }
             else -> null
         }
     }
-}
 
+    private fun refreshPlayerSnapshotIfNeeded(playerId: UUID) {
+        val current = playerSnapshots[playerId]
+        if (current != null && !current.isStale()) return
+        if (!refreshingPlayers.add(playerId)) return
+
+        plugin.launch {
+            try {
+                playerSnapshots[playerId] = PlayerSnapshot(
+                    activeAuctions = CountSnapshot(
+                        auctionRepository.countPlayerAuctions(playerId, AuctionStatus.ACTIVE),
+                        System.currentTimeMillis()
+                    ),
+                    activeOrders = CountSnapshot(
+                        orderRepository.countPlayerOrders(playerId, OrderStatus.PENDING) +
+                            orderRepository.countPlayerOrders(playerId, OrderStatus.PARTIAL),
+                        System.currentTimeMillis()
+                    ),
+                    expiredItems = CountSnapshot(
+                        consolidatedExpiredItemService.countPlayerConsolidatedItems(playerId),
+                        System.currentTimeMillis()
+                    )
+                )
+            } finally {
+                refreshingPlayers.remove(playerId)
+            }
+        }
+    }
+
+    private fun refreshTotalAuctionsIfNeeded() {
+        if (!totalAuctionsSnapshot.isStale() || !refreshingTotalAuctions.compareAndSet(false, true)) return
+
+        plugin.launch {
+            try {
+                totalAuctionsSnapshot = CountSnapshot(
+                    auctionRepository.getActiveAuctionsCount(),
+                    System.currentTimeMillis()
+                )
+            } finally {
+                refreshingTotalAuctions.set(false)
+            }
+        }
+    }
+
+    private data class CountSnapshot(val value: Int, val loadedAt: Long) {
+        fun isStale(): Boolean = System.currentTimeMillis() - loadedAt > CACHE_TTL_MS
+    }
+
+    private data class PlayerSnapshot(
+        val activeAuctions: CountSnapshot,
+        val activeOrders: CountSnapshot,
+        val expiredItems: CountSnapshot
+    ) {
+        fun isStale(): Boolean {
+            return activeAuctions.isStale() || activeOrders.isStale() || expiredItems.isStale()
+        }
+    }
+
+    private companion object {
+        private const val CACHE_TTL_MS = 5_000L
+    }
+}

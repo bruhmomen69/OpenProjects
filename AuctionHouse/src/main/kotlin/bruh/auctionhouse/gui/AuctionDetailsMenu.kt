@@ -11,12 +11,12 @@ import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDoubleAsync
+import com.github.shynixn.mccoroutine.folia.launch
 import com.cryptomorin.xseries.XMaterial
 import net.kyori.adventure.text.Component
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
-import java.util.concurrent.CompletableFuture
 
 /**
  * Menu for viewing auction details and placing bids or buying.
@@ -169,9 +169,8 @@ class AuctionDetailsMenu(
                 ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> {
-                            CompletableFuture.supplyAsync {
-                                kotlinx.coroutines.runBlocking { pctx.auctionService.placeBid(pctx.player, auction.id, result.value) }
-                            }.thenAccept { bidResult ->
+                            pctx.plugin.launch {
+                                val bidResult = pctx.auctionService.placeBid(pctx.player, auction.id, result.value)
                                 pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
                                     pctx.player.sendMessage(bidResult.message)
                                     pctx.menuAPI.open(AuctionDetailsMenu(pctx, auction), pctx.player)
@@ -375,9 +374,8 @@ class AuctionDetailsMenu(
     }
 
     private fun handlePriceUpdate(newStart: Double?, newBin: Double?) {
-        CompletableFuture.supplyAsync {
-            kotlinx.coroutines.runBlocking { pctx.auctionService.editAuctionPrice(pctx.player, auction.id, newStart, newBin) }
-        }.thenAccept { result ->
+        pctx.plugin.launch {
+            val result = pctx.auctionService.editAuctionPrice(pctx.player, auction.id, newStart, newBin)
             pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
                 when (result) {
                     is ServiceResult.Success -> {

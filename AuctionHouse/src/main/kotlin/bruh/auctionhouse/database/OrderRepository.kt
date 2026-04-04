@@ -220,6 +220,14 @@ class OrderRepository(private val database: Database) {
         )
     }
 
+    suspend fun cancelWithVersion(scope: TransactionScope, id: UUID, expectedVersion: Int): Int {
+        return scope.execute(
+            sql("UPDATE orders SET status = 'CANCELLED', version = version + 1 WHERE id = ? AND version = ? AND status IN ('PENDING', 'PARTIAL')"),
+            id.toString(),
+            expectedVersion
+        )
+    }
+
     /**
      * Gets active orders with filtering and sorting.
      */

@@ -7,6 +7,7 @@ import bruh.zchat.utils.menuapi.ClickResult
 import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptTextAsync
+import com.github.shynixn.mccoroutine.folia.launch
 import com.cryptomorin.xseries.XMaterial
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
@@ -58,9 +59,12 @@ class AdminBlacklistMenu(
                                 val currentList = pctx.config.restrictions.blacklistedMaterials.toMutableList()
                                 if (!currentList.contains(materialName)) {
                                     currentList.add(materialName)
-                                    pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ADDED) {
-                                        unparsed("material", materialName)
-                                    })
+                                    persistBlacklist(
+                                        currentList,
+                                        pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ADDED) {
+                                            unparsed("material", materialName)
+                                        }
+                                    )
                                 } else {
                                     pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ALREADY_EXISTS) {
                                         unparsed("material", materialName)
@@ -100,9 +104,12 @@ class AdminBlacklistMenu(
                             val currentList = pctx.config.restrictions.blacklistedMaterials.toMutableList()
                             if (currentList.contains(materialName)) {
                                 currentList.remove(materialName)
-                                pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
-                                    unparsed("material", materialName)
-                                })
+                                persistBlacklist(
+                                    currentList,
+                                    pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
+                                        unparsed("material", materialName)
+                                    }
+                                )
                             } else {
                                 pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_NOT_FOUND) {
                                     unparsed("material", materialName)
@@ -132,9 +139,12 @@ class AdminBlacklistMenu(
                     onClick { _, _ ->
                         val currentList = pctx.config.restrictions.blacklistedMaterials.toMutableList()
                         currentList.remove(material)
-                        pctx.player.sendMessage(pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
-                            unparsed("material", material)
-                        })
+                        persistBlacklist(
+                            currentList,
+                            pctx.translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
+                                unparsed("material", material)
+                            }
+                        )
                         ClickResult.Refresh
                     }
                 })
@@ -152,5 +162,22 @@ class AdminBlacklistMenu(
         item(53, MenuUtils.closeButton(pctx.translationAPI).apply {
             onClick { _, _ -> ClickResult.Close }
         })
+    }
+
+    private fun persistBlacklist(updatedMaterials: List<String>, successMessage: Component) {
+        pctx.plugin.launch {
+            try {
+                val newConfig = pctx.config.copy(
+                    restrictions = pctx.config.restrictions.copy(
+                        blacklistedMaterials = updatedMaterials.distinct().sorted()
+                    )
+                )
+                pctx.plugin.savePluginConfig(newConfig)
+                pctx.player.sendMessage(successMessage)
+            } catch (e: Exception) {
+                pctx.plugin.slF4JLogger.error("Failed to persist blacklist update", e)
+                pctx.player.sendMessage(pctx.mm.deserialize("<red>Failed to save blacklist changes. Check console."))
+            }
+        }
     }
 }

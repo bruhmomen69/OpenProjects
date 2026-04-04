@@ -12,8 +12,9 @@ import org.bukkit.Material
 import org.bukkit.inventory.ItemStack
 import org.slf4j.Logger
 import java.util.UUID
-import bruh.auctionhouse.util.toBigInteger
-import bruh.auctionhouse.util.toUuid
+import bruh.auctionhouse.util.getStoredUuid
+import bruh.auctionhouse.util.getStoredUuidOrNull
+import bruh.auctionhouse.util.toBytes
 import kotlin.math.min
 
 /**
@@ -49,6 +50,10 @@ class ConsolidatedExpiredItemsMigration(
                 mysql("""
                     INSERT INTO plugin_metadata (key, value) VALUES (?, TRUE)
                     ON DUPLICATE KEY UPDATE value = TRUE
+                """)
+                postgres("""
+                    INSERT INTO plugin_metadata (key, value) VALUES (?, 'TRUE')
+                    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
                 """)
                 sqlite("""
                     INSERT OR REPLACE INTO plugin_metadata (key, value) VALUES (?, TRUE)
@@ -120,18 +125,25 @@ class ConsolidatedExpiredItemsMigration(
                 sql {
                     mysql("""
                         INSERT INTO consolidated_expired_items
+                        (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """)
+                    postgres("""
+                        INSERT INTO consolidated_expired_items
+                        (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)
                     sqlite("""
                         INSERT INTO consolidated_expired_items
+                        (id, owner_uuid, owner_name, item_type, source_id, item_material, item_display_name, total_quantity, claimed_quantity, item_stack, reason, expired_at, last_updated_at, is_fully_claimed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """)
                 },
-                consolidated.id.toBigInteger(),
-                consolidated.ownerUuid.toBigInteger(),
+                consolidated.id.toBytes(),
+                consolidated.ownerUuid.toBytes(),
                 consolidated.ownerName,
                 consolidated.itemType.name,
-                consolidated.sourceId.toBigInteger(),
+                consolidated.sourceId.toBytes(),
                 consolidated.itemMaterial.name,
                 consolidated.itemDisplayName,
                 consolidated.totalQuantity,
@@ -149,8 +161,8 @@ class ConsolidatedExpiredItemsMigration(
             items.forEach { item ->
                 database.execute(
                     sql("UPDATE expired_items SET consolidated_group_id = ? WHERE id = ?"),
-                    consolidated.id.toBigInteger(),
-                    item.id.toBigInteger()
+                    consolidated.id.toBytes(),
+                    item.id.toBytes()
                 )
                 migratedCount++
             }
@@ -182,15 +194,16 @@ class ConsolidatedExpiredItemsMigration(
     )
 
     private fun mapFromResultSet(rs: java.sql.ResultSet): MigrationItem {
+        val itemStack = org.bukkit.inventory.ItemStack.deserializeBytes(rs.getBytes("item_stack"))
         return MigrationItem(
-            id = rs.getObject("id", java.math.BigInteger::class.java).toUuid(),
-            ownerUuid = rs.getObject("owner_uuid", java.math.BigInteger::class.java).toUuid(),
+            id = rs.getStoredUuid("id"),
+            ownerUuid = rs.getStoredUuid("owner_uuid"),
             ownerName = rs.getString("owner_name"),
             itemType = ExpiredItemType.valueOf(rs.getString("item_type")),
-            sourceId = rs.getObject("source_id", java.math.BigInteger::class.java).toUuid(),
-            consolidatedGroupId = rs.getObject("consolidated_group_id", java.math.BigInteger::class.java)?.toUuid(),
-            itemStack = org.bukkit.inventory.ItemStack.deserializeBytes(rs.getBytes("item_stack")),
-            amount = org.bukkit.inventory.ItemStack.deserializeBytes(rs.getBytes("item_stack")).amount,
+            sourceId = rs.getStoredUuid("source_id"),
+            consolidatedGroupId = rs.getStoredUuidOrNull("consolidated_group_id"),
+            itemStack = itemStack,
+            amount = itemStack.amount,
             reason = rs.getString("reason"),
             expiredAt = rs.getTimestamp("expired_at").toInstant()
         )

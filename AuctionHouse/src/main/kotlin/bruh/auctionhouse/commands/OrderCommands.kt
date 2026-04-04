@@ -4,6 +4,7 @@ import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.gui.AuctionMenuContext
 import bruh.auctionhouse.gui.MyOrdersMenu
 import bruh.auctionhouse.gui.OrderBrowserMenu
+import bruh.auctionhouse.gui.OrderFulfillMenu
 import bruh.auctionhouse.translations.OrderMessages
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -92,9 +93,6 @@ class OrderCommands(
             player, itemToSell, pricePerUnit, duration
         )
 
-        if (result.success) {
-            player.inventory.removeItem(itemToSell)
-        }
         player.sendMessage(result.message)
     }
 
@@ -136,7 +134,7 @@ class OrderCommands(
 
     @Subcommand("fulfill")
     @CommandPermission("order.fulfill")
-    fun fulfill(
+    suspend fun fulfill(
         player: Player,
         @Named("orderId") orderId: String
     ) {
@@ -145,16 +143,25 @@ class OrderCommands(
             return
         }
 
-        val uuid = try {
-            UUID.fromString(orderId)
-        } catch (e: IllegalArgumentException) {
+        val order = run {
+            val byFullUuid = try {
+                orderService.getOrder(UUID.fromString(orderId))
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+
+            byFullUuid ?: orderService.findOrderByShortId(orderId)
+        }
+
+        if (order == null) {
             player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_NOT_FOUND))
             return
         }
 
-        player.sendMessage(translationAPI.getComponentSync(OrderMessages.ORDER_FULFILLED) {
-            unparsed("amount", "0")
-        })
+        val menu = OrderFulfillMenu(ctx.forPlayer(player), order)
+        if (!menu.canOpen) return
+
+        menuAPI.open(menu, player)
     }
 
     @Subcommand("myorders")

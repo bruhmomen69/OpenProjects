@@ -11,9 +11,9 @@ import bruh.zchat.utils.menuapi.Menu
 import bruh.zchat.utils.menuapi.SimpleMenu
 import bruh.zchat.utils.menuapi.VItem
 import bruh.zchat.utils.menuapi.promptDoubleAsync
+import com.github.shynixn.mccoroutine.folia.launch
 import com.cryptomorin.xseries.XMaterial
 import net.kyori.adventure.text.Component
-import java.util.concurrent.CompletableFuture
 
 class OrderManageMenu(
     private val pctx: PlayerMenuContext,
@@ -117,9 +117,8 @@ class OrderManageMenu(
                 ).thenAccept { result ->
                     when (result) {
                         is AnvilInputResult.Success -> {
-                            CompletableFuture.supplyAsync {
-                                kotlinx.coroutines.runBlocking { pctx.orderService.editOrderPrice(pctx.player, currentOrder.id, result.value) }
-                            }.thenAccept { editResult ->
+                            pctx.plugin.launch {
+                                val editResult = pctx.orderService.editOrderPrice(pctx.player, currentOrder.id, result.value)
                                 pctx.plugin.server.scheduler.runTask(pctx.plugin, Runnable {
                                     when (editResult) {
                                         is ServiceResult.Success -> {

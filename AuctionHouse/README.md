@@ -39,6 +39,7 @@ A GUI-based Auction House plugin with dual-mode auctions (Auction + BIN) and an 
 - `/order` - Browse orders
 - `/order buy <material> <quantity> <price>` - Create buy order
 - `/order sell <pricePerUnit> [quantity]` - Create sell order from held item
+- `/order fulfill <orderId>` - Open the fulfillment menu for a buy/sell order (accepts short ID)
 - `/order cancel <orderId>` - Cancel your order (accepts short ID)
 - `/order myorders` - View and manage your orders
 - `/ahadmin` - Admin commands
@@ -93,6 +94,10 @@ The test server will:
 - **Order Fulfillment Pre-Validation**: The order fulfillment menu now correctly counts items that match NBT and lore requirements, not just material type
 - **Sell Order Quantity**: Sell orders now correctly use the quantity selected in the creation menu, not the entire held stack
 - **Bulk Listing Item Recovery**: Items for failed bulk auctions are no longer removed from inventory; only successfully created auctions consume items
+- **Blacklist Persistence**: Blacklist changes made from `/ahadmin blacklist ...` and the admin GUI now save to `config.conf` immediately and take effect without restarting
+- **Live Placeholder Counts**: PlaceholderAPI values are now refreshed asynchronously and `%auctionhouse_total_auctions%` returns the real global active-auction count
+- **Safer Cancellation/Fulfillment Flows**: Auction/order cancellation and order fulfillment now reserve inventory first, use optimistic transaction guards, and compensate economy changes if downstream database work fails
+- **Stable Exact-NBT Matching**: New orders use serialized item matching for exact-NBT checks, while older hash-based orders remain compatible
 
 **New Features:**
 - **My Orders Menu**: View and manage your own orders with `/order myorders` - cancel orders, view status, edit prices
@@ -131,7 +136,7 @@ When PlaceholderAPI is installed, the following placeholders are available:
 | Placeholder | Description |
 |-------------|-------------|
 | `%auctionhouse_active_auctions%` | Player's active auction count |
-| `%auctionhouse_active_orders%` | Player's pending orders count |
+| `%auctionhouse_active_orders%` | Player's active order count |
 | `%auctionhouse_total_auctions%` | Global active auctions count |
 | `%auctionhouse_expired_items%` | Player's unclaimed expired items count |
 

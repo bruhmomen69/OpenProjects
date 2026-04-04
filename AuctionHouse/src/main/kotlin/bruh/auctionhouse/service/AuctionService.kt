@@ -39,7 +39,7 @@ import java.util.UUID
  */
 class AuctionService(
     private val plugin: AuctionHousePlugin,
-    private val config: AuctionHouseConfig,
+    config: AuctionHouseConfig,
     private val database: Database,
     private val auctionRepository: AuctionRepository,
     private val bidRepository: BidRepository,
@@ -52,6 +52,8 @@ class AuctionService(
 ) {
     private val mm = MiniMessage.miniMessage()
     private val logger = plugin.slF4JLogger
+    private val config: AuctionHouseConfig
+        get() = plugin.config
 
     /**
      * Creates a new auction listing.
@@ -651,59 +653,64 @@ class AuctionService(
             )
         }
 
-        // Refund highest bidder - use atomic markAsOutbid to prevent double-refund.
-        // The SQL includes AND is_outbid = FALSE, so only one caller will succeed.
         val highestBid = bidRepository.getHighestBid(auctionId)
-        var shouldRefund = false
-        var bidderUuid: UUID? = null
-        var bidderName: String? = null
-        var bidAmount: Double? = null
+        val refundBid = highestBid
 
-        highestBid?.let { bid ->
-            // Atomic check-and-mark: returns 1 if we marked it, 0 if already outbid
-            val marked = bidRepository.markAsOutbid(bid.id)
-            if (marked > 0) {
-                shouldRefund = true
-                bidderUuid = bid.bidderUuid
-                bidderName = bid.bidderName
-                bidAmount = bid.bidAmount
+        try {
+            database.transaction(isolation = TransactionIsolation.SERIALIZABLE) {
+                val updated = auctionRepository.cancelWithVersion(this, auctionId, auction.version)
+                if (updated == 0) {
+                    throw ConcurrentAuctionUpdateException(auctionId)
+                }
+
+                refundBid?.let { bid ->
+                    val marked = bidRepository.markAsOutbid(this, bid.id)
+                    if (marked == 0) {
+                        throw ConcurrentAuctionUpdateException(auctionId)
+                    }
+                }
+
+                expiredItemManager.storeExpiredItemWithinTransaction(
+                    this,
+                    ownerUuid = auction.sellerUuid,
+                    ownerName = auction.sellerName,
+                    itemType = ExpiredItemType.AUCTION_ITEM,
+                    sourceId = auctionId,
+                    item = auction.itemStack,
+                    reason = "CANCELLED"
+                )
+            }
+        } catch (e: ConcurrentAuctionUpdateException) {
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(AuctionMessages.AUCTION_ALREADY_ENDED)
+            )
+        } catch (e: Exception) {
+            throw e
+        }
+
+        refundBid?.let { bid ->
+            economy.deposit(plugin.server.getOfflinePlayer(bid.bidderUuid), BigDecimal.valueOf(bid.bidAmount))
+            try {
+                transactionRepository.create(
+                    Transaction(
+                        transactionType = TransactionType.AUCTION_BID_RETURN,
+                        fromUuid = null,
+                        fromName = null,
+                        toUuid = bid.bidderUuid,
+                        toName = bid.bidderName,
+                        amount = bid.bidAmount,
+                        taxAmount = 0.0,
+                        itemMaterial = null,
+                        itemQuantity = null,
+                        referenceId = auctionId,
+                        timestamp = Instant.now(),
+                        serverId = serverId
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Failed to record bid refund transaction for cancelled auction {}", auctionId, e)
             }
         }
-
-        // Refund outside transaction (economy is external)
-        if (shouldRefund && bidderUuid != null) {
-            val bidder = plugin.server.getOfflinePlayer(bidderUuid!!)
-            economy.deposit(bidder, BigDecimal.valueOf(bidAmount!!))
-            transactionRepository.create(
-                Transaction(
-                    transactionType = TransactionType.AUCTION_BID_RETURN,
-                    fromUuid = null,
-                    fromName = null,
-                    toUuid = bidderUuid!!,
-                    toName = bidderName!!,
-                    amount = bidAmount!!,
-                    taxAmount = 0.0,
-                    itemMaterial = null,
-                    itemQuantity = null,
-                    referenceId = auctionId,
-                    timestamp = Instant.now(),
-                    serverId = serverId
-                )
-            )
-        }
-
-        // Return item to seller
-        expiredItemManager.storeExpiredItem(
-            ownerUuid = auction.sellerUuid,
-            ownerName = auction.sellerName,
-            itemType = ExpiredItemType.AUCTION_ITEM,
-            sourceId = auctionId,
-            item = auction.itemStack,
-            reason = "CANCELLED"
-        )
-
-        // Mark as cancelled
-        auctionRepository.updateStatus(auctionId, AuctionStatus.CANCELLED)
 
         ServiceResult.Success(auction)
     }
@@ -1203,6 +1210,89 @@ class AuctionService(
         false // Partial or no success - stored in expired items
     }
 
+    private suspend fun reserveBulkListingItems(
+        seller: Player,
+        template: ItemStack,
+        quantity: Int
+    ): List<ItemStack>? = withContext(plugin.entityDispatcher(seller)) {
+        val reservedItems = mutableListOf<ItemStack>()
+        var remaining = quantity
+
+        for (slot in seller.inventory.storageContents.indices) {
+            if (remaining <= 0) break
+
+            val stack = seller.inventory.getItem(slot) ?: continue
+            if (!stack.isSimilar(template)) continue
+
+            val toTake = minOf(remaining, stack.amount)
+            repeat(toTake) {
+                reservedItems += stack.clone().apply { amount = 1 }
+            }
+
+            if (stack.amount == toTake) {
+                seller.inventory.setItem(slot, null)
+            } else {
+                seller.inventory.setItem(slot, stack.clone().apply { amount = stack.amount - toTake })
+            }
+
+            remaining -= toTake
+        }
+
+        if (remaining > 0) {
+            val overflowItems = mutableListOf<ItemStack>()
+            reservedItems.forEach { item ->
+                val overflow = seller.inventory.addItem(item)
+                if (overflow.isNotEmpty()) {
+                    overflowItems += overflow.values
+                }
+            }
+
+            if (overflowItems.isNotEmpty()) {
+                expiredItemManager.storeExpiredItems(
+                    ownerUuid = seller.uniqueId,
+                    ownerName = seller.name,
+                    itemType = ExpiredItemType.AUCTION_ITEM,
+                    sourceId = UUID.randomUUID(),
+                    items = overflowItems,
+                    reason = "BULK_LISTING_ROLLBACK"
+                )
+            }
+            return@withContext null
+        }
+
+        reservedItems
+    }
+
+    private suspend fun restoreBulkListingItems(seller: Player, items: List<ItemStack>) {
+        if (items.isEmpty()) return
+        withContext(plugin.entityDispatcher(seller)) {
+            val overflowItems = mutableListOf<ItemStack>()
+            items.forEach { item ->
+                val overflow = seller.inventory.addItem(item.clone())
+                if (overflow.isNotEmpty()) {
+                    overflowItems += overflow.values
+                }
+            }
+
+            if (overflowItems.isNotEmpty()) {
+                expiredItemManager.storeExpiredItems(
+                    ownerUuid = seller.uniqueId,
+                    ownerName = seller.name,
+                    itemType = ExpiredItemType.AUCTION_ITEM,
+                    sourceId = UUID.randomUUID(),
+                    items = overflowItems,
+                    reason = "BULK_LISTING_ROLLBACK"
+                )
+
+                seller.sendMessage(
+                    translationAPI.getComponentSync(AuctionMessages.INVENTORY_FULL_STORED) {
+                        unparsed("count", overflowItems.sumOf { it.amount }.toString())
+                    }
+                )
+            }
+        }
+    }
+
     /**
      * Plays a sound to a player if the sound is configured.
      */
@@ -1342,28 +1432,39 @@ class AuctionService(
             )
         }
 
+        val reservedItems = reserveBulkListingItems(seller, item, quantity)
+            ?: return@withContext BulkListingResult(
+                false, 0, 0, 0.0,
+                translationAPI.getComponentSync(AuctionMessages.ITEMS_MAY_HAVE_MOVED)
+            )
+
         // Charge total fee upfront
         if (totalFee > 0) {
-            economy.withdraw(seller, BigDecimal.valueOf(totalFee))
-            transactionRepository.create(
-                Transaction(
-                    transactionType = TransactionType.FEE_LISTING,
-                    fromUuid = seller.uniqueId,
-                    fromName = seller.name,
-                    toUuid = null,
-                    toName = null,
-                    amount = totalFee,
-                    taxAmount = 0.0,
-                    itemMaterial = null,
-                    itemQuantity = quantity,
-                    referenceId = null,
-                    timestamp = Instant.now(),
-                    serverId = serverId
+            try {
+                economy.withdraw(seller, BigDecimal.valueOf(totalFee))
+                transactionRepository.create(
+                    Transaction(
+                        transactionType = TransactionType.FEE_LISTING,
+                        fromUuid = seller.uniqueId,
+                        fromName = seller.name,
+                        toUuid = null,
+                        toName = null,
+                        amount = totalFee,
+                        taxAmount = 0.0,
+                        itemMaterial = null,
+                        itemQuantity = quantity,
+                        referenceId = null,
+                        timestamp = Instant.now(),
+                        serverId = serverId
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                economy.deposit(seller, BigDecimal.valueOf(totalFee))
+                restoreBulkListingItems(seller, reservedItems)
+                throw e
+            }
         }
 
-        // Create auctions first - only remove items for successful auctions
         var auctionsCreated = 0
         var auctionsFailed = 0
         var feesCharged = 0.0
@@ -1404,14 +1505,6 @@ class AuctionService(
             }
         }
 
-        // Only remove items that were successfully created as auctions
-        if (auctionsCreated > 0) {
-            val itemToRemove = item.clone().apply { amount = auctionsCreated }
-            withContext(plugin.entityDispatcher(seller)) {
-                seller.inventory.removeItem(itemToRemove)
-            }
-        }
-
         // Handle partial failures - refund fees for failed auctions
         if (auctionsFailed > 0 && totalFee > 0) {
             val refundAmount = feePerAuction * auctionsFailed
@@ -1434,6 +1527,10 @@ class AuctionService(
                     serverId = serverId
                 )
             )
+        }
+
+        if (auctionsFailed > 0) {
+            restoreBulkListingItems(seller, reservedItems.takeLast(auctionsFailed))
         }
 
         val success = auctionsCreated > 0
@@ -1459,3 +1556,6 @@ class AuctionService(
         )
     }
 }
+
+private class ConcurrentAuctionUpdateException(auctionId: UUID) :
+    IllegalStateException("Auction $auctionId was modified concurrently")

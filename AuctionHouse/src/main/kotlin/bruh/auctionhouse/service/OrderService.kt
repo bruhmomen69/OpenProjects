@@ -19,6 +19,7 @@ import bruh.auctionhouse.model.OrderType
 import bruh.auctionhouse.model.Transaction
 import bruh.auctionhouse.model.TransactionType
 import bruh.auctionhouse.translations.OrderMessages
+import bruh.auctionhouse.util.OrderItemMatching
 import bruh.zchat.utils.database.Database
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
@@ -39,7 +40,7 @@ import java.util.UUID
  */
 class OrderService(
     private val plugin: AuctionHousePlugin,
-    private val config: AuctionHouseConfig,
+    config: AuctionHouseConfig,
     private val database: Database,
     private val orderRepository: OrderRepository,
     private val orderFillRepository: OrderFillRepository,
@@ -52,6 +53,8 @@ class OrderService(
 ) {
     private val mm = MiniMessage.miniMessage()
     private val logger = plugin.slF4JLogger
+    private val config: AuctionHouseConfig
+        get() = plugin.config
 
     /**
      * Validates if an item matches an order's requirements based on config settings.
@@ -64,7 +67,7 @@ class OrderService(
 
         // Check display name if order has display name filter
         if (order.itemDisplayName != null) {
-            val itemDisplayName = item.itemMeta?.displayName()?.let { mm.serialize(it) }
+            val itemDisplayName = OrderItemMatching.serializeDisplayName(item, mm)
             if (order.itemDisplayName != itemDisplayName) {
                 return ItemMatchResult.NameMismatch
             }
@@ -72,8 +75,7 @@ class OrderService(
 
         // Check NBT if order has NBT hash (user specified exact NBT matching)
         if (order.itemNbtHash != null) {
-            val itemNbtHash = computeItemNbtHash(item)
-            if (order.itemNbtHash != itemNbtHash) {
+            if (!OrderItemMatching.matchesStoredNbtHash(item, order.itemNbtHash)) {
                 return ItemMatchResult.NbtMismatch
             }
         }
@@ -93,35 +95,14 @@ class OrderService(
      * Computes a hash of an item's NBT data for comparison.
      */
     private fun computeItemNbtHash(item: ItemStack): String {
-        // Simple hash based on item meta properties
-        val meta = item.itemMeta ?: return ""
-        val sb = StringBuilder()
-        
-        // Add enchantments
-        meta.enchants.forEach { (enchant, level) ->
-            sb.append(enchant.key.key).append(":").append(level).append(";")
-        }
-        
-        // Add custom model data
-        if (meta.hasCustomModelData()) {
-            sb.append("cmd:").append(meta.customModelData).append(";")
-        }
-        
-        // Add item flags
-        meta.itemFlags.forEach { flag ->
-            sb.append("flag:").append(flag.name).append(";")
-        }
-        
-        return sb.toString().hashCode().toString()
+        return OrderItemMatching.computeStoredNbtHash(item)
     }
 
     /**
      * Computes a hash of an item's lore for comparison.
      */
     private fun computeItemLoreHash(item: ItemStack): String {
-        val meta = item.itemMeta ?: return ""
-        val lore = meta.lore ?: return ""
-        return lore.joinToString("|").hashCode().toString()
+        return OrderItemMatching.computeStoredLoreHash(item)
     }
 
     /**
@@ -515,6 +496,24 @@ class OrderService(
         val fillFee = calculateFee(fillPrice, config.orders.fillFee)
         val earnings = fillPrice - fillFee
 
+        val fulfillmentItems = when (order.orderType) {
+            OrderType.BUY_ORDER -> {
+                consumeMatchingItemsFromInventory(filler, order, totalQuantity)
+                    ?: return@withContext FulfillResult(
+                        false, 0, 0.0,
+                        translationAPI.getComponentSync(bruh.auctionhouse.translations.AuctionMessages.ITEMS_MAY_HAVE_MOVED)
+                    )
+            }
+            OrderType.SELL_ORDER -> {
+                val storedItem = order.itemStack?.clone()
+                    ?: return@withContext FulfillResult(
+                        false, 0, 0.0,
+                        translationAPI.getComponentSync(OrderMessages.ORDER_NOT_FOUND)
+                    )
+                listOf(storedItem.apply { amount = totalQuantity })
+            }
+        }
+
         // Helper to reverse economy operations if transaction fails
         fun reverseEconomy() {
             when (order.orderType) {
@@ -531,43 +530,62 @@ class OrderService(
             }
         }
 
+        suspend fun restoreConsumedItems() {
+            if (order.orderType == OrderType.BUY_ORDER) {
+                giveItemsOrStoreExpired(
+                    filler,
+                    filler.uniqueId,
+                    filler.name,
+                    fulfillmentItems,
+                    orderId,
+                    ExpiredItemType.ORDER_ITEM,
+                    "FULFILLMENT_ROLLBACK"
+                )
+            }
+        }
+
         // For buy orders: creator pays filler
         // For sell orders: filler pays creator
         // Perform economy operations outside transaction (economy is external).
         // Wrapped in try-catch so if the DB transaction throws, we reverse the economy ops.
-        when (order.orderType) {
-            OrderType.BUY_ORDER -> {
-                // Check creator still has funds
-                if (!economy.has(
-                        plugin.server.getOfflinePlayer(order.creatorUuid),
-                        BigDecimal.valueOf(fillPrice)
-                    )
-                ) {
-                    return@withContext FulfillResult(
-                        false, 0, 0.0,
-                        translationAPI.getComponent(OrderMessages.ORDER_CREATOR_NO_FUNDS)
-                    )
+        try {
+            when (order.orderType) {
+                OrderType.BUY_ORDER -> {
+                    if (!economy.has(
+                            plugin.server.getOfflinePlayer(order.creatorUuid),
+                            BigDecimal.valueOf(fillPrice)
+                        )
+                    ) {
+                        restoreConsumedItems()
+                        return@withContext FulfillResult(
+                            false, 0, 0.0,
+                            translationAPI.getComponent(OrderMessages.ORDER_CREATOR_NO_FUNDS)
+                        )
+                    }
+
+                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                    economy.withdraw(creator, BigDecimal.valueOf(fillPrice))
+                    economy.deposit(filler, BigDecimal.valueOf(earnings))
                 }
 
-                // Transfer funds: creator pays filler
-                val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
-                economy.withdraw(creator, BigDecimal.valueOf(fillPrice))
-                economy.deposit(filler, BigDecimal.valueOf(earnings))
-            }
+                OrderType.SELL_ORDER -> {
+                    if (!economy.has(filler, BigDecimal.valueOf(fillPrice))) {
+                        return@withContext FulfillResult(
+                            false, 0, 0.0,
+                            translationAPI.getComponent(OrderMessages.ORDER_FULFILL_NO_MONEY)
+                        )
+                    }
 
-            OrderType.SELL_ORDER -> {
-                if (!economy.has(filler, BigDecimal.valueOf(fillPrice))) {
-                    return@withContext FulfillResult(
-                        false, 0, 0.0,
-                        translationAPI.getComponent(OrderMessages.ORDER_FULFILL_NO_MONEY)
-                    )
+                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+                    economy.withdraw(filler, BigDecimal.valueOf(fillPrice))
+                    economy.deposit(creator, BigDecimal.valueOf(earnings))
                 }
-
-                // Transfer funds: filler pays creator
-                val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
-                economy.withdraw(filler, BigDecimal.valueOf(fillPrice))
-                economy.deposit(creator, BigDecimal.valueOf(earnings))
             }
+        } catch (e: Exception) {
+            if (order.orderType == OrderType.BUY_ORDER) {
+                restoreConsumedItems()
+            }
+            throw e
         }
 
         // Atomic database operations inside transaction with optimistic locking
@@ -632,6 +650,7 @@ class OrderService(
             // If optimistic lock failed (concurrent fill), reverse economy operations
             if (txResult.rowsAffected == 0) {
                 reverseEconomy()
+                restoreConsumedItems()
                 return@withContext FulfillResult(
                     false, 0, 0.0,
                     translationAPI.getComponentSync(OrderMessages.ORDER_ALREADY_FILLED)
@@ -645,6 +664,7 @@ class OrderService(
             } catch (reversalError: Exception) {
                 logger.error("CRITICAL: Failed to reverse economy for order $orderId (${order.orderType}) after transaction failure", reversalError)
             }
+            restoreConsumedItems()
             throw e
         }
 
@@ -662,7 +682,7 @@ class OrderService(
                             ownerName = order.creatorName,
                             itemType = ExpiredItemType.ORDER_ITEM,
                             sourceId = orderId,
-                            items = items,
+                            items = fulfillmentItems,
                             reason = "ORDER_FILL"
                         )
                         creatorPlayer.sendMessage(
@@ -673,7 +693,7 @@ class OrderService(
                             creatorPlayer,
                             order.creatorUuid,
                             order.creatorName,
-                            items,
+                            fulfillmentItems,
                             orderId,
                             ExpiredItemType.ORDER_ITEM,
                             "ORDER_FILL"
@@ -685,16 +705,9 @@ class OrderService(
                         ownerName = order.creatorName,
                         itemType = ExpiredItemType.ORDER_ITEM,
                         sourceId = orderId,
-                        items = items,
+                        items = fulfillmentItems,
                         reason = "ORDER_FILL"
                     )
-                }
-
-                // Remove items from filler AFTER successfully giving to creator
-                withContext(plugin.entityDispatcher(filler)) {
-                    items.forEach { item ->
-                        filler.inventory.removeItemAnySlot(item)
-                    }
                 }
             }
 
@@ -706,7 +719,7 @@ class OrderService(
                     filler,
                     filler.uniqueId,
                     filler.name,
-                    items,
+                    fulfillmentItems,
                     orderId,
                     ExpiredItemType.ORDER_ITEM,
                     "ORDER_FILL"
@@ -761,48 +774,85 @@ class OrderService(
             )
         }
 
-        orderRepository.updateStatus(orderId, OrderStatus.CANCELLED)
+        val remainingValue = if (order.orderType == OrderType.BUY_ORDER) order.remainingValue() else 0.0
+        val shouldRefund = remainingValue > 0
 
-        // Return items or refund based on order type
-        when (order.orderType) {
-            OrderType.SELL_ORDER -> {
-                // Return items to seller
-                order.itemStack?.let { itemStack ->
-                    expiredItemManager.storeExpiredItem(
-                        ownerUuid = order.creatorUuid,
-                        ownerName = order.creatorName,
-                        itemType = ExpiredItemType.ORDER_ITEM,
-                        sourceId = orderId,
-                        item = itemStack,
-                        reason = "CANCELLED"
-                    )
+        fun reverseRefund() {
+            if (!shouldRefund) return
+            val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+            economy.withdraw(creator, BigDecimal.valueOf(remainingValue))
+        }
+
+        if (shouldRefund) {
+            val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
+            economy.deposit(creator, BigDecimal.valueOf(remainingValue))
+        }
+
+        try {
+            database.transaction {
+                val updated = orderRepository.cancelWithVersion(this, orderId, order.version)
+                if (updated == 0) {
+                    throw ConcurrentOrderUpdateException(orderId)
+                }
+
+                when (order.orderType) {
+                    OrderType.SELL_ORDER -> {
+                        order.itemStack?.let { itemStack ->
+                            expiredItemManager.storeExpiredItemWithinTransaction(
+                                this,
+                                ownerUuid = order.creatorUuid,
+                                ownerName = order.creatorName,
+                                itemType = ExpiredItemType.ORDER_ITEM,
+                                sourceId = orderId,
+                                item = itemStack,
+                                reason = "CANCELLED"
+                            )
+                        }
+                    }
+
+                    OrderType.BUY_ORDER -> {
+                        if (shouldRefund) {
+                            transactionRepository.create(
+                                this,
+                                Transaction(
+                                    transactionType = TransactionType.ORDER_REFUND,
+                                    fromUuid = null,
+                                    fromName = null,
+                                    toUuid = order.creatorUuid,
+                                    toName = order.creatorName,
+                                    amount = remainingValue,
+                                    taxAmount = 0.0,
+                                    itemMaterial = null,
+                                    itemQuantity = null,
+                                    referenceId = orderId,
+                                    timestamp = Instant.now(),
+                                    serverId = serverId
+                                )
+                            )
+                        }
+                    }
                 }
             }
-
-            OrderType.BUY_ORDER -> {
-                // Refund remaining money
-                val remainingValue = order.remainingValue()
-                if (remainingValue > 0) {
-                    val creator = plugin.server.getOfflinePlayer(order.creatorUuid)
-                    economy.deposit(creator, BigDecimal.valueOf(remainingValue))
-                    transactionRepository.create(
-                        Transaction(
-                            transactionType = TransactionType.ORDER_REFUND,
-                            fromUuid = null,
-                            fromName = null,
-                            toUuid = order.creatorUuid,
-                            toName = order.creatorName,
-                            amount = remainingValue,
-                            taxAmount = 0.0,
-                            itemMaterial = null,
-                            itemQuantity = null,
-                            referenceId = orderId,
-                            timestamp = Instant.now(),
-                            serverId = serverId
-                        )
-                    )
+        } catch (e: ConcurrentOrderUpdateException) {
+            if (shouldRefund) {
+                try {
+                    reverseRefund()
+                } catch (reversalError: Exception) {
+                    logger.error("CRITICAL: Failed to reverse refund for cancelled order {}", orderId, reversalError)
                 }
             }
+            return@withContext ServiceResult.Failure(
+                translationAPI.getComponentSync(OrderMessages.ORDER_ALREADY_FILLED)
+            )
+        } catch (e: Exception) {
+            if (shouldRefund) {
+                try {
+                    reverseRefund()
+                } catch (reversalError: Exception) {
+                    logger.error("CRITICAL: Failed to reverse refund for cancelled order {}", orderId, reversalError)
+                }
+            }
+            throw e
         }
 
         ServiceResult.Success(order)
@@ -1013,6 +1063,57 @@ class OrderService(
         return fee.coerceIn(feeConfig.minFee, feeConfig.maxFee)
     }
 
+    private suspend fun consumeMatchingItemsFromInventory(
+        player: Player,
+        order: Order,
+        quantity: Int
+    ): List<ItemStack>? = withContext(plugin.entityDispatcher(player)) {
+        val consumedItems = mutableListOf<ItemStack>()
+        var remaining = quantity
+
+        for (slot in player.inventory.storageContents.indices) {
+            if (remaining <= 0) break
+
+            val stack = player.inventory.getItem(slot) ?: continue
+            if (itemMatchesOrder(stack, order) != ItemMatchResult.Match) continue
+
+            val toTake = minOf(remaining, stack.amount)
+            consumedItems += stack.clone().apply { amount = toTake }
+
+            if (stack.amount == toTake) {
+                player.inventory.setItem(slot, null)
+            } else {
+                player.inventory.setItem(slot, stack.clone().apply { amount = stack.amount - toTake })
+            }
+
+            remaining -= toTake
+        }
+
+        if (remaining > 0) {
+            val overflowItems = mutableListOf<ItemStack>()
+            consumedItems.forEach { item ->
+                val overflow = player.inventory.addItem(item)
+                if (overflow.isNotEmpty()) {
+                    overflowItems += overflow.values
+                }
+            }
+
+            if (overflowItems.isNotEmpty()) {
+                expiredItemManager.storeExpiredItems(
+                    ownerUuid = player.uniqueId,
+                    ownerName = player.name,
+                    itemType = ExpiredItemType.ORDER_ITEM,
+                    sourceId = UUID.randomUUID(),
+                    items = overflowItems,
+                    reason = "FULFILLMENT_ROLLBACK"
+                )
+            }
+            return@withContext null
+        }
+
+        consumedItems
+    }
+
     /**
      * Attempts to give items to a player. If their inventory is full or partially full,
      * stores the excess in the expired items system instead of dropping on the ground.
@@ -1080,3 +1181,6 @@ sealed class ItemMatchResult {
     object NbtMismatch : ItemMatchResult()
     object LoreMismatch : ItemMatchResult()
 }
+
+private class ConcurrentOrderUpdateException(orderId: UUID) :
+    IllegalStateException("Order $orderId was modified concurrently")

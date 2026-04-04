@@ -30,12 +30,13 @@ class AuctionMenuContext(
     val consolidatedExpiredItemRepository: ConsolidatedExpiredItemRepository,
     val transactionRepository: TransactionRepository,
     val playerBanRepository: PlayerBanRepository,
-    val config: AuctionHouseConfig,
     val translationAPI: TranslationAPI,
     val plugin: AuctionHousePlugin,
     val economy: EconomyProvider
 ) {
     val mm: MiniMessage = MiniMessage.miniMessage()
+    val config: AuctionHouseConfig
+        get() = plugin.config
 
     fun forPlayer(player: Player) = PlayerMenuContext(this, player)
 }

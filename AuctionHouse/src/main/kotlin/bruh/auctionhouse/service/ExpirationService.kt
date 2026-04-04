@@ -2,11 +2,10 @@ package bruh.auctionhouse.service
 
 import bruh.auctionhouse.AuctionHousePlugin
 import bruh.auctionhouse.config.AuctionHouseConfig
-import kotlinx.coroutines.runBlocking
+import com.github.shynixn.mccoroutine.folia.launch
 import org.bukkit.scheduler.BukkitTask
 import org.slf4j.Logger
-import java.time.Duration
-import kotlin.math.min
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Service that handles automatic expiration of auctions and orders.
@@ -16,11 +15,15 @@ class ExpirationService(
     private val plugin: AuctionHousePlugin,
     private val auctionService: AuctionService,
     private val orderService: OrderService,
-    private val config: AuctionHouseConfig,
+    config: AuctionHouseConfig,
     private val logger: Logger
 ) {
     private var task: BukkitTask? = null
     private var cleanupTask: BukkitTask? = null
+    private val expirationRunInProgress = AtomicBoolean(false)
+    private val cleanupRunInProgress = AtomicBoolean(false)
+    private val config: AuctionHouseConfig
+        get() = plugin.config
 
     /**
      * Starts the expiration checking task.
@@ -30,7 +33,18 @@ class ExpirationService(
         task = plugin.server.scheduler.runTaskTimerAsynchronously(
             plugin,
             Runnable {
-                runBlocking { checkExpirations() }
+                if (!expirationRunInProgress.compareAndSet(false, true)) {
+                    logger.warn("Skipping expiration pass because a previous run is still in progress")
+                    return@Runnable
+                }
+
+                plugin.launch {
+                    try {
+                        checkExpirations()
+                    } finally {
+                        expirationRunInProgress.set(false)
+                    }
+                }
             },
             1200L, // Initial delay: 1 minute
             1200L  // Period: 1 minute
@@ -40,10 +54,21 @@ class ExpirationService(
         cleanupTask = plugin.server.scheduler.runTaskTimerAsynchronously(
             plugin,
             Runnable {
-                runBlocking { cleanupOldExpiredItems() }
+                if (!cleanupRunInProgress.compareAndSet(false, true)) {
+                    logger.warn("Skipping expired-item cleanup because a previous run is still in progress")
+                    return@Runnable
+                }
+
+                plugin.launch {
+                    try {
+                        cleanupOldExpiredItems()
+                    } finally {
+                        cleanupRunInProgress.set(false)
+                    }
+                }
             },
             72000L, // Initial delay: 1 hour (in ticks)
-            14400L // Period: 4 hours (in ticks)
+            288000L // Period: 4 hours (in ticks)
         )
 
         logger.info("Expiration service started - checking every minute, cleanup every 4 hours")
@@ -84,11 +109,23 @@ class ExpirationService(
             val auctionDays = config.auctions.expiredStorageDays
             val orderDays = config.orders.expiredStorageDays
 
-            // Delete old expired items
-            val deletedCount = plugin.expiredItemRepository.deleteOldItems(min(auctionDays, orderDays))
+            val deletedAuctionItems = plugin.expiredItemRepository.deleteOldItems(
+                auctionDays,
+                bruh.auctionhouse.model.ExpiredItemType.AUCTION_ITEM
+            )
+            val deletedOrderItems = plugin.expiredItemRepository.deleteOldItems(
+                orderDays,
+                bruh.auctionhouse.model.ExpiredItemType.ORDER_ITEM
+            )
+            val deletedCount = deletedAuctionItems + deletedOrderItems
 
             if (deletedCount > 0) {
-                logger.info("Cleaned up {} expired items older than {} days", deletedCount, min(auctionDays, orderDays))
+                logger.info(
+                    "Cleaned up {} expired items (auction retention: {} days, order retention: {} days)",
+                    deletedCount,
+                    auctionDays,
+                    orderDays
+                )
             }
         } catch (e: Exception) {
             logger.error("Error cleaning up old expired items", e)

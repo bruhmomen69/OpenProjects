@@ -513,7 +513,7 @@ class AuctionAdminCommands(
      */
     @Subcommand("blacklist add")
     @CommandPermission("auctionhouse.admin.blacklist")
-    fun adminBlacklistAdd(
+    suspend fun adminBlacklistAdd(
         actor: BukkitCommandActor,
         @Named("material") materialName: String,
         @Optional @Named("reason") reason: String?
@@ -530,7 +530,7 @@ class AuctionAdminCommands(
         val currentList = config.restrictions.blacklistedMaterials.toMutableList()
         if (!currentList.contains(material.name)) {
             currentList.add(material.name)
-            // In production, this would save to config
+            saveBlacklist(currentList)
             actor.reply(
                 translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_ADDED) {
                     unparsed("material", material.name)
@@ -549,14 +549,14 @@ class AuctionAdminCommands(
      */
     @Subcommand("blacklist remove")
     @CommandPermission("auctionhouse.admin.blacklist")
-    fun adminBlacklistRemove(
+    suspend fun adminBlacklistRemove(
         actor: BukkitCommandActor,
         @Named("material") materialName: String
     ) {
         val currentList = config.restrictions.blacklistedMaterials.toMutableList()
         if (currentList.contains(materialName.uppercase())) {
             currentList.remove(materialName.uppercase())
-            // In production, this would save to config
+            saveBlacklist(currentList)
             actor.reply(
                 translationAPI.getComponentSync(AuctionMessages.ADMIN_BLACKLIST_REMOVED) {
                     unparsed("material", materialName)
@@ -590,5 +590,15 @@ class AuctionAdminCommands(
                 unparsed("count", (blacklisted.size - 10).toString())
             })
         }
+    }
+
+    private suspend fun saveBlacklist(updatedMaterials: List<String>) {
+        plugin.savePluginConfig(
+            config.copy(
+                restrictions = config.restrictions.copy(
+                    blacklistedMaterials = updatedMaterials.distinct().sorted()
+                )
+            )
+        )
     }
 }
