@@ -5,6 +5,8 @@ import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.asyncDispatcher
+import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.bukkit.Bukkit
@@ -58,9 +60,17 @@ class TemplateCommands(
         val minChunkZ = floor(minZ / 16.0).toInt()
         val maxChunkZ = floor(maxZ / 16.0).toInt()
 
-        withContext(Dispatchers.Default) {
-            val template = nmsAdapter.serializeArea(targetWorld, minChunkX, minChunkZ, maxChunkX, maxChunkZ)
+        val template = if (nmsAdapter.supportsAsync) {
+            withContext(plugin.asyncDispatcher) {
+                nmsAdapter.serializeArea(targetWorld, minChunkX, minChunkZ, maxChunkX, maxChunkZ)
+            }
+        } else {
+            withContext(plugin.globalRegionDispatcher) {
+                nmsAdapter.serializeArea(targetWorld, minChunkX, minChunkZ, maxChunkX, maxChunkZ)
+            }
+        }
 
+        withContext(Dispatchers.Default) {
             val descriptionFormat = config.templates.defaultDescriptionFormat
             val description = descriptionFormat.replace("<player>", actor.name())
             templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)

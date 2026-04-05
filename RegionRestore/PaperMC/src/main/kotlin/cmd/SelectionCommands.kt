@@ -77,18 +77,29 @@ class SelectionCommands(
             unparsed("name", name)
         })
 
-        withContext(plugin.globalRegionDispatcher) {
-
+        val template = if (nmsAdapter.supportsAsync) {
+            withContext(plugin.asyncDispatcher) {
+                nmsAdapter.serializeArea(
+                    selection.world,
+                    selection.minChunkX,
+                    selection.minChunkZ,
+                    selection.maxChunkX,
+                    selection.maxChunkZ
+                )
+            }
+        } else {
+            withContext(plugin.globalRegionDispatcher) {
+                nmsAdapter.serializeArea(
+                    selection.world,
+                    selection.minChunkX,
+                    selection.minChunkZ,
+                    selection.maxChunkX,
+                    selection.maxChunkZ
+                )
+            }
         }
 
         withContext(plugin.asyncDispatcher) {
-            val template = nmsAdapter.serializeArea(
-                selection.world,
-                selection.minChunkX,
-                selection.minChunkZ,
-                selection.maxChunkX,
-                selection.maxChunkZ
-            )
             val descriptionFormat = config.templates.defaultDescriptionFormat
             val description = descriptionFormat.replace("<player>", player.name)
             templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)
