@@ -89,13 +89,9 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
 
 
         private val STATE_VISIBLE_FIELD: Field = SWMRNibbleArray::class.java.getDeclaredField("stateVisible")
-        private val SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD: MethodHandle
 
         init {
             STATE_VISIBLE_FIELD.isAccessible = true
-            val slqChunkTasksReflection = StarLightInterface.ServerLightQueue::class.java.getDeclaredField("chunkTasks")
-            slqChunkTasksReflection.isAccessible = true
-            SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD = MethodHandles.lookup().unreflectGetter(slqChunkTasksReflection)
         }
     }
 

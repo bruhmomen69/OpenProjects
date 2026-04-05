@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
 import net.minecraft.core.BlockPos
+import net.minecraft.core.RegistryAccess
 import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket
 import net.minecraft.server.level.ServerLevel
@@ -25,6 +26,8 @@ import net.minecraft.server.level.ThreadedLevelLightEngine
 import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity
 import net.minecraft.world.level.chunk.LevelChunk
+import net.minecraft.world.level.chunk.LevelChunkSection
+import net.minecraft.world.level.chunk.PalettedContainerFactory
 import net.minecraft.world.level.chunk.status.ChunkStatus
 import net.minecraft.world.level.levelgen.Heightmap
 import org.bukkit.Chunk
@@ -56,7 +59,11 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalAtomicApi::class)
 class PaperNmsAdapter1_21_9 : PaperNmsAdapter, ChunkByChunkRestore {
     companion object {
-        private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 100) {
+        private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 200) {
+            strategy = KacheStrategy.LRU
+        }
+
+        private val CONTAINER_CACHE = InMemoryKache<RegistryAccess, PalettedContainerFactory>(maxSize = 20) {
             strategy = KacheStrategy.LRU
         }
 
@@ -74,6 +81,13 @@ class PaperNmsAdapter1_21_9 : PaperNmsAdapter, ChunkByChunkRestore {
                 return@getOrPut null
             }
         }
+
+        private suspend fun getContainerFactory(registryAccess: RegistryAccess): PalettedContainerFactory {
+            return CONTAINER_CACHE.getOrPut(registryAccess) {
+                PalettedContainerFactory.create(registryAccess)
+            }!!
+        }
+
 
         private val STATE_VISIBLE_FIELD: Field = SWMRNibbleArray::class.java.getDeclaredField("stateVisible")
         private val SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD: MethodHandle
@@ -130,6 +144,8 @@ class PaperNmsAdapter1_21_9 : PaperNmsAdapter, ChunkByChunkRestore {
 
         val relightFuture = CompletableFuture<Unit>()
 
+        val containerFactory = getContainerFactory(level.registryAccess())
+
         val restore = restoreChunk(
             template,
             targetChunkX,
@@ -139,7 +155,8 @@ class PaperNmsAdapter1_21_9 : PaperNmsAdapter, ChunkByChunkRestore {
             chunk,
             fBuffer,
             chonkHandle,
-            updateLight
+            updateLight,
+            containerFactory
         )
 
         if (!updateLight) relightFuture.complete(Unit)
@@ -429,16 +446,25 @@ class PaperNmsAdapter1_21_9 : PaperNmsAdapter, ChunkByChunkRestore {
         chunk: Chunk,
         fBuffer: FriendlyByteBuf,
         chonkHandle: LevelChunk,
-        doFullRelight: Boolean
+        doFullRelight: Boolean,
+        containerFactory: PalettedContainerFactory? = null
     ): ChunkRestoreData {
         chunkData.readerIndex(0)
 
         val sections = fBuffer.readShort()
 
-        for (i in 0 until sections) {
-            val section = chonkHandle.sections[i]
-            section.read(fBuffer)
+        if (containerFactory != null) {
+            for (i in 0 until sections) {
+                val section = LevelChunkSection(containerFactory, level, chonkHandle.pos, i)
+                section.read(fBuffer)
+                chonkHandle.sections[i] = section
+            }
+        } else {
+            for (i in 0 until sections) {
+                chonkHandle.sections[i].read(fBuffer)
+            }
         }
+
 
         val beMap = chonkHandle.blockEntities
         for (mutableEntry in HashMap(beMap)) {
