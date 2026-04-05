@@ -66,7 +66,7 @@ class PaperNmsAdapter1_21_4 : PaperNmsAdapter {
         return buffer
     }
 
-    override fun deserializeChunkDataFromByteBuf(buffer: ByteBuf): Map<Pair<Int, Int>, ByteBuf> {
+    override fun deserializeChunkDataFromByteBuf(buffer: ByteBuf, offheap: Boolean): Map<Pair<Int, Int>, ByteBuf> {
         val size = buffer.readInt()
         val result = mutableMapOf<Pair<Int, Int>, ByteBuf>()
 
@@ -74,7 +74,7 @@ class PaperNmsAdapter1_21_4 : PaperNmsAdapter {
             val x = buffer.readInt()
             val z = buffer.readInt()
             val dataLength = buffer.readInt()
-            val dataBytes = Unpooled.directBuffer(dataLength)
+            val dataBytes = if (offheap) Unpooled.directBuffer(dataLength) else Unpooled.buffer(dataLength)
             buffer.readBytes(dataBytes, dataLength)
             result[Pair(x, z)] = dataBytes
         }

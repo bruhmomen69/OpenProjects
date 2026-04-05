@@ -71,5 +71,5 @@ interface PaperNmsAdapter {
 
     fun serializeChunkDataToByteBuf(chunkData: Map<Pair<Int, Int>, ByteBuf>): ByteBuf
 
-    fun deserializeChunkDataFromByteBuf(buffer: ByteBuf): Map<Pair<Int, Int>, ByteBuf>
+    fun deserializeChunkDataFromByteBuf(buffer: ByteBuf, offheap: Boolean = true): Map<Pair<Int, Int>, ByteBuf>
 }

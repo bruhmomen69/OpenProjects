@@ -18,6 +18,7 @@ dependencies {
     api(libs.bundles.adventure)
     api(libs.bundles.configurate)
     api(libs.zstd)
+    compileOnly(libs.oshiCore)
     implementation(libs.kotlinReflect)
     implementation(libs.kache)
 }

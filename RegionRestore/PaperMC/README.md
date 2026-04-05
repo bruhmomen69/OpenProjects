@@ -93,6 +93,7 @@ Format: `<regionrestore_<placeholder>>`
 
 - **PlaceholderAPI**: For `%regionrestore_*%` placeholders
 - **MiniPlaceholders**: For `<regionrestore_*>` placeholders in MiniMessage
+- **OSHI** (loaded via plugin.yml `libraries`): Used to check available off-heap memory before loading large template datafiles. If insufficient memory is detected, templates are deserialized using on-heap buffers as a fallback to avoid native OOM crashes.
 
 ## Entity Killer
 

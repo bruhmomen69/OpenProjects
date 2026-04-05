@@ -6,6 +6,8 @@ website: https://github.com/bruhmomen69/RegionRestore
 authors: [bruhmomen69]
 description: High-performance region/arena snapshot + restore with mass cloning
 folia-supported: true
+libraries:
+  - com.github.oshi:oshi-core:6.10.0
 softdepend:
   - PlaceholderAPI
   - MiniPlaceholders

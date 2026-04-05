@@ -52,6 +52,7 @@ kache = "2.1.1"
 xseries = "13.6.0"
 anvilgui = "2.0.4-20251228.114051-1"
 zstd = "1.5.7-2"
+oshi = "6.10.0"
 
 # Testing
 junit = "5.10.2"
@@ -119,6 +120,7 @@ kache = { module = "com.mayakapps.kache:kache", version.ref = "kache" }
 xseries = { module = "com.github.cryptomorin:XSeries", version.ref = "xseries" }
 anvilgui = { module = "net.wesjd:anvilgui", version.ref = "anvilgui" }
 zstd = { module = "com.github.luben:zstd-jni", version.ref = "zstd" }
+oshiCore = { module = "com.github.oshi:oshi-core", version.ref = "oshi" }
 
 # Testing
 junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }

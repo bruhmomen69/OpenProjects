@@ -21,6 +21,7 @@ dependencies {
     compileOnly(libs.paperApi)
     compileOnly(libs.placeholderapi)
     compileOnly(libs.miniplaceholders)
+    compileOnly(libs.oshiCore)
     implementation(libs.mccoroutineFoliaCore)
 }
 

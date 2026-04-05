@@ -535,7 +535,13 @@ class TemplateRepository(
         val metadata = cbor.decodeFromByteArray<TemplateMetadata>(metadataBytes)
         
         val chunkDataBuffer = io.netty.buffer.Unpooled.wrappedBuffer(chunkDataBytes)
-        val chunkData = nmsAdapter.deserializeChunkDataFromByteBuf(chunkDataBuffer)
+
+        val offheap = MemoryChecker.hasSufficientOffheapMemory(originalSize)
+        if (!offheap) {
+            logger.warn("Loading template $name v$versionId using heap memory. This can cause reduced server performance and increased GC pressure. Increase the memory overhead (or contact support) to improve performance.")
+        }
+
+        val chunkData = nmsAdapter.deserializeChunkDataFromByteBuf(chunkDataBuffer, offheap)
         
         val template = RegionTemplate(
             name = metadata.templateName1,

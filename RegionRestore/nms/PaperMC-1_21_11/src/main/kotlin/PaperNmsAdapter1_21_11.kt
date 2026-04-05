@@ -282,7 +282,7 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
         return bigBuffer
     }
 
-    override fun deserializeChunkDataFromByteBuf(buffer: ByteBuf): Map<Pair<Int, Int>, ByteBuf> {
+    override fun deserializeChunkDataFromByteBuf(buffer: ByteBuf, offheap: Boolean): Map<Pair<Int, Int>, ByteBuf> {
         val chunks = buffer.readInt()
         val result = ConcurrentHashMap<Pair<Int, Int>, ByteBuf>()
         logger.info("Deserializing $chunks chunksets")
@@ -296,29 +296,49 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
             buffer.readBytes(chunkBytes, chunkSize)
 
             tasks.add(CompletableFuture.runAsync({
-                val buffer = Unpooled.directBuffer(originalByteSize)
-                Zstd.decompressUnsafe(
-                    buffer.memoryAddress(),
-                    originalByteSize.toLong(),
-                    chunkBytes.memoryAddress(),
-                    chunkSize.toLong()
-                )
-                buffer.writerIndex(originalByteSize)
+                val count = if (offheap) {
+                    val buffer = Unpooled.directBuffer(originalByteSize)
+                    Zstd.decompressUnsafe(
+                        buffer.memoryAddress(),
+                        originalByteSize.toLong(),
+                        chunkBytes.memoryAddress(),
+                        chunkSize.toLong()
+                    )
+                    buffer.writerIndex(originalByteSize)
 
-                val size = buffer.readInt()
+                    val size = buffer.readInt()
 
-                repeat(size) {
-                    val x = buffer.readInt()
-                    val z = buffer.readInt()
-                    val dataLength = buffer.readInt()
-                    val dataBytes = Unpooled.directBuffer(dataLength)
-                    buffer.readBytes(dataBytes, dataLength)
-                    result[Pair(x, z)] = dataBytes
+                    repeat(size) {
+                        val x = buffer.readInt()
+                        val z = buffer.readInt()
+                        val dataLength = buffer.readInt()
+                        val dataBytes = Unpooled.directBuffer(dataLength)
+                        buffer.readBytes(dataBytes, dataLength)
+                        result[Pair(x, z)] = dataBytes
+                    }
+                    buffer.release()
+
+                    size
+                } else {
+                    val decompressed = Zstd.decompress(chunkBytes.array(), originalByteSize)
+                    val buffer = Unpooled.wrappedBuffer(decompressed)
+
+                    val size = buffer.readInt()
+
+                    repeat(size) {
+                        val x = buffer.readInt()
+                        val z = buffer.readInt()
+                        val dataLength = buffer.readInt()
+                        val dataBytes = Unpooled.buffer(dataLength)
+                        buffer.readBytes(dataBytes, dataLength)
+                        result[Pair(x, z)] = dataBytes
+                    }
+
+                    size
                 }
-                buffer.release()
                 chunkBytes.release()
 
-                logger.info("Loaded a $size-long chunkset.")
+                logger.info("Loaded a $count-long chunkset.")
             }, RESTORE_POOL))
         }
 
