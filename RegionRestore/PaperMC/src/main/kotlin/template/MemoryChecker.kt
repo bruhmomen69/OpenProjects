@@ -37,7 +37,7 @@ object MemoryChecker {
         val needed = requiredBytes + SAFETY_MARGIN_BYTES
 
         if (available < needed) {
-            logger.warn(
+            logger.debug(
                 "Insufficient off-heap memory for template load. " +
                         "Available: ${formatBytes(available)}, Required: ${formatBytes(needed)} " +
                         "(including 256 MB safety margin). " +
