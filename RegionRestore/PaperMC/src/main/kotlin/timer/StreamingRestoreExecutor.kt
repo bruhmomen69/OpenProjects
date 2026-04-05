@@ -52,7 +52,7 @@ class StreamingRestoreExecutor(
         val maxMem =
             if (Runtime.getRuntime().maxMemory() == Long.MAX_VALUE) 8000000000L else Runtime.getRuntime().maxMemory()
         val speedMult = maxMem / 1000 / 1000 / 1000
-        val maxSpeed = context.restoreConfig.taskLoadThrottle * speedMult
+        val maxSpeed = context.restoreConfig.taskLoadThrottle * speedMult * 1.15 // Add 15% to account for pre-chunk-load locking delay.
 
         val completedTasks = AtomicLong(0)
         val totalTasks = job.template.chunkData.size.toLong()
@@ -63,7 +63,6 @@ class StreamingRestoreExecutor(
 
             taskCount.incrementAndFetch()
 
-            val chunkFuture = job.world.getChunkAtAsync(targetChunkX, targetChunkZ)
             val worldId = job.world.uid
             val key = ChunkTicketManager.ChunkKey(worldId, targetChunkX, targetChunkZ)
             val neighborKeys = context.buildNeighborChunkKeys(worldId, targetChunkX, targetChunkZ)
@@ -75,45 +74,44 @@ class StreamingRestoreExecutor(
                 context.plugin.regionDispatcher(job.world, targetChunkX, targetChunkZ)
             }
 
+            val future = CompletableFuture<Unit>()
+            context.plugin.launch(dispatcher) {
+                val (localLock, neighborLocks, locked) = if (useChunkLocking) {
+                    val localLock = context.chunkLockManager.accessChunkLock(targetChunkX, targetChunkZ)
+                    val neighborLocks = neighborKeys.map { (_, x, z) ->
+                        context.chunkLockManager.accessChunkLock(x, z)
+                    }
+                    val locked = acquireLocksWithLogging(localLock, neighborLocks, targetChunkX, targetChunkZ)
+                    Triple(localLock, neighborLocks, locked)
+                } else {
+                    Triple(null, emptyList(), false)
+                }
+
+                val chunk = try {
+                    job.world.getChunkAtAsync(targetChunkX, targetChunkZ).await()
+                } catch (e: Exception) {
+                    context.slF4JLogger.error(
+                        "Failed to load chunk at $targetChunkX, $targetChunkZ",
+                        e
+                    )
+                    future.completeExceptionally(e)
+                    return@launch
+                }
+
+                val handle = createAndAddTicket(chunk, key, wasLoaded, targetChunkX, targetChunkZ)
+                    ?: run {
+                        future.complete(Unit)
+                        return@launch
+                    }
+
+                executeChunkRestore(
+                    job, templateChunkX, templateChunkZ, targetChunkX, targetChunkZ,
+                    handle, localLock, neighborLocks, locked, totalTime, future, useChunkLocking
+                )
+            }
+
             restoreFutures.add(
-                chunkFuture.handle { chunk, throwable ->
-                    if (throwable != null || chunk == null) {
-                        context.slF4JLogger.error(
-                            "Failed to load chunk at $targetChunkX, $targetChunkZ",
-                            throwable
-                        )
-                        return@handle CompletableFuture.completedFuture(Unit)
-                    }
-
-                    val future = CompletableFuture<Unit>()
-                    context.plugin.launch(dispatcher) {
-                        val handle = createAndAddTicket(chunk, key, wasLoaded, targetChunkX, targetChunkZ)
-                            ?: run {
-                                future.complete(Unit)
-                                return@launch
-                            }
-
-                        delay(48)
-
-                        val (localLock, neighborLocks, locked) = if (useChunkLocking) {
-                            val localLock = context.chunkLockManager.accessChunkLock(targetChunkX, targetChunkZ)
-                            val neighborLocks = neighborKeys.map { (_, x, z) ->
-                                context.chunkLockManager.accessChunkLock(x, z)
-                            }
-                            val locked = acquireLocksWithLogging(localLock, neighborLocks, targetChunkX, targetChunkZ)
-                            Triple(localLock, neighborLocks, locked)
-                        } else {
-                            Triple(null, emptyList(), false)
-                        }
-
-                        executeChunkRestore(
-                            job, templateChunkX, templateChunkZ, targetChunkX, targetChunkZ,
-                            handle, localLock, neighborLocks, locked, totalTime, future, useChunkLocking
-                        )
-                    }
-
-                    return@handle future
-                }.thenCompose { it }.whenComplete { _, _ ->
+                future.whenComplete { _, _ ->
                     taskCount.decrementAndFetch()
                     completedTasks.incrementAndFetch()
                 }

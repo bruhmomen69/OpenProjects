@@ -26,7 +26,7 @@ tasks.reobfJar.configure {
     toNamespace.set("mojang")
 
     val myFile = File.createTempFile("mappings", ".tiny")
-    myFile.deleteOnExit()
     mappingsFile.set(myFile)
+    myFile.deleteOnExit()
     enabled = true
 }
