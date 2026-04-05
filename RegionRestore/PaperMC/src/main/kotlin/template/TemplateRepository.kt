@@ -21,6 +21,7 @@ import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.nms.RegionTemplate
 import bruh.regionrestore.nms.RegionTemplateVersion
+import io.netty.buffer.Unpooled
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
@@ -92,7 +93,8 @@ class TemplateRepository(
         val minChunkZ: Int,
         val sizeXChunks: Int,
         val sizeZChunks: Int,
-        val chunkCoords: List<ChunkCoord> = emptyList()
+        val chunkCoords: List<ChunkCoord> = emptyList(),
+        val encodedVersion: Int = 1
     )
 
     @ConfigSerializable
@@ -521,7 +523,7 @@ class TemplateRepository(
 
             val metadata = cbor.decodeFromByteArray<TemplateMetadata>(metadataBytes)
 
-            val chunkDataBuffer = io.netty.buffer.Unpooled.wrappedBuffer(chunkDataBytes)
+            val chunkDataBuffer = Unpooled.wrappedBuffer(chunkDataBytes)
 
             val offheap = MemoryChecker.hasSufficientOffheapMemory(originalSize)
             if (!offheap) {
