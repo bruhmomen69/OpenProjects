@@ -52,7 +52,8 @@ class StreamingRestoreExecutor(
         val maxMem =
             if (Runtime.getRuntime().maxMemory() == Long.MAX_VALUE) 8000000000L else Runtime.getRuntime().maxMemory()
         val speedMult = maxMem / 1000 / 1000 / 1000
-        val maxSpeed = context.restoreConfig.taskLoadThrottle * speedMult * 1.15 // Add 15% to account for pre-chunk-load locking delay.
+        // Add 25% to account for pre-chunk-load locking (and similar) delay. The other delays are still correct and use the normal values.
+        val maxSpeed = context.restoreConfig.taskLoadThrottle * speedMult * 1.25
 
         val completedTasks = AtomicLong(0)
         val totalTasks = job.template.chunkData.size.toLong()
