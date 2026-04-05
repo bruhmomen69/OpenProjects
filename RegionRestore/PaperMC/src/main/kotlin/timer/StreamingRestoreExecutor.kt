@@ -47,6 +47,7 @@ class StreamingRestoreExecutor(
         val totalTime = AtomicLong(0)
         val async = context.restoreConfig.asyncRestore ?: true
         val restoreFutures = mutableListOf<CompletableFuture<Unit>>()
+        val useChunkLocking = context.shouldUseChunkLocking()
 
         val maxMem =
             if (Runtime.getRuntime().maxMemory() == Long.MAX_VALUE) 8000000000L else Runtime.getRuntime().maxMemory()
@@ -74,8 +75,6 @@ class StreamingRestoreExecutor(
                 context.plugin.regionDispatcher(job.world, targetChunkX, targetChunkZ)
             }
 
-            val localLock = context.chunkLockManager.accessChunkLock(targetChunkX, targetChunkZ)
-
             restoreFutures.add(
                 chunkFuture.handle { chunk, throwable ->
                     if (throwable != null || chunk == null) {
@@ -94,17 +93,22 @@ class StreamingRestoreExecutor(
                                 return@launch
                             }
 
-                        delay(48) // Try to be next tick after load to drastically reduce errors.
+                        delay(48)
 
-                        val neighborLocks = neighborKeys.map { (_, x, z) ->
-                            context.chunkLockManager.accessChunkLock(x, z)
+                        val (localLock, neighborLocks, locked) = if (useChunkLocking) {
+                            val localLock = context.chunkLockManager.accessChunkLock(targetChunkX, targetChunkZ)
+                            val neighborLocks = neighborKeys.map { (_, x, z) ->
+                                context.chunkLockManager.accessChunkLock(x, z)
+                            }
+                            val locked = acquireLocksWithLogging(localLock, neighborLocks, targetChunkX, targetChunkZ)
+                            Triple(localLock, neighborLocks, locked)
+                        } else {
+                            Triple(null, emptyList(), false)
                         }
-
-                        val locked = acquireLocksWithLogging(localLock, neighborLocks, targetChunkX, targetChunkZ)
 
                         executeChunkRestore(
                             job, templateChunkX, templateChunkZ, targetChunkX, targetChunkZ,
-                            handle, localLock, neighborLocks, locked, totalTime, future
+                            handle, localLock, neighborLocks, locked, totalTime, future, useChunkLocking
                         )
                     }
 
@@ -192,11 +196,12 @@ class StreamingRestoreExecutor(
         targetChunkX: Int,
         targetChunkZ: Int,
         handle: ChunkTicketManager.ChunkTicketHandle,
-        localLock: ChunkLockManager.ChunkLock,
+        localLock: ChunkLockManager.ChunkLock?,
         neighborLocks: List<ChunkLockManager.ChunkLock>,
         initiallyLocked: Boolean,
         totalTime: AtomicLong,
         future: CompletableFuture<Unit>,
+        useChunkLocking: Boolean
     ) {
         var locked = initiallyLocked
 
@@ -213,9 +218,8 @@ class StreamingRestoreExecutor(
                 job.updateLight
             )
 
-            // Unlock post-await
-            if (locked) {
-                localLock.lock.unlock()
+            if (useChunkLocking && locked) {
+                localLock!!.lock.unlock()
                 locked = false
                 context.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ")
             }
@@ -225,7 +229,6 @@ class StreamingRestoreExecutor(
 
             nextTickFuture.asCompletableFuture().await()
 
-            // Release ticket immediately after restore and tick tasks have completed.
             context.chunkTicketManager.releaseChunkTickets(listOf(handle))
             future.complete(Unit)
         } catch (e: Exception) {
@@ -236,16 +239,16 @@ class StreamingRestoreExecutor(
             context.chunkTicketManager.releaseChunkTickets(listOf(handle))
             future.completeExceptionally(e)
         } finally {
-            // Release local lock, if locked.
-            if (locked) {
-                localLock.lock.unlock()
+            if (useChunkLocking && locked) {
+                localLock!!.lock.unlock()
                 locked = false
                 context.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ (e-case)")
             }
 
-            // Release lock references
-            neighborLocks.forEach { context.chunkLockManager.releaseChunkLock(it) }
-            context.chunkLockManager.releaseChunkLock(localLock)
+            if (useChunkLocking) {
+                neighborLocks.forEach { context.chunkLockManager.releaseChunkLock(it) }
+                context.chunkLockManager.releaseChunkLock(localLock!!)
+            }
         }
     }
 }

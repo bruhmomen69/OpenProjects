@@ -93,6 +93,11 @@ class RestoreExecutionContext(
                     .coerceAtMost(1000)
     }
 
+    fun shouldUseChunkLocking(): Boolean {
+        restoreConfig.disableChunkLocking?.let { return !it }
+        return nmsAdapter.requiresChunkLocking or restoreConfig.updateLight
+    }
+
     /**
      * Build a set of neighbor chunk keys for a given chunk position.
      */

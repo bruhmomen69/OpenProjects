@@ -22,7 +22,7 @@ The NMS (Net Minecraft Server) abstraction layer handles version-specific Minecr
   - `RESTORE_POOL`: Thread pool for parallel chunk restoration
   - `IS_FOLIA`: Lazy Folia server detection
   - `serializeChunkDataToByteBuf()`/`deserializeChunkDataFromByteBuf()`: Zstd compression/decompression
-- **[`PaperNmsAdapter`](src/main/kotlin/nms/PaperNmsAdapter.kt)**: Interface defining NMS adapter contract
+- **[`PaperNmsAdapter`](src/main/kotlin/nms/PaperNmsAdapter.kt)**: Interface defining NMS adapter contract, including `requiresChunkLocking` property for version-specific locking requirements
 - **[`ChunkByChunkRestore`](src/main/kotlin/nms/ChunkByChunkRestore.kt)**: Interface for streaming restore support
 - **[`RegionTemplate`](src/main/kotlin/nms/PaperNmsAdapter.kt)**: Data class for region snapshot metadata and chunk data
 
@@ -178,6 +178,39 @@ entityKiller:
     - ZOMBIE
     - SKELETON
     - CREEPER
-    - SPIDER
-    - PHANTOM
+     - SPIDER
+     - PHANTOM
+     ```
+
+## Streaming Restore Chunk Locking
+
+RegionRestore's streaming restore mode uses chunk-level locking to prevent concurrent modifications to the same chunk or its neighbors during restore operations. This ensures data integrity during parallel chunk restoration.
+
+### Default Behavior
+
+- **Paper 1.21.9+**: Chunk locking is **disabled by default**. Modern Paper versions have improved thread safety for chunk operations, making explicit locking unnecessary.
+- **Paper 1.21.8 and earlier**: Chunk locking is **enabled by default** for safety.
+
+### Configuration
+
+You can override the default behavior in your config:
+
+```yaml
+restore:
+  streaming-restore: true
+  disable-chunk-locking: null  # null = auto (recommended)
 ```
+
+### Values
+
+| Value | Behavior |
+|-------|----------|
+| `null` or omitted | Auto-detect based on server version (recommended) |
+| `false` | Always use chunk locking (force enable) |
+| `true` | Never use chunk locking (force disable) |
+
+### When to Override
+
+**Force enable (`false`)** if you experience chunk corruption issues on modern Paper versions (rare).
+
+**Force disable (`true`)** on older Paper versions if you're confident in your server's concurrency handling and want maximum performance.

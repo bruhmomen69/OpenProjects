@@ -97,6 +97,7 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
 
     override val minecraftVersion = "26.1.1"
     override val supportsAsync = true
+    override val requiresChunkLocking = false
 
     override suspend fun restoreSingleChunk(
         world: World,

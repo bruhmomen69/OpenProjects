@@ -81,6 +81,8 @@ data class RestoreConfig(
     val asyncRestore: Boolean? = null,
     @Comment("Stream large restores as chunks are loaded? Makes the restore use more time on CPU, but it will not load all chunks at once, which provides a performance improvement for large sections.")
     val streamingRestore: Boolean = false,
+    @Comment("Override chunk locking behavior for streaming restores. null = auto (based on server version), false = always lock chunks, true = never lock chunks")
+    val disableChunkLocking: Boolean? = null,
     @Comment("Log restore timing information to console. Shows active time and total wall clock time for restores.")
     val logTimer: Boolean = false
 )

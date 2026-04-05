@@ -52,6 +52,9 @@ interface PaperNmsAdapter {
 
     val supportsAsync: Boolean
 
+    val requiresChunkLocking: Boolean
+        get() = true
+
     suspend fun serializeArea(
         world: World,
         minChunkX: Int,
