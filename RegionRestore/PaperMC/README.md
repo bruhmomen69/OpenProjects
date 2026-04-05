@@ -14,6 +14,20 @@ Core implementation of the RegionRestore plugin for Paper/Folia servers.
 
 ## Architecture
 
+### NMS Package (`nms/`)
+
+The NMS (Net Minecraft Server) abstraction layer handles version-specific Minecraft internals:
+
+- **[`NmsAdapterCommon`](src/main/kotlin/nms/NmsAdapterCommon.kt)**: Shared utilities extracted from all NMS adapters:
+  - `RESTORE_POOL`: Thread pool for parallel chunk restoration
+  - `IS_FOLIA`: Lazy Folia server detection
+  - `serializeChunkDataToByteBuf()`/`deserializeChunkDataFromByteBuf()`: Zstd compression/decompression
+- **[`PaperNmsAdapter`](src/main/kotlin/nms/PaperNmsAdapter.kt)**: Interface defining NMS adapter contract
+- **[`ChunkByChunkRestore`](src/main/kotlin/nms/ChunkByChunkRestore.kt)**: Interface for streaming restore support
+- **[`RegionTemplate`](src/main/kotlin/nms/PaperNmsAdapter.kt)**: Data class for region snapshot metadata and chunk data
+
+Version-specific adapters (in `nms/` submodules) implement these interfaces for each Minecraft/Paper version (1.21.4 through 26.1).
+
 ### Timer Package (`timer/`)
 
 The restore scheduling system has been refactored into a clean, modular architecture:
@@ -93,7 +107,6 @@ Format: `<regionrestore_<placeholder>>`
 
 - **PlaceholderAPI**: For `%regionrestore_*%` placeholders
 - **MiniPlaceholders**: For `<regionrestore_*>` placeholders in MiniMessage
-- **OSHI** (loaded via plugin.yml `libraries`): Used to check available off-heap memory before loading large template datafiles. If insufficient memory is detected, templates are deserialized using on-heap buffers as a fallback to avoid native OOM crashes.
 
 ## Entity Killer
 

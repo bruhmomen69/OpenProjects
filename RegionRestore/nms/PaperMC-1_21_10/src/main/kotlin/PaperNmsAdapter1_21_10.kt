@@ -1,7 +1,10 @@
 package bruh.regionrestore.nms.v1_21_10
 
+import bruh.regionrestore.nms.ChunkByChunkRestore
+import bruh.regionrestore.nms.NmsAdapterCommon
+import bruh.regionrestore.nms.PaperNmsAdapter
+import bruh.regionrestore.nms.RegionTemplate
 import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray
-import com.github.luben.zstd.Zstd
 import com.github.shynixn.mccoroutine.folia.launch
 import com.github.shynixn.mccoroutine.folia.regionDispatcher
 import com.mayakapps.kache.InMemoryKache
@@ -28,21 +31,12 @@ import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
-import org.slf4j.LoggerFactory
-import bruh.regionrestore.nms.ChunkByChunkRestore
-import bruh.regionrestore.nms.PaperNmsAdapter
-import bruh.regionrestore.nms.RegionTemplate
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import kotlin.collections.component1
-import kotlin.collections.component2
-import kotlin.collections.iterator
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
@@ -69,25 +63,11 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             }
         }
 
-        private fun isFolia(): Boolean {
-            try {
-                Class.forName("io.papermc.paper.threadedregions.RegionizedServer")
-                return true
-            } catch (e: ClassNotFoundException) {
-                return false
-            }
-        }
-
         private val STATE_VISIBLE_FIELD: Field = SWMRNibbleArray::class.java.getDeclaredField("stateVisible")
-        private val IS_FOLIA: Boolean by lazy { isFolia() }
 
         init {
             STATE_VISIBLE_FIELD.isAccessible = true
         }
-
-        private val RESTORE_POOL = Executors.newFixedThreadPool((Runtime.getRuntime().availableProcessors() - 3).coerceAtLeast(2))
-
-        private val logger = LoggerFactory.getLogger("RegionRestore NMS")
     }
 
     override val minecraftVersion = "1.21.10"
@@ -113,7 +93,7 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             templateChunkZ - template.minChunkZ + targetChunkZ
         )
 
-        val chonkHandle = if (IS_FOLIA) {
+        val chonkHandle = if (NmsAdapterCommon.IS_FOLIA) {
             level.getChunkIfLoaded(movedChunkPos.x, movedChunkPos.z)?.let { return@let it }
                 ?: world.getChunkAtAsync(movedChunkPos.x, movedChunkPos.z).thenApply { (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk }.join()
         } else {
@@ -124,7 +104,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
 
         val relightFuture = CompletableFuture<Unit>()
 
-        // Restore this chunk
         val restore = restoreChunk(
             template,
             targetChunkX,
@@ -137,7 +116,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             updateLight
         )
 
-        // Re-light this chunk
         if (!updateLight) relightFuture.complete(Unit)
         else if (level.lightEngine is ThreadedLevelLightEngine) level.lightEngine.`starlight$serverRelightChunks`(
             mutableListOf(movedChunkPos),
@@ -184,7 +162,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             level.setBlockEntity(blockEnt)
         }
 
-        // Censor the curse word in this kotlin class name.
         val `j*b` = Job()
 
         relightFuture.await()
@@ -198,7 +175,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                 chonkHandle, level.lightEngine, bitset, bitset, true
             )
 
-            // Send the packets, once all sent, complete the j*b.
             val remaining = AtomicInt(players.size)
             for (player in players) {
                 player.connection.send(packet) {
@@ -214,143 +190,13 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
         return `j*b`
     }
 
-    override fun getRestoreExecutor(): ExecutorService = RESTORE_POOL
+    override fun getRestoreExecutor(): ExecutorService = NmsAdapterCommon.RESTORE_POOL
 
-    override fun serializeChunkDataToByteBuf(chunkData: Map<Pair<Int, Int>, ByteBuf>): ByteBuf {
-        val chunks = chunkData.entries.chunked(600)
-        val bigBuffer = Unpooled.directBuffer(chunkData.values.size * 2000)
+    override fun serializeChunkDataToByteBuf(chunkData: Map<Pair<Int, Int>, ByteBuf>): ByteBuf =
+        NmsAdapterCommon.serializeChunkDataToByteBuf(chunkData)
 
-        data class SubData(
-            val originalByteSize: Int,
-            val smallBytes: ByteArray
-        ) {
-            override fun equals(other: Any?): Boolean {
-                if (this === other) return true
-                if (other !is SubData) return false
-
-                if (originalByteSize != other.originalByteSize) return false
-                if (!smallBytes.contentEquals(other.smallBytes)) return false
-
-                return true
-            }
-
-            override fun hashCode(): Int {
-                var result = originalByteSize
-                result = 31 * result + smallBytes.contentHashCode()
-                return result
-            }
-        }
-
-        bigBuffer.writeInt(chunks.size)
-        logger.info("Serializing ${chunks.size} chunksets (${chunkData.size} chunks)")
-
-        val queue = ArrayDeque<CompletableFuture<SubData>>()
-        for (chunk in chunks) {
-            queue.add(CompletableFuture.supplyAsync({
-                val buffer = Unpooled.buffer(chunk.sumOf { it.value.readableBytes() + 4 + 4 + 4 + 4 } + 64)
-                buffer.writeInt(chunk.size)
-                for ((pos, byteBuf) in chunk) {
-                    buffer.writeInt(pos.first)
-                    buffer.writeInt(pos.second)
-                    val xLen = byteBuf.readableBytes()
-                    val dataBytes = Unpooled.directBuffer(xLen)
-                    byteBuf.readBytes(dataBytes, xLen)
-                    buffer.writeInt(xLen)
-                    buffer.writeBytes(dataBytes)
-                    dataBytes.release()
-                }
-                val originalByteSize = buffer.writerIndex()
-                val originalBytes = ByteArray(originalByteSize)
-                buffer.readBytes(originalBytes)
-
-                val smallBytes = Zstd.compress(originalBytes, 18)
-                buffer.release()
-                SubData(originalByteSize, smallBytes)
-            }, RESTORE_POOL))
-        }
-
-        for (chunk in queue) {
-            val data = chunk.join()
-
-            bigBuffer.writeInt(data.originalByteSize)
-            bigBuffer.writeInt(data.smallBytes.size)
-            logger.info("Compressed to ${data.smallBytes.size} bytes from ${data.originalByteSize} bytes.")
-            bigBuffer.writeBytes(data.smallBytes)
-        }
-
-        return bigBuffer
-    }
-
-    override fun deserializeChunkDataFromByteBuf(buffer: ByteBuf, offheap: Boolean): Map<Pair<Int, Int>, ByteBuf> {
-        val chunks = buffer.readInt()
-        val result = ConcurrentHashMap<Pair<Int, Int>, ByteBuf>()
-        logger.info("Deserializing $chunks chunksets")
-
-        val tasks = ArrayDeque<CompletableFuture<*>>()
-
-        repeat(chunks) {
-            val originalByteSize = buffer.readInt()
-            val chunkSize = buffer.readInt()
-            val chunkBytes = Unpooled.directBuffer(chunkSize)
-            buffer.readBytes(chunkBytes, chunkSize)
-
-            tasks.add(CompletableFuture.runAsync({
-                val count = if (offheap) {
-                    val buffer = Unpooled.directBuffer(originalByteSize)
-                    Zstd.decompressUnsafe(
-                        buffer.memoryAddress(),
-                        originalByteSize.toLong(),
-                        chunkBytes.memoryAddress(),
-                        chunkSize.toLong()
-                    )
-                    buffer.writerIndex(originalByteSize)
-
-                    val size = buffer.readInt()
-
-                    repeat(size) {
-                        val x = buffer.readInt()
-                        val z = buffer.readInt()
-                        val dataLength = buffer.readInt()
-                        val dataBytes = Unpooled.directBuffer(dataLength)
-                        buffer.readBytes(dataBytes, dataLength)
-                        result[Pair(x, z)] = dataBytes
-                    }
-                    buffer.release()
-
-                    size
-                } else {
-                    val decompressed = Zstd.decompress(chunkBytes.array(), originalByteSize)
-                    val buffer = Unpooled.wrappedBuffer(decompressed)
-
-                    val size = buffer.readInt()
-
-                    repeat(size) {
-                        val x = buffer.readInt()
-                        val z = buffer.readInt()
-                        val dataLength = buffer.readInt()
-                        val dataBytes = Unpooled.buffer(dataLength)
-                        buffer.readBytes(dataBytes, dataLength)
-                        result[Pair(x, z)] = dataBytes
-                    }
-
-                    size
-                }
-                chunkBytes.release()
-
-                logger.info("Loaded a $count-long chunkset.")
-            }, RESTORE_POOL))
-        }
-
-        CompletableFuture.allOf(*tasks.toTypedArray()).join()
-
-        logger.info("Loaded chunk data for ${result.size} chunks.")
-
-        val returnSyncMap = mutableMapOf<Pair<Int, Int>, ByteBuf>()
-        result.forEach { (key, value) ->
-            returnSyncMap[key] = value
-        }
-        return returnSyncMap
-    }
+    override fun deserializeChunkDataFromByteBuf(buffer: ByteBuf, offheap: Boolean): Map<Pair<Int, Int>, ByteBuf> =
+        NmsAdapterCommon.deserializeChunkDataFromByteBuf(buffer, offheap)
 
     override suspend fun serializeArea(
         world: World,
@@ -396,7 +242,7 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                 chunkPos.second - template.minChunkZ + originChunkZ,
             )
 
-            if (IS_FOLIA) {
+            if (NmsAdapterCommon.IS_FOLIA) {
                 chunkHandleMap.put(
                     movedChunkPos,
                     level.getChunkIfLoaded(
@@ -446,7 +292,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
             relightCompletions[movedChunkPos] = relightFuture
 
             completions.add(CompletableFuture.supplyAsync({
-                // Restore this chunk
                 val restore =
                     restoreChunk(
                         template,
@@ -459,7 +304,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                         chonkHandle,
                         updateLight
                     )
-                // Re-light this chunk
                 if (!updateLight) relightFuture.complete(Unit)
                 else if (level.lightEngine is ThreadedLevelLightEngine) level.lightEngine.`starlight$serverRelightChunks`(
                     mutableListOf(movedChunkPos),
@@ -471,9 +315,8 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                     level.lightEngine.propagateLightSources(movedChunkPos)
                     relightFuture.complete(Unit)
                 }
-                // Return
                 return@supplyAsync restore
-            }, RESTORE_POOL))
+            }, NmsAdapterCommon.RESTORE_POOL))
         }
 
         CompletableFuture.allOf(*(completions as List<CompletableFuture<*>>).toTypedArray()).join()
@@ -516,9 +359,9 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                     blockEnt.setItem(invPos.toInt(), (iStack as CraftItemStack).handle)
                 }
 
-            beMap[blockPos] = blockEnt
-            level.setBlockEntity(blockEnt)
-        }
+                beMap[blockPos] = blockEnt
+                level.setBlockEntity(blockEnt)
+            }
 
             val bitset = BitSet()
             for (layer in 0..level.lightEngine.lightSectionCount) {
@@ -529,7 +372,6 @@ class PaperNmsAdapter1_21_10 : PaperNmsAdapter, ChunkByChunkRestore {
                 val players = level.getChunkSource().chunkMap.getPlayers(chonkHandle.pos, false)
 
                 if (players.isNotEmpty()) {
-                    // Ensure light has updated before sending
                     relightCompletions[chonkHandle.pos]?.whenComplete(
                         { _, _ ->
                             val packet = ClientboundLevelChunkWithLightPacket(
