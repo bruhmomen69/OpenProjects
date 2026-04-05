@@ -10,10 +10,16 @@ import kotlinx.coroutines.future.await
 import org.bukkit.Chunk
 import java.util.concurrent.CompletableFuture
 import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Handles streaming restore mode where chunks are restored as they load.
@@ -25,6 +31,8 @@ class StreamingRestoreExecutor(
 ) {
     private val chunkAdapter: ChunkByChunkRestore
         get() = context.nmsAdapter as ChunkByChunkRestore
+
+    private val taskCount = AtomicLong(0)
 
     /**
      * Execute a restore using streaming mode.
@@ -40,8 +48,19 @@ class StreamingRestoreExecutor(
         val async = context.restoreConfig.asyncRestore ?: true
         val restoreFutures = mutableListOf<CompletableFuture<Unit>>()
 
+        val maxMem =
+            if (Runtime.getRuntime().maxMemory() == Long.MAX_VALUE) 8000000000L else Runtime.getRuntime().maxMemory()
+        val speedMult = maxMem / 1000 / 1000 / 1000
+        val maxSpeed = context.restoreConfig.taskChunkLoadThrottle * speedMult
+
+        val completedTasks = AtomicLong(0)
+        val totalTasks = job.template.chunkData.size.toLong()
+        var lastNotification = Clock.System.now()
+
         for ((templateChunkX, templateChunkZ) in job.template.chunkData.keys) {
             val (targetChunkX, targetChunkZ) = context.calculateTargetChunk(job, templateChunkX, templateChunkZ)
+
+            taskCount.incrementAndFetch()
 
             val chunkFuture = job.world.getChunkAtAsync(targetChunkX, targetChunkZ)
             val worldId = job.world.uid
@@ -75,7 +94,7 @@ class StreamingRestoreExecutor(
                                 return@launch
                             }
 
-                        delay(42) // Try to be next tick after load to drastically reduce errors.
+                        delay(48) // Try to be next tick after load to drastically reduce errors.
 
                         val neighborLocks = neighborKeys.map { (_, x, z) ->
                             context.chunkLockManager.accessChunkLock(x, z)
@@ -90,10 +109,26 @@ class StreamingRestoreExecutor(
                     }
 
                     return@handle future
-                }.thenCompose { it }
+                }.thenCompose { it }.whenComplete { _, _ ->
+                    taskCount.decrementAndFetch()
+                    completedTasks.incrementAndFetch()
+                }
             )
 
-            applyChunkLoadThrottle(wasLoaded)
+            if (taskCount.load() > maxSpeed) {
+                val now = Clock.System.now()
+                if (now - lastNotification > 5.seconds) {
+                    val speed = taskCount.load().toDouble() / maxSpeed
+                    val percent = (speed * 100).roundToInt()
+                    val completedPercent = (completedTasks.load().toDouble() / totalTasks * 100).roundToInt()
+                    context.plugin.slF4JLogger.warn(
+                        "Throttling chunk load tasks: $percent% of max speed (${taskCount.load()} tasks queued), " +
+                                "$completedPercent% completed"
+                    )
+                    lastNotification = now
+                }
+                delay(200.milliseconds)
+            }
         }
 
         CompletableFuture.allOf(*restoreFutures.toTypedArray()).await()
@@ -161,7 +196,7 @@ class StreamingRestoreExecutor(
         neighborLocks: List<ChunkLockManager.ChunkLock>,
         initiallyLocked: Boolean,
         totalTime: AtomicLong,
-        future: CompletableFuture<Unit>
+        future: CompletableFuture<Unit>,
     ) {
         var locked = initiallyLocked
 
@@ -178,7 +213,7 @@ class StreamingRestoreExecutor(
                 job.updateLight
             )
 
-            // Unlock pre-await
+            // Unlock post-await
             if (locked) {
                 localLock.lock.unlock()
                 locked = false
@@ -211,19 +246,6 @@ class StreamingRestoreExecutor(
             // Release lock references
             neighborLocks.forEach { context.chunkLockManager.releaseChunkLock(it) }
             context.chunkLockManager.releaseChunkLock(localLock)
-        }
-    }
-
-    /**
-     * Apply chunk load throttling based on configuration.
-     * Matches original behavior: increments counter and delays when threshold is hit.
-     */
-    private suspend fun applyChunkLoadThrottle(wasLoaded: Boolean) {
-        if (!wasLoaded) {
-            // Increment and check threshold (same as original implementation)
-            if (context.chunkTicketManager.incrementAndGetLoadCount() % context.restoreConfig.taskChunkLoadThrottle == 0L) {
-                delay(48)
-            }
         }
     }
 }
