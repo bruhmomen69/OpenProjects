@@ -8,6 +8,9 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 
 data class CompressedChunkData(
     val originalByteSize: Int,
@@ -97,6 +100,7 @@ object NmsAdapterCommon {
         return bigBuffer
     }
 
+    @OptIn(ExperimentalAtomicApi::class)
     fun deserializeChunkDataFromByteBuf(
         buffer: ByteBuf,
         offheap: Boolean,
@@ -105,6 +109,10 @@ object NmsAdapterCommon {
         val chunks = buffer.readInt()
         val result = ConcurrentHashMap<Pair<Int, Int>, ByteBuf>()
         SERIAL_LOGGER.info("Deserializing $chunks chunksets")
+
+        val logEvery = if (chunks <= 15) 1 else (chunks / 10)
+
+        val logCounter = AtomicInt(0)
 
         val tasks = ArrayDeque<CompletableFuture<*>>()
 
@@ -157,7 +165,14 @@ object NmsAdapterCommon {
                 }
                 chunkBytes.release()
 
-                SERIAL_LOGGER.info("Loaded a $count-long chunkset.")
+                if (logEvery == 1) {
+                    SERIAL_LOGGER.info("Loaded a $count-long chunkset.")
+                } else {
+                    val current = logCounter.incrementAndFetch()
+                    if (current % logEvery == 0) {
+                        SERIAL_LOGGER.info("Loaded $current/$chunks chunksets.")
+                    }
+                }
             }, executor))
         }
 

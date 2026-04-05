@@ -5,6 +5,7 @@ import bruh.regionrestore.nms.NmsAdapterCommon
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.nms.RegionTemplate
 import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray
+import ca.spottedleaf.moonrise.patches.starlight.light.StarLightInterface
 import com.github.shynixn.mccoroutine.folia.launch
 import com.github.shynixn.mccoroutine.folia.regionDispatcher
 import com.mayakapps.kache.InMemoryKache
@@ -32,6 +33,8 @@ import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
+import java.lang.invoke.MethodHandle
+import java.lang.invoke.MethodHandles
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.time.Instant
@@ -46,11 +49,20 @@ import kotlin.math.roundToLong
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import ca.spottedleaf.concurrentutil.map.concurrent.longs.ConcurrentChainedLong2ReferenceHashTable
+import net.minecraft.core.RegistryAccess
+import net.minecraft.world.level.chunk.LevelChunkSection
+import net.minecraft.world.level.chunk.PalettedContainerFactory
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalAtomicApi::class)
 class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
     companion object {
-        private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 100) {
+        private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 200) {
+            strategy = KacheStrategy.LRU
+        }
+
+        private val CONTAINER_CACHE = InMemoryKache<RegistryAccess, PalettedContainerFactory>(maxSize = 20) {
             strategy = KacheStrategy.LRU
         }
 
@@ -69,14 +81,25 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
             }
         }
 
+        private suspend fun getContainerFactory(registryAccess: RegistryAccess): PalettedContainerFactory {
+            return CONTAINER_CACHE.getOrPut(registryAccess) {
+                PalettedContainerFactory.create(registryAccess)
+            }!!
+        }
+
+
         private val STATE_VISIBLE_FIELD: Field = SWMRNibbleArray::class.java.getDeclaredField("stateVisible")
+        private val SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD: MethodHandle
 
         init {
             STATE_VISIBLE_FIELD.isAccessible = true
+            val slqChunkTasksReflection = StarLightInterface.ServerLightQueue::class.java.getDeclaredField("chunkTasks")
+            slqChunkTasksReflection.isAccessible = true
+            SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD = MethodHandles.lookup().unreflectGetter(slqChunkTasksReflection)
         }
     }
 
-    override val minecraftVersion = "1.21.11"
+    override val minecraftVersion = "26.1.1"
     override val supportsAsync = true
 
     override suspend fun restoreSingleChunk(
@@ -111,8 +134,9 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
         val chunk = CraftChunk(chonkHandle)
 
         val relightFuture = CompletableFuture<Unit>()
+        val containerFactory = getContainerFactory(level.registryAccess())
 
-        val restore = restoreChunk(
+        restoreChunk(
             template,
             targetChunkX,
             targetChunkZ,
@@ -121,7 +145,8 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
             chunk,
             fBuffer,
             chonkHandle,
-            updateLight
+            updateLight,
+            containerFactory
         )
 
         if (!updateLight) relightFuture.complete(Unit)
@@ -252,28 +277,23 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
             )
 
             if (NmsAdapterCommon.IS_FOLIA) {
-                chunkHandleMap.put(
-                    movedChunkPos,
-                    level.getChunkIfLoaded(
-                        movedChunkPos.x,
-                        movedChunkPos.z
-                    )?.let { CompletableFuture.completedFuture(it) } ?: world.getChunkAtAsync(
-                        movedChunkPos.x,
-                        movedChunkPos.z
-                    ).thenApply { it ->
-                        (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk
-                    }
-                )
+                chunkHandleMap[movedChunkPos] = level.getChunkIfLoaded(
+                    movedChunkPos.x,
+                    movedChunkPos.z
+                )?.let { CompletableFuture.completedFuture(it) } ?: world.getChunkAtAsync(
+                    movedChunkPos.x,
+                    movedChunkPos.z
+                ).thenApply {
+                    (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk
+                }
             } else {
-                chunkHandleMap.put(
-                    movedChunkPos, CompletableFuture.completedFuture(
-                        level.getChunk(
-                            movedChunkPos.x,
-                            movedChunkPos.z,
-                            ChunkStatus.FULL,
-                            true
-                        )!! as LevelChunk
-                    )
+                chunkHandleMap[movedChunkPos] = CompletableFuture.completedFuture(
+                    level.getChunk(
+                        movedChunkPos.x,
+                        movedChunkPos.z,
+                        ChunkStatus.FULL,
+                        true
+                    )!! as LevelChunk
                 )
             }
         }
@@ -410,15 +430,23 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
         chunk: Chunk,
         fBuffer: FriendlyByteBuf,
         chonkHandle: LevelChunk,
-        doFullRelight: Boolean
+        doFullRelight: Boolean,
+        containerFactory: PalettedContainerFactory? = null
     ): ChunkRestoreData {
         chunkData.readerIndex(0)
 
         val sections = fBuffer.readShort()
 
-        for (i in 0 until sections) {
-            val section = chonkHandle.sections[i]
-            section.read(fBuffer)
+        if (containerFactory != null) {
+            for (i in 0 until sections) {
+                val section = LevelChunkSection(containerFactory)
+                section.read(fBuffer)
+                chonkHandle.sections[i] = section
+            }
+        } else {
+            for (i in 0 until sections) {
+                chonkHandle.sections[i].read(fBuffer)
+            }
         }
 
         val beMap = chonkHandle.blockEntities

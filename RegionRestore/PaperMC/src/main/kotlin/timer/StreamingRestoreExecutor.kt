@@ -51,7 +51,7 @@ class StreamingRestoreExecutor(
         val maxMem =
             if (Runtime.getRuntime().maxMemory() == Long.MAX_VALUE) 8000000000L else Runtime.getRuntime().maxMemory()
         val speedMult = maxMem / 1000 / 1000 / 1000
-        val maxSpeed = context.restoreConfig.taskChunkLoadThrottle * speedMult
+        val maxSpeed = context.restoreConfig.taskLoadThrottle * speedMult
 
         val completedTasks = AtomicLong(0)
         val totalTasks = job.template.chunkData.size.toLong()
@@ -79,7 +79,7 @@ class StreamingRestoreExecutor(
             restoreFutures.add(
                 chunkFuture.handle { chunk, throwable ->
                     if (throwable != null || chunk == null) {
-                        context.plugin.slF4JLogger.error(
+                        context.slF4JLogger.error(
                             "Failed to load chunk at $targetChunkX, $targetChunkZ",
                             throwable
                         )
@@ -121,7 +121,7 @@ class StreamingRestoreExecutor(
                     val speed = taskCount.load().toDouble() / maxSpeed
                     val percent = (speed * 100).roundToInt()
                     val completedPercent = (completedTasks.load().toDouble() / totalTasks * 100).roundToInt()
-                    context.plugin.slF4JLogger.warn(
+                    context.slF4JLogger.warn(
                         "Throttling chunk load tasks: $percent% of max speed (${taskCount.load()} tasks queued), " +
                                 "$completedPercent% completed"
                     )
@@ -155,7 +155,7 @@ class StreamingRestoreExecutor(
                 ChunkTicketManager.ChunkTicketHandle(key, chunk, hadTicket = true, wasLoaded = wasLoaded)
             } catch (t: Exception) {
                 context.chunkTicketManager.decrementTicketRef(key)
-                context.plugin.slF4JLogger.error(
+                context.slF4JLogger.error(
                     "Failed to ticket chunk at $targetChunkX, $targetChunkZ",
                     t
                 )
@@ -176,9 +176,9 @@ class StreamingRestoreExecutor(
         targetChunkZ: Int
     ): Boolean {
         val locked = context.chunkLockManager.acquireLocksWithRetry(localLock, neighborLocks) { message ->
-            context.plugin.slF4JLogger.debug(message)
+            context.slF4JLogger.debug(message)
         }
-        context.plugin.slF4JLogger.debug("Locked chunk $targetChunkX, $targetChunkZ")
+        context.slF4JLogger.debug("Locked chunk $targetChunkX, $targetChunkZ")
         return locked
     }
 
@@ -217,7 +217,7 @@ class StreamingRestoreExecutor(
             if (locked) {
                 localLock.lock.unlock()
                 locked = false
-                context.plugin.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ")
+                context.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ")
             }
 
             val completeTime = System.currentTimeMillis()
@@ -229,7 +229,7 @@ class StreamingRestoreExecutor(
             context.chunkTicketManager.releaseChunkTickets(listOf(handle))
             future.complete(Unit)
         } catch (e: Exception) {
-            context.plugin.slF4JLogger.error(
+            context.slF4JLogger.error(
                 "Failed to restore chunk at $targetChunkX, $targetChunkZ",
                 e
             )
@@ -240,7 +240,7 @@ class StreamingRestoreExecutor(
             if (locked) {
                 localLock.lock.unlock()
                 locked = false
-                context.plugin.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ (e-case)")
+                context.slF4JLogger.debug("Unlocked chunk $targetChunkX, $targetChunkZ (e-case)")
             }
 
             // Release lock references

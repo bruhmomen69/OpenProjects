@@ -32,6 +32,12 @@ class RestoreExecutionContext(
 ) {
     val activeRestores = AtomicInt(0)
 
+    /**
+     * Every time you call plugin.slF4JLogger, it creates a new wrapper instance which is expensive. Cache it here for reuse.
+     * Creating a wrapper instance can allocate 4+MB of memory.
+     */
+    val slF4JLogger by lazy { plugin.slF4JLogger }
+
     // Job tracking
     val countdownJobs = ConcurrentHashMap<UUID, Job>()
     val repeatingJobs = ConcurrentHashMap<UUID, Job>()
@@ -81,7 +87,7 @@ class RestoreExecutionContext(
         return nmsAdapter is bruh.regionrestore.nms.ChunkByChunkRestore &&
                 restoreConfig.streamingRestore &&
                 job.sizeXChunks * job.sizeZChunks >
-                (restoreConfig.taskChunkLoadThrottle * 0.9)
+                (restoreConfig.taskLoadThrottle * 0.9)
                     .toLong()
                     .coerceAtLeast(100)
                     .coerceAtMost(1000)

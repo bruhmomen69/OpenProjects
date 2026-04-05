@@ -118,7 +118,7 @@ class ChunkTicketManager(
                 futures += handleFuture
 
                 if (!wasLoaded) {
-                    if (chunkLoads.incrementAndFetch() % restoreConfig.taskChunkLoadThrottle == 0L) {
+                    if (chunkLoads.incrementAndFetch() % restoreConfig.taskLoadThrottle == 0L) {
                         delay(48)
                     }
                 }
@@ -143,8 +143,8 @@ class ChunkTicketManager(
 
                 if (restoreConfig.unload && handle.chunk != null && !handle.wasLoaded) {
                     val currentLoad = chunkLoads.incrementAndFetch()
-                    val needsDelay = currentLoad % restoreConfig.taskChunkLoadThrottle == 0L
-                    val delay = ceil(currentLoad / restoreConfig.taskChunkLoadThrottle.toDouble()).toLong() * 48
+                    val needsDelay = currentLoad % restoreConfig.taskLoadThrottle == 0L
+                    val delay = ceil(currentLoad / restoreConfig.taskLoadThrottle.toDouble()).toLong() * 48
 
                     plugin.launch(
                         plugin.regionDispatcher(

@@ -4,7 +4,10 @@ import bruh.regionrestore.nms.ChunkByChunkRestore
 import bruh.regionrestore.nms.NmsAdapterCommon
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.nms.RegionTemplate
+import ca.spottedleaf.concurrentutil.map.ConcurrentLong2ReferenceChainedHashTable
+import ca.spottedleaf.moonrise.common.util.CoordinateUtils
 import ca.spottedleaf.moonrise.patches.starlight.light.SWMRNibbleArray
+import ca.spottedleaf.moonrise.patches.starlight.light.StarLightInterface
 import com.github.shynixn.mccoroutine.folia.launch
 import com.github.shynixn.mccoroutine.folia.regionDispatcher
 import com.mayakapps.kache.InMemoryKache
@@ -15,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
 import net.minecraft.core.BlockPos
+import net.minecraft.core.RegistryAccess
 import net.minecraft.network.FriendlyByteBuf
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket
 import net.minecraft.server.level.ServerLevel
@@ -22,6 +26,8 @@ import net.minecraft.server.level.ThreadedLevelLightEngine
 import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity
 import net.minecraft.world.level.chunk.LevelChunk
+import net.minecraft.world.level.chunk.LevelChunkSection
+import net.minecraft.world.level.chunk.PalettedContainerFactory
 import net.minecraft.world.level.chunk.status.ChunkStatus
 import net.minecraft.world.level.levelgen.Heightmap
 import org.bukkit.Chunk
@@ -32,12 +38,15 @@ import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
+import java.lang.invoke.MethodHandle
+import java.lang.invoke.MethodHandles
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
@@ -50,7 +59,11 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalAtomicApi::class)
 class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
     companion object {
-        private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 100) {
+        private val CONSTRUCTOR_CACHE = InMemoryKache<String, Constructor<BaseContainerBlockEntity>>(maxSize = 200) {
+            strategy = KacheStrategy.LRU
+        }
+
+        private val CONTAINER_CACHE = InMemoryKache<RegistryAccess, PalettedContainerFactory>(maxSize = 20) {
             strategy = KacheStrategy.LRU
         }
 
@@ -69,10 +82,20 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
             }
         }
 
+        private suspend fun getContainerFactory(registryAccess: RegistryAccess): PalettedContainerFactory {
+            return CONTAINER_CACHE.getOrPut(registryAccess) {
+                PalettedContainerFactory.create(registryAccess)
+            }!!
+        }
+
         private val STATE_VISIBLE_FIELD: Field = SWMRNibbleArray::class.java.getDeclaredField("stateVisible")
+        private val SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD: MethodHandle
 
         init {
             STATE_VISIBLE_FIELD.isAccessible = true
+            val slqChunkTasksReflection = StarLightInterface.ServerLightQueue::class.java.getDeclaredField("chunkTasks")
+            slqChunkTasksReflection.isAccessible = true
+            SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD = MethodHandles.lookup().unreflectGetter(slqChunkTasksReflection)
         }
     }
 
@@ -107,9 +130,21 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
             level.getChunk(movedChunkPos.x, movedChunkPos.z, ChunkStatus.FULL, true)!! as LevelChunk
         }
 
+        val serverLightQueue = level.lightEngine.`starlight$getLightEngine`().serverLightQueue
+        val myChunk = CoordinateUtils.getChunkKey(movedChunkPos)
+        val chunkKeys = SERVER_LIGHT_QUEUE_CHUNK_TASKS_FIELD.invokeExact(serverLightQueue) as ConcurrentLong2ReferenceChainedHashTable<StarLightInterface.ServerLightQueue.ServerChunkTasks>
+        val thisChunkLighting = chunkKeys[myChunk]
+        if (thisChunkLighting != null) {
+            val future = CompletableFuture<Unit>().orTimeout(30, TimeUnit.SECONDS)
+            thisChunkLighting.queueOrRunTask { future.complete(Unit) }
+            future.await()
+        }
+
         val chunk = CraftChunk(chonkHandle)
 
         val relightFuture = CompletableFuture<Unit>()
+
+        val containerFactory = getContainerFactory(level.registryAccess())
 
         val restore = restoreChunk(
             template,
@@ -120,7 +155,8 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
             chunk,
             fBuffer,
             chonkHandle,
-            updateLight
+            updateLight,
+            containerFactory
         )
 
         if (!updateLight) relightFuture.complete(Unit)
@@ -251,28 +287,23 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
             )
 
             if (NmsAdapterCommon.IS_FOLIA) {
-                chunkHandleMap.put(
-                    movedChunkPos,
-                    level.getChunkIfLoaded(
-                        movedChunkPos.x,
-                        movedChunkPos.z
-                    )?.let { CompletableFuture.completedFuture(it) } ?: world.getChunkAtAsync(
-                        movedChunkPos.x,
-                        movedChunkPos.z
-                    ).thenApply { it ->
-                        (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk
-                    }
-                )
+                chunkHandleMap[movedChunkPos] = level.getChunkIfLoaded(
+                    movedChunkPos.x,
+                    movedChunkPos.z
+                )?.let { CompletableFuture.completedFuture(it) } ?: world.getChunkAtAsync(
+                    movedChunkPos.x,
+                    movedChunkPos.z
+                ).thenApply { it ->
+                    (it as CraftChunk).getHandle(ChunkStatus.FULL) as LevelChunk
+                }
             } else {
-                chunkHandleMap.put(
-                    movedChunkPos, CompletableFuture.completedFuture(
-                        level.getChunk(
-                            movedChunkPos.x,
-                            movedChunkPos.z,
-                            ChunkStatus.FULL,
-                            true
-                        )!! as LevelChunk
-                    )
+                chunkHandleMap[movedChunkPos] = CompletableFuture.completedFuture(
+                    level.getChunk(
+                        movedChunkPos.x,
+                        movedChunkPos.z,
+                        ChunkStatus.FULL,
+                        true
+                    )!! as LevelChunk
                 )
             }
         }
@@ -411,15 +442,23 @@ class PaperNmsAdapter1_21_11 : PaperNmsAdapter, ChunkByChunkRestore {
         chunk: Chunk,
         fBuffer: FriendlyByteBuf,
         chonkHandle: LevelChunk,
-        doFullRelight: Boolean
+        doFullRelight: Boolean,
+        containerFactory: PalettedContainerFactory? = null
     ): ChunkRestoreData {
         chunkData.readerIndex(0)
 
         val sections = fBuffer.readShort()
 
-        for (i in 0 until sections) {
-            val section = chonkHandle.sections[i]
-            section.read(fBuffer)
+        if (containerFactory != null) {
+            for (i in 0 until sections) {
+                val section = LevelChunkSection(containerFactory, level, chonkHandle.pos, i)
+                section.read(fBuffer)
+                chonkHandle.sections[i] = section
+            }
+        } else {
+            for (i in 0 until sections) {
+                chonkHandle.sections[i].read(fBuffer)
+            }
         }
 
         val beMap = chonkHandle.blockEntities

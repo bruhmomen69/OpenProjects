@@ -69,8 +69,8 @@ data class NotificationsConfig(
 data class RestoreConfig(
     val defaultAnnounceTimes: List<Int> = listOf(60, 30, 10, 5, 4, 3, 2, 1),
     val maxConcurrentRestores: Int = 5,
-    @Comment("In %, how fast to load chunks. 50% for low TPS impact, 1000% for chunk loading at realtime speed.")
-    val taskChunkLoadThrottle: Int = 500,
+    @Comment("In %, how fast to schedule tasks. 70% for low TPS impact, 1000% for chunk loading at realtime speed. To throttle chunk loads, please see your Paper config.")
+    val taskLoadThrottle: Int = 800,
     @Comment("Unload chunks that were not loaded before after restoration is complete. When restoring large areas (roughly 50k chunks), without unloading, all the chunks can stay loaded for a while, causing server lag. This fixes this issue.")
     val unload: Boolean = true,
     @Comment("Instant unload chunks? If not, then we use paper's unload queue which helps reduce per-tick lag.")
