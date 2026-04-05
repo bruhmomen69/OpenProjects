@@ -5,7 +5,7 @@ import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.template.TemplateRepository
-import bruh.regionrestore.timer.RestoreJob
+import bruh.regionrestore.restore.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.translations.CommandMessages
 import bruh.regionrestore.translations.GuiMessages
@@ -14,8 +14,6 @@ import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
 import org.slf4j.LoggerFactory
-import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
-import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.withContext
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player

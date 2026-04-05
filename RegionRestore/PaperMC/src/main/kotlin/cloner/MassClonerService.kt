@@ -25,7 +25,7 @@ import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.template.TemplateCache
 import bruh.regionrestore.template.TemplateRef
 import bruh.regionrestore.template.TemplateRepository
-import bruh.regionrestore.timer.RestoreJob
+import bruh.regionrestore.restore.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap

@@ -1,7 +1,6 @@
-package bruh.regionrestore.timer
+package bruh.regionrestore.restore
 
 import bruh.regionrestore.notification.AudienceScope
-import bruh.regionrestore.notification.NotificationConfig
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

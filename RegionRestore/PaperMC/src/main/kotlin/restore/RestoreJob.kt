@@ -1,4 +1,4 @@
-package bruh.regionrestore.timer
+package bruh.regionrestore.restore
 
 import bruh.regionrestore.nms.RegionTemplate
 import org.bukkit.World

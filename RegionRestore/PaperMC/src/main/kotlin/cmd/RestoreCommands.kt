@@ -4,7 +4,7 @@ import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.template.TemplateRepository
-import bruh.regionrestore.timer.RestoreJob
+import bruh.regionrestore.restore.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI

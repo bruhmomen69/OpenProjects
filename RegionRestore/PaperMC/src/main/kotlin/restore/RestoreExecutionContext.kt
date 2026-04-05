@@ -1,8 +1,9 @@
-package bruh.regionrestore.timer
+package bruh.regionrestore.restore
 
 import bruh.regionrestore.config.NotificationsConfig
 import bruh.regionrestore.config.NotificationEventConfig
 import bruh.regionrestore.config.RestoreConfig
+import bruh.regionrestore.nms.ChunkByChunkRestore
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
 import bruh.regionrestore.notification.NotificationService
@@ -84,7 +85,7 @@ class RestoreExecutionContext(
      * Check if streaming mode should be used for this job.
      */
     fun shouldUseStreamingMode(job: RestoreJob): Boolean {
-        return nmsAdapter is bruh.regionrestore.nms.ChunkByChunkRestore &&
+        return nmsAdapter is ChunkByChunkRestore &&
                 restoreConfig.streamingRestore &&
                 job.sizeXChunks * job.sizeZChunks >
                 (restoreConfig.taskLoadThrottle * 0.9)

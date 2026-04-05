@@ -10,7 +10,7 @@ import bruh.regionrestore.nms.RegionTemplate
 import bruh.regionrestore.nms.RegionTemplateVersion
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
-import bruh.regionrestore.timer.RestoreJob
+import bruh.regionrestore.restore.RestoreJob
 import bruh.regionrestore.cloner.InstanceConfig
 import bruh.regionrestore.cloner.InstanceType
 import bruh.regionrestore.cloner.RegionInstance

@@ -15,7 +15,7 @@ import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
 import bruh.regionrestore.notification.NotificationService
 import bruh.regionrestore.template.TemplateRepository
-import bruh.regionrestore.timer.RestoreJob
+import bruh.regionrestore.restore.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import java.util.*
 import kotlin.math.floor
