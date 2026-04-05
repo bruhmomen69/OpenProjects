@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.runPaper)
 }
 
-version = "1.0.3"
+version = "1.0.4"
 
 dependencies {
     implementation(project(":RegionRestore:api"))
