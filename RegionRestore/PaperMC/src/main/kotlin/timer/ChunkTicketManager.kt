@@ -80,7 +80,7 @@ class ChunkTicketManager(
      * Applies throttling based on config.
      */
     suspend fun preloadChunks(job: RestoreJob): List<ChunkTicketHandle> {
-        val futures = mutableListOf<java.util.concurrent.CompletableFuture<ChunkTicketHandle>>()
+        val futures = mutableListOf<CompletableFuture<ChunkTicketHandle>>()
         val worldId = job.world.uid
 
         for (dx in 0 until job.sizeXChunks) {
@@ -199,7 +199,7 @@ class ChunkTicketManager(
                 return@suspendCancellableCoroutine
             }
 
-            val all = java.util.concurrent.CompletableFuture.allOf(*futures.toTypedArray())
+            val all = CompletableFuture.allOf(*futures.toTypedArray())
 
             cont.invokeOnCancellation {
                 all.cancel(false)

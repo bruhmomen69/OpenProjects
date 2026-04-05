@@ -20,7 +20,9 @@ data class RestoreJob(
     private val _isRunning = AtomicBoolean(false)
     val isRunning: Boolean get() = _isRunning.get()
     fun tryStart(): Boolean = _isRunning.compareAndSet(false, true)
-    fun finish() { _isRunning.set(false) }
+    fun finish() {
+        _isRunning.set(false)
+    }
 
     /**
      * AABB block bounds of the region.

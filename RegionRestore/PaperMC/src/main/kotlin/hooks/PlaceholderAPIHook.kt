@@ -54,9 +54,11 @@ class PlaceholderAPIHook(
                     suffix.equals("pooled", ignoreCase = true) -> {
                         massClonerService.listInstances(instanceType = InstanceType.POOLED).size.toString()
                     }
+
                     suffix.equals("manual", ignoreCase = true) -> {
                         massClonerService.listInstances(instanceType = InstanceType.MANUAL).size.toString()
                     }
+
                     else -> {
                         // World name
                         massClonerService.listInstances(worldName = suffix).size.toString()
@@ -103,12 +105,14 @@ class PlaceholderAPIHook(
                     templateRepository.getTemplateVersions(templateName)?.size?.toString() ?: "0"
                 }
             }
+
             params.endsWith("_active_version", ignoreCase = true) -> {
                 val templateName = params.removeSuffix("_active_version")
                 runBlocking {
                     templateRepository.loadActiveTemplateVersion(templateName)?.versionId?.toString() ?: "none"
                 }
             }
+
             else -> null
         }
     }
@@ -138,13 +142,16 @@ class PlaceholderAPIHook(
             "count" -> {
                 massClonerService.getInstancesForPool(worldName, templateName).size.toString()
             }
+
             "target" -> {
                 massClonerService.getPoolTarget(worldName, templateName)?.toString() ?: "0"
             }
+
             "occupied" -> {
                 massClonerService.getInstancesForPool(worldName, templateName)
                     .count { it.occupancyCount > 0 }.toString()
             }
+
             else -> null
         }
     }

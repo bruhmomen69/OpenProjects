@@ -156,6 +156,6 @@ class SelectionService {
      * @param playerUuid The player's UUID
      * @return true if both positions are set
      */
-    fun hasCompleteSelection(playerUuid: UUID): Boolean = 
+    fun hasCompleteSelection(playerUuid: UUID): Boolean =
         selections[playerUuid]?.isComplete() == true
 }

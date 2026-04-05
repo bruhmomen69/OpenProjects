@@ -41,9 +41,11 @@ class PlacementAllocator {
         val separation = pool.separationChunks
         val worldName = pool.worldName
 
-        logger.info("Allocating $neededCount instances for template '${pool.templateName}' " +
-                   "(${templateWidth}x${templateDepth} chunks) in world '$worldName' " +
-                   "with $separation chunk separation")
+        logger.info(
+            "Allocating $neededCount instances for template '${pool.templateName}' " +
+                    "(${templateWidth}x${templateDepth} chunks) in world '$worldName' " +
+                    "with $separation chunk separation"
+        )
 
         // Scan positions starting from (0,0) for deterministic placement
         var candidateX = 0
@@ -54,8 +56,8 @@ class PlacementAllocator {
             if (candidateZ > maxSearchZChunks) {
                 logger.error(
                     "Allocator exceeded max search Z ($maxSearchZChunks) for template '${pool.templateName}' " +
-                    "in world '$worldName'. Allocated $allocated/$neededCount instances. " +
-                    "The world may be saturated or the search area too small."
+                            "in world '$worldName'. Allocated $allocated/$neededCount instances. " +
+                            "The world may be saturated or the search area too small."
                 )
                 break
             }

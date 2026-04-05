@@ -10,8 +10,11 @@ import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import org.slf4j.LoggerFactory
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import java.util.UUID
+
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.annotation.CommandPermission
@@ -24,7 +27,7 @@ class TimerCommands(
     private val config: RegionRestoreConfig,
     private val translations: TranslationAPI
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(TimerCommands::class.java)
+    private val log = LoggerFactory.getLogger(TimerCommands::class.java)
 
     @Subcommand("timer set instance")
     @CommandPermission("regionrestore.timer.set")
@@ -34,7 +37,7 @@ class TimerCommands(
         intervalSeconds: Int,
         scope: AudienceScope = config.notifications.defaultAudienceScope
     ) {
-        val id = java.util.UUID.fromString(instanceId)
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -60,14 +63,20 @@ class TimerCommands(
 
         val removeResult = massClonerService.removeInstance(instance.instanceId)
         if (removeResult.isFailure) {
-            log.error("Failed to persist state after removing instance ${instance.instanceId} for timer update", removeResult.exceptionOrNull())
+            log.error(
+                "Failed to persist state after removing instance ${instance.instanceId} for timer update",
+                removeResult.exceptionOrNull()
+            )
             actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
             return
         }
-        
+
         val addResult = massClonerService.addManualInstance(updatedInstance)
         if (addResult.isFailure) {
-            log.error("Failed to persist state after adding updated instance ${updatedInstance.instanceId} for timer update", addResult.exceptionOrNull())
+            log.error(
+                "Failed to persist state after adding updated instance ${updatedInstance.instanceId} for timer update",
+                addResult.exceptionOrNull()
+            )
             actor.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
             return
         }
@@ -123,7 +132,7 @@ class TimerCommands(
         )
 
         val instance = RegionInstance.create(
-            instanceId = java.util.UUID.randomUUID(),
+            instanceId = UUID.randomUUID(),
             worldName = targetWorld.name,
             templateName = templateName,
             versionId = templateVersion.versionId,
@@ -157,7 +166,7 @@ class TimerCommands(
         actor: CommandSender,
         @SuggestInstanceId instanceId: String,
     ) {
-        val id = java.util.UUID.fromString(instanceId)
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -207,7 +216,10 @@ class TimerCommands(
                 if (result.isSuccess) {
                     cancelledCount++
                 } else {
-                    log.error("Failed to persist state after cancelling timer for instance ${instance.instanceId}", result.exceptionOrNull())
+                    log.error(
+                        "Failed to persist state after cancelling timer for instance ${instance.instanceId}",
+                        result.exceptionOrNull()
+                    )
                     failedCount++
                 }
             }

@@ -79,12 +79,12 @@ class RestoreExecutionContext(
      */
     fun shouldUseStreamingMode(job: RestoreJob): Boolean {
         return nmsAdapter is bruh.regionrestore.nms.ChunkByChunkRestore &&
-            restoreConfig.streamingRestore &&
-            job.sizeXChunks * job.sizeZChunks >
-            (restoreConfig.taskChunkLoadThrottle * 0.9)
-                .toLong()
-                .coerceAtLeast(100)
-                .coerceAtMost(1000)
+                restoreConfig.streamingRestore &&
+                job.sizeXChunks * job.sizeZChunks >
+                (restoreConfig.taskChunkLoadThrottle * 0.9)
+                    .toLong()
+                    .coerceAtLeast(100)
+                    .coerceAtMost(1000)
     }
 
     /**

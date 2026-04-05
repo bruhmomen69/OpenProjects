@@ -115,7 +115,7 @@ class EntityKiller(
     ): List<Entity> = withContext(plugin.globalRegionDispatcher) {
         world.entities.filter { entity ->
             isEntityInBounds(entity, minBlockX, maxBlockX, minBlockZ, maxBlockZ) &&
-                shouldKillEntity(entity.type, entityTypes)
+                    shouldKillEntity(entity.type, entityTypes)
         }
     }
 

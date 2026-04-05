@@ -6,9 +6,11 @@ import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import net.kyori.adventure.text.minimessage.MiniMessage.miniMessage
+import org.slf4j.LoggerFactory
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import java.time.Instant
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.annotation.CommandPermission
@@ -21,7 +23,7 @@ class TemplateCommands(
     private val config: RegionRestoreConfig,
     private val translations: TranslationAPI
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(TemplateCommands::class.java)
+    private val log = LoggerFactory.getLogger(TemplateCommands::class.java)
 
     @Subcommand("template create")
     @CommandPermission("regionrestore.template.create")
@@ -103,11 +105,12 @@ class TemplateCommands(
             unparsed("count", versions.size.toString())
         })
         versions.forEach { version ->
-            val activeMark = if (version.versionId == activeVersionId) translations.getString(CommandMessages.TEMPLATE_INFO_VERSION_ACTIVE_MARK) else ""
+            val activeMark =
+                if (version.versionId == activeVersionId) translations.getString(CommandMessages.TEMPLATE_INFO_VERSION_ACTIVE_MARK) else ""
             actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_INFO_VERSION_LINE) {
                 unparsed("version", version.versionId.toString())
                 unparsed("active_mark", activeMark)
-                unparsed("created", java.time.Instant.ofEpochMilli(version.createdAt).toString())
+                unparsed("created", Instant.ofEpochMilli(version.createdAt).toString())
                 unparsed("description", version.description)
             })
         }

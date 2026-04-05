@@ -12,8 +12,10 @@ import org.bukkit.World
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.*
+import org.bukkit.entity.Player
 import org.bukkit.event.HandlerList
 import org.bukkit.plugin.java.JavaPlugin
+import org.slf4j.LoggerFactory
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import bruh.regionrestore.config.MassClonerConfig
 import bruh.regionrestore.config.RestoreConfig
@@ -185,7 +187,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
         instanceOccupancy.remove(instanceId)
     }
 
-    fun updatePlayerOccupancy(player: org.bukkit.entity.Player): List<OccupancyUpdate> {
+    fun updatePlayerOccupancy(player: Player): List<OccupancyUpdate> {
         val playerId = player.uniqueId
         val playerState = playerStates.getOrPut(playerId) { PlayerState() }
 
@@ -302,7 +304,7 @@ class OccupancyTracker(private val plugin: JavaPlugin) : Listener {
         val playerState = playerStates[playerId] ?: return
 
         // Synchronize on playerState to prevent race condition with concurrent move events
-        val instance = synchronized(playerState) {
+        synchronized(playerState) {
             val instance = playerState.currentInstance ?: return
             playerState.currentInstance = null
             playerStates.remove(playerId)
@@ -342,7 +344,7 @@ class MassClonerService(
     private val restoreConfig: RestoreConfig,
     private val templateCache: TemplateCache
 ) {
-    private val slf4jLogger = org.slf4j.LoggerFactory.getLogger(MassClonerService::class.java)
+    private val slf4jLogger = LoggerFactory.getLogger(MassClonerService::class.java)
     private val stateLoader = ClonerStateLoader(plugin.dataFolder.toPath(), slf4jLogger)
     private val registry = InstanceRegistry(ConcurrentHashMap())
     private val pools = ConcurrentHashMap<PoolKey, RegionPool>()
@@ -364,7 +366,7 @@ class MassClonerService(
         loadConfig()
 
         // Register all instances (pooled and manual)
-        for ((worldName, instances) in registry.instances) {
+        for ((_, instances) in registry.instances) {
             for (instance in instances) {
                 registerInstance(instance)
             }
@@ -484,7 +486,7 @@ class MassClonerService(
         restoreIntervalSeconds: Int? = null,
         restoreAudienceScope: AudienceScope = AudienceScope.WORLD,
         updateLight: Boolean? = null
-    ): Result<Int> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    ): Result<Int> = withContext(kotlinx.coroutines.Dispatchers.IO) {
         val pool = RegionPool(
             worldName = worldName,
             templateName = templateName,
@@ -561,7 +563,7 @@ class MassClonerService(
         if (newInstances.size != neededCount) {
             slf4jLogger.warn(
                 "Allocated only ${newInstances.size}/$neededCount instances for pool '${pool.templateName}' in world '$worldName'. " +
-                "The world may be saturated or the search area too small."
+                        "The world may be saturated or the search area too small."
             )
         }
 
@@ -569,13 +571,13 @@ class MassClonerService(
         synchronized(stateLock) {
             val currentCountNow = registry.instances[worldName]
                 ?.count { it.templateName == templateName } ?: 0
-if (currentCountNow + newInstances.size > pool.count) {
-                    slf4jLogger.warn(
-                        "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
-                        "in world '$worldName': pool count changed during allocation (now $currentCountNow, was $currentCount)."
-                    )
-                    return@withContext Result.success(0)
-                }
+            if (currentCountNow + newInstances.size > pool.count) {
+                slf4jLogger.warn(
+                    "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
+                            "in world '$worldName': pool count changed during allocation (now $currentCountNow, was $currentCount)."
+                )
+                return@withContext Result.success(0)
+            }
             addInstancesLocked(newInstances)
         }
 
@@ -647,7 +649,7 @@ if (currentCountNow + newInstances.size > pool.count) {
         }
     }
 
-    private suspend fun ensurePoolInstanceCounts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    private suspend fun ensurePoolInstanceCounts() = withContext(kotlinx.coroutines.Dispatchers.IO) {
         for (pool in pools.values) {
             // Snapshot all world instances and count pool instances in a single lock
             val allWorldInstances: List<RegionInstance>
@@ -702,7 +704,7 @@ if (currentCountNow + newInstances.size > pool.count) {
                 if (newInstances.size != neededCount) {
                     slf4jLogger.warn(
                         "Allocated only ${newInstances.size}/$neededCount instances for pool '${pool.templateName}' in world '${pool.worldName}'. " +
-                        "The world may be saturated or the search area too small."
+                                "The world may be saturated or the search area too small."
                     )
                 }
 
@@ -713,7 +715,7 @@ if (currentCountNow + newInstances.size > pool.count) {
                     if (currentCountNow + newInstances.size > pool.count) {
                         slf4jLogger.warn(
                             "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
-                            "in world '${pool.worldName}': pool count changed during allocation (now $currentCountNow, was $currentCount)."
+                                    "in world '${pool.worldName}': pool count changed during allocation (now $currentCountNow, was $currentCount)."
                         )
                         continue
                     }
@@ -809,7 +811,7 @@ if (currentCountNow + newInstances.size > pool.count) {
     private suspend fun scheduleRestore(pool: RegionPool, instance: RegionInstance) {
         val world = Bukkit.getWorld(pool.worldName) ?: return
 
-        val versionId = when (pool.versionMode) {
+        when (pool.versionMode) {
             VersionMode.ACTIVE ->
                 templateRepository.loadActiveTemplateVersion(pool.templateName)?.versionId
 
@@ -843,7 +845,7 @@ if (currentCountNow + newInstances.size > pool.count) {
         val world = Bukkit.getWorld(pool.worldName) ?: return
         val interval = pool.restoreIntervalSeconds ?: return
 
-        val versionId = when (pool.versionMode) {
+        when (pool.versionMode) {
             VersionMode.ACTIVE ->
                 templateRepository.loadActiveTemplateVersion(pool.templateName)?.versionId
 
@@ -952,7 +954,7 @@ if (currentCountNow + newInstances.size > pool.count) {
         }
     }
 
-    suspend fun shutdown() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    suspend fun shutdown() = withContext(kotlinx.coroutines.Dispatchers.IO) {
         // Unpin all templates that were preloaded
         val requiredTemplates = collectRequiredTemplates()
         for (ref in requiredTemplates) {
@@ -1063,7 +1065,7 @@ if (currentCountNow + newInstances.size > pool.count) {
         val config = instance.config ?: return  // Legacy pooled instances use pool config
 
         // Load template version using a blocking-friendly dispatcher
-        val templateVersion = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val templateVersion = withContext(kotlinx.coroutines.Dispatchers.IO) {
             when {
                 // If instance has specific versionId, use it
                 instance.versionId != null ->
@@ -1140,7 +1142,7 @@ if (currentCountNow + newInstances.size > pool.count) {
      * Add a new manual instance to the registry.
      */
     suspend fun addManualInstance(instance: RegionInstance): Result<Unit> =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
             synchronized(stateLock) {
                 addInstanceLocked(instance)
             }
@@ -1163,7 +1165,7 @@ if (currentCountNow + newInstances.size > pool.count) {
      * Remove an instance (manual or pooled).
      */
     suspend fun removeInstance(instanceId: UUID): Result<Boolean> =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
             val removed = synchronized(stateLock) {
                 removeInstanceLocked(instanceId)
             } ?: return@withContext Result.success(false)
@@ -1201,7 +1203,7 @@ if (currentCountNow + newInstances.size > pool.count) {
      * @return Pair of (total removed, total allocated)
      */
     suspend fun regeneratePools(worldNames: List<String> = emptyList()): Result<Pair<Int, Int>> =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
             val worldsToRegen = if (worldNames.isEmpty()) {
                 massClonerConfig.worlds.map { it.name }
             } else {
@@ -1289,7 +1291,7 @@ if (currentCountNow + newInstances.size > pool.count) {
                         if (currentCountNow + newInstances.size > pool.count) {
                             slf4jLogger.warn(
                                 "Discarding ${newInstances.size} allocated instances for pool '${pool.templateName}' " +
-                                "in world '$worldName': pool count changed during regeneration (now $currentCountNow)."
+                                        "in world '$worldName': pool count changed during regeneration (now $currentCountNow)."
                             )
                         } else {
                             addInstancesLocked(newInstances)

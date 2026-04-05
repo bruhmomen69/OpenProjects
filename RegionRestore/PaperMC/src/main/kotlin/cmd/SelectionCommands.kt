@@ -9,6 +9,7 @@ import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import revxrsal.commands.annotation.Command
@@ -26,7 +27,7 @@ class SelectionCommands(
     private val selectionWandService: SelectionWandService,
     private val plugin: JavaPlugin
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(SelectionCommands::class.java)
+    private val log = LoggerFactory.getLogger(SelectionCommands::class.java)
 
     @Subcommand("selection wand")
     @CommandPermission("regionrestore.wand")

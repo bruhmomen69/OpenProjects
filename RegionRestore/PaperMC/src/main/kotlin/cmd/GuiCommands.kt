@@ -13,12 +13,16 @@ import bruh.zchat.utils.menuapi.*
 import bruh.zchat.utils.translations.TranslationAPI
 import com.cryptomorin.xseries.XMaterial
 import com.github.shynixn.mccoroutine.folia.entityDispatcher
+import org.slf4j.LoggerFactory
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
 import kotlinx.coroutines.withContext
 import org.bukkit.Bukkit
+import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import revxrsal.commands.annotation.Command
+import java.time.Instant
+import java.util.UUID
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import revxrsal.commands.bukkit.annotation.CommandPermission
@@ -35,7 +39,7 @@ class GuiCommands(
     private val plugin: JavaPlugin,
     private val translations: TranslationAPI
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(GuiCommands::class.java)
+    private val log = LoggerFactory.getLogger(GuiCommands::class.java)
 
     private fun tGui(key: GuiMessages) = translations.getString(key)
 
@@ -138,7 +142,11 @@ class GuiCommands(
                             tGui(GuiMessages.TEMPLATE_DESC_LINE).replace("<description>", description)
                         )
 
-                        submenuNode("template_$templateName", tGui(GuiMessages.TEMPLATE_ITEM_TITLE).replace("<name>", templateName), XMaterial.PAPER) {
+                        submenuNode(
+                            "template_$templateName",
+                            tGui(GuiMessages.TEMPLATE_ITEM_TITLE).replace("<name>", templateName),
+                            XMaterial.PAPER
+                        ) {
                             display(
                                 "info",
                                 tGui(GuiMessages.TEMPLATE_INFO_TITLE),
@@ -153,14 +161,29 @@ class GuiCommands(
                                     versions.map { version ->
                                         val isActive = version.versionId == activeVersionId
                                         val title = if (isActive) {
-                                            tGui(GuiMessages.VERSION_ACTIVE).replace("<version>", version.versionId.toString())
+                                            tGui(GuiMessages.VERSION_ACTIVE).replace(
+                                                "<version>",
+                                                version.versionId.toString()
+                                            )
                                         } else {
-                                            tGui(GuiMessages.VERSION_NORMAL).replace("<version>", version.versionId.toString())
+                                            tGui(GuiMessages.VERSION_NORMAL).replace(
+                                                "<version>",
+                                                version.versionId.toString()
+                                            )
                                         }
                                         val lore = listOf(
-                                            tGui(GuiMessages.VERSION_CREATED).replace("<timestamp>", java.time.Instant.ofEpochMilli(version.createdAt).toString()),
-                                            tGui(GuiMessages.VERSION_MINECRAFT).replace("<version>", version.minecraftVersion),
-                                            tGui(GuiMessages.VERSION_DESCRIPTION).replace("<description>", version.description)
+                                            tGui(GuiMessages.VERSION_CREATED).replace(
+                                                "<timestamp>",
+                                                Instant.ofEpochMilli(version.createdAt).toString()
+                                            ),
+                                            tGui(GuiMessages.VERSION_MINECRAFT).replace(
+                                                "<version>",
+                                                version.minecraftVersion
+                                            ),
+                                            tGui(GuiMessages.VERSION_DESCRIPTION).replace(
+                                                "<description>",
+                                                version.description
+                                            )
                                         )
 
                                         displayNode(
@@ -228,7 +251,7 @@ class GuiCommands(
                                 )
 
                                 val instance = RegionInstance.create(
-                                    instanceId = java.util.UUID.randomUUID(),
+                                    instanceId = UUID.randomUUID(),
                                     worldName = p.world.name,
                                     templateName = templateName,
                                     versionId = templateVersion.versionId,
@@ -396,7 +419,10 @@ class GuiCommands(
                                             )
 
                                             allocated.onFailure {
-                                                log.error("Failed to create pool '$tmplName' in world '${worldCfg.name}'", it)
+                                                log.error(
+                                                    "Failed to create pool '$tmplName' in world '${worldCfg.name}'",
+                                                    it
+                                                )
                                                 pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_FAILED) {
                                                     unparsed("name", tmplName)
                                                 })
@@ -421,7 +447,11 @@ class GuiCommands(
                 }
 
                 for (worldCfg in config.massCloner.worlds) {
-                    submenu("world_${worldCfg.name}", tGui(GuiMessages.WORLD_TITLE).replace("<world>", worldCfg.name), XMaterial.GRASS_BLOCK) {
+                    submenu(
+                        "world_${worldCfg.name}",
+                        tGui(GuiMessages.WORLD_TITLE).replace("<world>", worldCfg.name),
+                        XMaterial.GRASS_BLOCK
+                    ) {
                         action(
                             "create_pool",
                             tGui(GuiMessages.CREATE_POOL_TITLE),
@@ -437,7 +467,11 @@ class GuiCommands(
                             menuAPI.menuTree {
                                 title(tGui(GuiMessages.SELECT_TEMPLATE_TITLE).replace("<world>", worldCfg.name))
 
-                                submenu("templates_pool_${worldCfg.name}", tGui(GuiMessages.TEMPLATES_TITLE), XMaterial.BOOK) {
+                                submenu(
+                                    "templates_pool_${worldCfg.name}",
+                                    tGui(GuiMessages.TEMPLATES_TITLE),
+                                    XMaterial.BOOK
+                                ) {
                                     paginated(28)
 
                                     dynamicItems { _ ->
@@ -490,7 +524,10 @@ class GuiCommands(
                                                     )
 
                                                     allocated.onFailure {
-                                                        log.error("Failed to create pool '$tmplName' in world '${worldCfg.name}'", it)
+                                                        log.error(
+                                                            "Failed to create pool '$tmplName' in world '${worldCfg.name}'",
+                                                            it
+                                                        )
                                                         pp.sendMessage(translations.getComponentSync(CommandMessages.POOL_CREATION_FAILED) {
                                                             unparsed("name", tmplName)
                                                         })
@@ -538,8 +575,10 @@ class GuiCommands(
                                             placeholder("status", status)
                                         })
                                         p.sendMessage(translations.getComponentSync(CommandMessages.POOL_VERSION_LINE) {
-                                            unparsed("version", poolCfg.versionMode.toString() +
-                                                    (if (poolCfg.versionMode == VersionMode.PINNED) " #${poolCfg.pinnedVersionId}" else " (active)"))
+                                            unparsed(
+                                                "version", poolCfg.versionMode.toString() +
+                                                        (if (poolCfg.versionMode == VersionMode.PINNED) " #${poolCfg.pinnedVersionId}" else " (active)")
+                                            )
                                         })
                                         p.sendMessage(translations.getComponentSync(CommandMessages.POOL_SETTINGS_LINE) {
                                             unparsed("separation", poolCfg.separationChunks.toString())
@@ -582,7 +621,10 @@ class GuiCommands(
                                     ) { p ->
                                         val result = massClonerService.regeneratePools(listOf(worldCfg.name))
                                         result.onFailure {
-                                            log.error("Failed to persist state after regenerating pools for world '${worldCfg.name}'", it)
+                                            log.error(
+                                                "Failed to persist state after regenerating pools for world '${worldCfg.name}'",
+                                                it
+                                            )
                                             p.sendMessage(translations.getComponentSync(CommandMessages.CLONER_SAVE_FAILED))
                                         }
                                         result.onSuccess { (removed, allocated) ->
@@ -648,7 +690,12 @@ class GuiCommands(
                                 id = "create_manual_${templateName}",
                                 title = templateName,
                                 material = XMaterial.PAPER,
-                                description = listOf(tGui(GuiMessages.CREATE_MANUAL_DESC).replace("<name>", templateName)),
+                                description = listOf(
+                                    tGui(GuiMessages.CREATE_MANUAL_DESC).replace(
+                                        "<name>",
+                                        templateName
+                                    )
+                                ),
                                 returnLevels = 1
                             ) { pp ->
                                 val chunk = pp.location.chunk
@@ -713,7 +760,7 @@ class GuiCommands(
                                 )
 
                                 val instance = RegionInstance.create(
-                                    instanceId = java.util.UUID.randomUUID(),
+                                    instanceId = UUID.randomUUID(),
                                     worldName = pp.world.name,
                                     templateName = templateName,
                                     versionId = templateVersion.versionId,
@@ -861,7 +908,7 @@ class GuiCommands(
         }
     }
 
-    private suspend fun restoreTemplate(player: org.bukkit.entity.Player, templateName: String) {
+    private suspend fun restoreTemplate(player: Player, templateName: String) {
         val targetWorld = player.world
 
         val templateVersion = templateRepository.loadActiveTemplateVersion(templateName)
@@ -881,7 +928,7 @@ class GuiCommands(
         }
 
         val job = RestoreJob(
-            id = java.util.UUID.randomUUID(),
+            id = UUID.randomUUID(),
             world = targetWorld,
             targetChunkX = templateVersion.data.minChunkX,
             targetChunkZ = templateVersion.data.minChunkZ,
@@ -900,7 +947,7 @@ class GuiCommands(
     }
 
     private suspend fun restoreAt(
-        player: org.bukkit.entity.Player,
+        player: Player,
         templateName: String,
         world: String,
         x: Int,
@@ -946,7 +993,7 @@ class GuiCommands(
         val targetChunkZ = floor(z / 16.0).toInt()
 
         val job = RestoreJob(
-            id = java.util.UUID.randomUUID(),
+            id = UUID.randomUUID(),
             world = targetWorld,
             targetChunkX = targetChunkX,
             targetChunkZ = targetChunkZ,
@@ -967,7 +1014,7 @@ class GuiCommands(
     }
 
     private suspend fun createInstance(
-        player: org.bukkit.entity.Player,
+        player: Player,
         templateName: String,
         chunkX: Int,
         chunkZ: Int,
@@ -1008,7 +1055,7 @@ class GuiCommands(
         )
 
         val instance = RegionInstance.create(
-            instanceId = java.util.UUID.randomUUID(),
+            instanceId = UUID.randomUUID(),
             worldName = targetWorld.name,
             templateName = templateName,
             versionId = versionId ?: templateVersion.versionId,
@@ -1038,8 +1085,8 @@ class GuiCommands(
         })
     }
 
-    private suspend fun instanceInfo(player: org.bukkit.entity.Player, instanceId: String) {
-        val id = java.util.UUID.fromString(instanceId)
+    private suspend fun instanceInfo(player: Player, instanceId: String) {
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -1080,8 +1127,8 @@ class GuiCommands(
         })
     }
 
-    private suspend fun restoreInstance(player: org.bukkit.entity.Player, instanceId: String) {
-        val id = java.util.UUID.fromString(instanceId)
+    private suspend fun restoreInstance(player: Player, instanceId: String) {
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -1145,8 +1192,14 @@ class GuiCommands(
                 if (cfg == null || cfg.restoreIntervalSeconds == null) {
                     timerLoreBase += tGui(GuiMessages.TIMER_NO_CONFIG)
                 } else {
-                    timerLoreBase += tGui(GuiMessages.TIMER_INTERVAL).replace("<interval>", cfg.restoreIntervalSeconds.toString())
-                    timerLoreBase += tGui(GuiMessages.TIMER_AUDIENCE).replace("<scope>", cfg.restoreAudienceScope.toString())
+                    timerLoreBase += tGui(GuiMessages.TIMER_INTERVAL).replace(
+                        "<interval>",
+                        cfg.restoreIntervalSeconds.toString()
+                    )
+                    timerLoreBase += tGui(GuiMessages.TIMER_AUDIENCE).replace(
+                        "<scope>",
+                        cfg.restoreAudienceScope.toString()
+                    )
                 }
 
                 display(
@@ -1156,7 +1209,13 @@ class GuiCommands(
                     timerLoreBase
                 )
 
-                action("timer_set", tGui(GuiMessages.SET_TIMER_TITLE), XMaterial.LIME_DYE, emptyList(), returnLevels = 1) { p ->
+                action(
+                    "timer_set",
+                    tGui(GuiMessages.SET_TIMER_TITLE),
+                    XMaterial.LIME_DYE,
+                    emptyList(),
+                    returnLevels = 1
+                ) { p ->
                     val intervalResult = menuAPI.promptInt(
                         p,
                         tGui(GuiMessages.TIMER_INTERVAL_PROMPT),
@@ -1176,7 +1235,13 @@ class GuiCommands(
                     )
                 }
 
-                action("timer_clear", tGui(GuiMessages.DELETE_TIMER_TITLE), XMaterial.RED_DYE, emptyList(), returnLevels = 1) { p ->
+                action(
+                    "timer_clear",
+                    tGui(GuiMessages.DELETE_TIMER_TITLE),
+                    XMaterial.RED_DYE,
+                    emptyList(),
+                    returnLevels = 1
+                ) { p ->
                     cancelTimerById(p, instance.instanceId.toString())
                 }
             }
@@ -1184,12 +1249,12 @@ class GuiCommands(
     }
 
     private suspend fun setTimerByInstanceId(
-        player: org.bukkit.entity.Player,
+        player: Player,
         instanceId: String,
         intervalSeconds: Int,
         scope: AudienceScope
     ) {
-        val id = java.util.UUID.fromString(instanceId)
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -1213,14 +1278,20 @@ class GuiCommands(
 
         val removeResult = massClonerService.removeInstance(instance.instanceId)
         if (removeResult.isFailure) {
-            log.error("Failed to persist state after removing instance ${instance.instanceId} for timer update", removeResult.exceptionOrNull())
+            log.error(
+                "Failed to persist state after removing instance ${instance.instanceId} for timer update",
+                removeResult.exceptionOrNull()
+            )
             player.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
             return
         }
 
         val addResult = massClonerService.addManualInstance(updatedInstance)
         if (addResult.isFailure) {
-            log.error("Failed to persist state after adding updated instance ${updatedInstance.instanceId} for timer update", addResult.exceptionOrNull())
+            log.error(
+                "Failed to persist state after adding updated instance ${updatedInstance.instanceId} for timer update",
+                addResult.exceptionOrNull()
+            )
             player.sendMessage(translations.getComponent(CommandMessages.INSTANCE_SAVE_FAILED))
             return
         }
@@ -1236,8 +1307,8 @@ class GuiCommands(
         })
     }
 
-    private suspend fun cancelTimerById(player: org.bukkit.entity.Player, instanceId: String) {
-        val id = java.util.UUID.fromString(instanceId)
+    private suspend fun cancelTimerById(player: Player, instanceId: String) {
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {

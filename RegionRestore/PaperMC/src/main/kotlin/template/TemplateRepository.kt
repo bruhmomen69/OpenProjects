@@ -22,6 +22,8 @@ import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.nms.RegionTemplate
 import bruh.regionrestore.nms.RegionTemplateVersion
 import java.nio.file.Path
+import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.*
 
@@ -59,12 +61,12 @@ class TemplateRepository(
     fun setCache(cache: TemplateCache) {
         this.cache = cache
     }
-    
+
     @OptIn(ExperimentalSerializationApi::class)
     private val cbor = Cbor {
         ignoreUnknownKeys = true
     }
-    
+
     @OptIn(ExperimentalSerializationApi::class)
     @Serializable
     data class ChunkCoord(
@@ -182,7 +184,7 @@ class TemplateRepository(
         val templateVersion = RegionTemplateVersion(
             templateName = name,
             versionId = newVersionId,
-            createdAt = java.time.Instant.ofEpochMilli(now),
+            createdAt = Instant.ofEpochMilli(now),
             minecraftVersion = minecraftVersion,
             data = templateWithMetadata
         )
@@ -437,6 +439,7 @@ class TemplateRepository(
                 trimmed.startsWith("activeVersionId:") -> {
                     activeVersionId = trimmed.substringAfter(":RegionRestore:").trim().toIntOrNull() ?: 0
                 }
+
                 trimmed.startsWith("- versionId:") -> {
                     if (currentVersionId != -1) {
                         versionsList.add(
@@ -453,12 +456,15 @@ class TemplateRepository(
                     currentMinecraftVersion = ""
                     currentDescription = ""
                 }
+
                 trimmed.startsWith("createdAt:") -> {
                     currentCreatedAt = trimmed.substringAfter(":RegionRestore:").trim().toLongOrNull() ?: 0L
                 }
+
                 trimmed.startsWith("minecraftVersion:") -> {
                     currentMinecraftVersion = trimmed.substringAfter(":RegionRestore:").trim().removeSurrounding("\"")
                 }
+
                 trimmed.startsWith("description:") -> {
                     currentDescription = trimmed.substringAfter(":RegionRestore:").trim().removeSurrounding("\"")
                 }
@@ -483,84 +489,87 @@ class TemplateRepository(
         )
     }
 
-    private suspend fun saveTemplateData(versionFile: Path, version: RegionTemplateVersion) = withContext(Dispatchers.IO) {
-        val metadata = TemplateMetadata(
-            templateName = version.templateName,
-            versionId = version.versionId,
-            createdAt = version.createdAt.toEpochMilli(),
-            minecraftVersion = version.minecraftVersion,
-            templateName1 = version.data.name,
-            description = version.data.description,
-            sourceWorld = version.data.sourceWorld.toString(),
-            minChunkX = version.data.minChunkX,
-            minChunkZ = version.data.minChunkZ,
-            sizeXChunks = version.data.sizeXChunks,
-            sizeZChunks = version.data.sizeZChunks,
-            chunkCoords = version.data.chunkData.keys.map { (x, z) -> ChunkCoord(x, z) }
-        )
-        
-        val metadataBytes = cbor.encodeToByteArray(metadata)
-        
-        val chunkDataBuffer = nmsAdapter.serializeChunkDataToByteBuf(version.data.chunkData)
-        val chunkDataBytes = ByteArray(chunkDataBuffer.readableBytes())
-        chunkDataBuffer.readBytes(chunkDataBytes)
-        chunkDataBuffer.release()
-        
-        val combined = byteArrayOf(
-            (metadataBytes.size shr 24).toByte(),
-            (metadataBytes.size shr 16).toByte(),
-            (metadataBytes.size shr 8).toByte(),
-            metadataBytes.size.toByte(),
-            *metadataBytes,
-            *chunkDataBytes
-        )
-        
-        val compressed = Zstd.compress(combined, 9)
-        
-        versionFile.writeBytes(compressed)
-    }
+    private suspend fun saveTemplateData(versionFile: Path, version: RegionTemplateVersion) =
+        withContext(Dispatchers.IO) {
+            val metadata = TemplateMetadata(
+                templateName = version.templateName,
+                versionId = version.versionId,
+                createdAt = version.createdAt.toEpochMilli(),
+                minecraftVersion = version.minecraftVersion,
+                templateName1 = version.data.name,
+                description = version.data.description,
+                sourceWorld = version.data.sourceWorld.toString(),
+                minChunkX = version.data.minChunkX,
+                minChunkZ = version.data.minChunkZ,
+                sizeXChunks = version.data.sizeXChunks,
+                sizeZChunks = version.data.sizeZChunks,
+                chunkCoords = version.data.chunkData.keys.map { (x, z) -> ChunkCoord(x, z) }
+            )
 
-    private suspend fun loadTemplateData(versionFile: Path, name: String, versionId: Int): RegionTemplateVersion = withContext(Dispatchers.IO) {
-        val compressed = versionFile.readBytes()
-        val originalSize = Zstd.getFrameContentSize(compressed).let { if (it <= 0) compressed.size.toLong() * 5 else it }
-        val decompressed = Zstd.decompress(compressed, originalSize.toInt())
-        
-        val metadataLength = ((decompressed[0].toInt() and 0xFF) shl 24) or
-                             ((decompressed[1].toInt() and 0xFF) shl 16) or
-                             ((decompressed[2].toInt() and 0xFF) shl 8) or
-                             (decompressed[3].toInt() and 0xFF)
-        val metadataBytes = decompressed.copyOfRange(4, 4 + metadataLength)
-        val chunkDataBytes = decompressed.copyOfRange(4 + metadataLength, decompressed.size)
-        
-        val metadata = cbor.decodeFromByteArray<TemplateMetadata>(metadataBytes)
-        
-        val chunkDataBuffer = io.netty.buffer.Unpooled.wrappedBuffer(chunkDataBytes)
+            val metadataBytes = cbor.encodeToByteArray(metadata)
 
-        val offheap = MemoryChecker.hasSufficientOffheapMemory(originalSize)
-        if (!offheap) {
-            logger.warn("Loading template $name v$versionId using heap memory. This can cause reduced server performance and increased GC pressure. Increase the memory overhead (or contact support) to improve performance.")
+            val chunkDataBuffer = nmsAdapter.serializeChunkDataToByteBuf(version.data.chunkData)
+            val chunkDataBytes = ByteArray(chunkDataBuffer.readableBytes())
+            chunkDataBuffer.readBytes(chunkDataBytes)
+            chunkDataBuffer.release()
+
+            val combined = byteArrayOf(
+                (metadataBytes.size shr 24).toByte(),
+                (metadataBytes.size shr 16).toByte(),
+                (metadataBytes.size shr 8).toByte(),
+                metadataBytes.size.toByte(),
+                *metadataBytes,
+                *chunkDataBytes
+            )
+
+            val compressed = Zstd.compress(combined, 9)
+
+            versionFile.writeBytes(compressed)
         }
 
-        val chunkData = nmsAdapter.deserializeChunkDataFromByteBuf(chunkDataBuffer, offheap)
-        
-        val template = RegionTemplate(
-            name = metadata.templateName1,
-            description = metadata.description,
-            createdAt = java.time.Instant.ofEpochMilli(metadata.createdAt),
-            sourceWorld = java.util.UUID.fromString(metadata.sourceWorld),
-            minChunkX = metadata.minChunkX,
-            minChunkZ = metadata.minChunkZ,
-            sizeXChunks = metadata.sizeXChunks,
-            sizeZChunks = metadata.sizeZChunks,
-            chunkData = chunkData
-        )
-        
-        RegionTemplateVersion(
-            templateName = metadata.templateName,
-            versionId = metadata.versionId,
-            createdAt = java.time.Instant.ofEpochMilli(metadata.createdAt),
-            minecraftVersion = metadata.minecraftVersion,
-            data = template
-        )
-    }
+    private suspend fun loadTemplateData(versionFile: Path, name: String, versionId: Int): RegionTemplateVersion =
+        withContext(Dispatchers.IO) {
+            val compressed = versionFile.readBytes()
+            val originalSize =
+                Zstd.getFrameContentSize(compressed).let { if (it <= 0) compressed.size.toLong() * 5 else it }
+            val decompressed = Zstd.decompress(compressed, originalSize.toInt())
+
+            val metadataLength = ((decompressed[0].toInt() and 0xFF) shl 24) or
+                    ((decompressed[1].toInt() and 0xFF) shl 16) or
+                    ((decompressed[2].toInt() and 0xFF) shl 8) or
+                    (decompressed[3].toInt() and 0xFF)
+            val metadataBytes = decompressed.copyOfRange(4, 4 + metadataLength)
+            val chunkDataBytes = decompressed.copyOfRange(4 + metadataLength, decompressed.size)
+
+            val metadata = cbor.decodeFromByteArray<TemplateMetadata>(metadataBytes)
+
+            val chunkDataBuffer = io.netty.buffer.Unpooled.wrappedBuffer(chunkDataBytes)
+
+            val offheap = MemoryChecker.hasSufficientOffheapMemory(originalSize)
+            if (!offheap) {
+                logger.warn("Loading template $name v$versionId using heap memory. This can cause reduced server performance and increased GC pressure. Increase the memory overhead (or contact support) to improve performance.")
+            }
+
+            val chunkData = nmsAdapter.deserializeChunkDataFromByteBuf(chunkDataBuffer, offheap)
+
+            val template = RegionTemplate(
+                name = metadata.templateName1,
+                description = metadata.description,
+                createdAt = Instant.ofEpochMilli(metadata.createdAt),
+                sourceWorld = UUID.fromString(metadata.sourceWorld),
+                minChunkX = metadata.minChunkX,
+                minChunkZ = metadata.minChunkZ,
+                sizeXChunks = metadata.sizeXChunks,
+                sizeZChunks = metadata.sizeZChunks,
+                chunkData = chunkData
+            )
+
+            RegionTemplateVersion(
+                templateName = metadata.templateName,
+                versionId = metadata.versionId,
+                createdAt = Instant.ofEpochMilli(metadata.createdAt),
+                minecraftVersion = metadata.minecraftVersion,
+                data = template
+            )
+        }
 }

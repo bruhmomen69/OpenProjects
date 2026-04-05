@@ -39,9 +39,9 @@ object MemoryChecker {
         if (available < needed) {
             logger.warn(
                 "Insufficient off-heap memory for template load. " +
-                "Available: ${formatBytes(available)}, Required: ${formatBytes(needed)} " +
-                "(including 256 MB safety margin). " +
-                "Falling back to on-heap allocation."
+                        "Available: ${formatBytes(available)}, Required: ${formatBytes(needed)} " +
+                        "(including 256 MB safety margin). " +
+                        "Falling back to on-heap allocation."
             )
             return false
         }

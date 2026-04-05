@@ -6,6 +6,7 @@ import bruh.regionrestore.config.EntityKillerConfig
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.AudienceScope
 import bruh.regionrestore.notification.NotificationConfig
+import bruh.regionrestore.notification.NotificationService
 import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
 import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.launch
@@ -24,7 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalAtomicApi::class)
 class SchedulerService(
     private val plugin: SuspendingJavaPlugin,
-    notificationService: bruh.regionrestore.notification.NotificationService,
+    notificationService: NotificationService,
     private val restoreConfig: RestoreConfig,
     private val notificationsConfig: NotificationsConfig,
     private val entityKillerConfig: EntityKillerConfig,
@@ -234,13 +235,13 @@ class SchedulerService(
         if (restoreConfig.logTimer) {
             plugin.slF4JLogger.info(
                 "Restore Timer: ${activeTime}ms active " +
-                    "(restore time + packet writing cpu-time aggregated), " +
-                    "${totalTime}ms total " +
-                    "(wall clock, includes active wall clock time, chunk loading, and more)."
+                        "(restore time + packet writing cpu-time aggregated), " +
+                        "${totalTime}ms total " +
+                        "(wall clock, includes active wall clock time, chunk loading, and more)."
             )
             plugin.slF4JLogger.info(
                 "Note that `streamingRestore` is on in your config, " +
-                    "and causes a higher active time, but reduces memory usage and chunk load."
+                        "and causes a higher active time, but reduces memory usage and chunk load."
             )
         }
     }

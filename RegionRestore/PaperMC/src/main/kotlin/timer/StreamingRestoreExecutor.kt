@@ -7,6 +7,7 @@ import com.github.shynixn.mccoroutine.folia.regionDispatcher
 import kotlinx.coroutines.*
 import kotlinx.coroutines.future.asCompletableFuture
 import kotlinx.coroutines.future.await
+import org.bukkit.Chunk
 import java.util.concurrent.CompletableFuture
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -42,7 +43,6 @@ class StreamingRestoreExecutor(
         for ((templateChunkX, templateChunkZ) in job.template.chunkData.keys) {
             val (targetChunkX, targetChunkZ) = context.calculateTargetChunk(job, templateChunkX, templateChunkZ)
 
-            // Start async chunk load
             val chunkFuture = job.world.getChunkAtAsync(targetChunkX, targetChunkZ)
             val worldId = job.world.uid
             val key = ChunkTicketManager.ChunkKey(worldId, targetChunkX, targetChunkZ)
@@ -55,7 +55,6 @@ class StreamingRestoreExecutor(
                 context.plugin.regionDispatcher(job.world, targetChunkX, targetChunkZ)
             }
 
-            // Setup mutexes from one thread as the map is not thread safe.
             val localLock = context.chunkLockManager.accessChunkLock(targetChunkX, targetChunkZ)
 
             restoreFutures.add(
@@ -84,7 +83,6 @@ class StreamingRestoreExecutor(
 
                         val locked = acquireLocksWithLogging(localLock, neighborLocks, targetChunkX, targetChunkZ)
 
-                        // Execute the restore
                         executeChunkRestore(
                             job, templateChunkX, templateChunkZ, targetChunkX, targetChunkZ,
                             handle, localLock, neighborLocks, locked, totalTime, future
@@ -95,11 +93,9 @@ class StreamingRestoreExecutor(
                 }.thenCompose { it }
             )
 
-            // Throttle if this wasn't already loaded
             applyChunkLoadThrottle(wasLoaded)
         }
 
-        // Wait for all chunks to complete
         CompletableFuture.allOf(*restoreFutures.toTypedArray()).await()
         val end = System.currentTimeMillis()
 
@@ -110,7 +106,7 @@ class StreamingRestoreExecutor(
      * Create a ticket handle and add plugin chunk ticket.
      */
     private suspend fun createAndAddTicket(
-        chunk: org.bukkit.Chunk,
+        chunk: Chunk,
         key: ChunkTicketManager.ChunkKey,
         wasLoaded: Boolean,
         targetChunkX: Int,
@@ -123,7 +119,6 @@ class StreamingRestoreExecutor(
                 chunk.addPluginChunkTicket(context.plugin)
                 ChunkTicketManager.ChunkTicketHandle(key, chunk, hadTicket = true, wasLoaded = wasLoaded)
             } catch (t: Exception) {
-                // Roll back ref count and continue without a ticket
                 context.chunkTicketManager.decrementTicketRef(key)
                 context.plugin.slF4JLogger.error(
                     "Failed to ticket chunk at $targetChunkX, $targetChunkZ",
@@ -171,7 +166,6 @@ class StreamingRestoreExecutor(
         var locked = initiallyLocked
 
         try {
-            // Restore this chunk immediately
             val begin = System.currentTimeMillis()
             val nextTickFuture = chunkAdapter.restoreSingleChunk(
                 job.world,

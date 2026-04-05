@@ -12,6 +12,7 @@ import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.entity.Player
 import bruh.regionrestore.config.NotificationsConfig
+import java.time.Duration
 import bruh.regionrestore.config.NotificationEventConfig
 import kotlin.math.sqrt
 
@@ -38,7 +39,10 @@ data class NotificationConfig(
          * @param variables Map of variable names to values for substitution (e.g., {"seconds" to "5"})
          * @return NotificationConfig with parsed MiniMessage and substituted variables
          */
-        fun fromEventConfig(eventConfig: NotificationEventConfig, variables: Map<String, String> = emptyMap()): NotificationConfig? {
+        fun fromEventConfig(
+            eventConfig: NotificationEventConfig,
+            variables: Map<String, String> = emptyMap()
+        ): NotificationConfig? {
             if (!eventConfig.enabled) return null
 
             val miniMessage = MiniMessage.miniMessage()
@@ -86,7 +90,7 @@ class NotificationService(
     private val plugin: SuspendingJavaPlugin,
     private val notificationsConfig: NotificationsConfig
 ) {
-    
+
     fun sendNotification(
         scope: AudienceScope,
         config: NotificationConfig,
@@ -126,7 +130,7 @@ class NotificationService(
 
         sendToAudience(audience, config)
     }
-    
+
     private fun resolveAudience(
         scope: AudienceScope,
         world: World? = null,
@@ -141,6 +145,7 @@ class NotificationService(
                     Audience.audience(playersNearby(location, world, radiusBlocks))
                 }
             }
+
             AudienceScope.WORLD -> {
                 if (world == null) {
                     Audience.empty()
@@ -148,6 +153,7 @@ class NotificationService(
                     Audience.audience(world.players)
                 }
             }
+
             AudienceScope.SERVER -> {
                 Audience.audience(Bukkit.getOnlinePlayers())
             }
@@ -168,9 +174,19 @@ class NotificationService(
                 if (world == null) {
                     Audience.empty()
                 } else {
-                    Audience.audience(playersNearbyAABB(minBlockX, maxBlockX, minBlockZ, maxBlockZ, world, radiusBlocks))
+                    Audience.audience(
+                        playersNearbyAABB(
+                            minBlockX,
+                            maxBlockX,
+                            minBlockZ,
+                            maxBlockZ,
+                            world,
+                            radiusBlocks
+                        )
+                    )
                 }
             }
+
             AudienceScope.WORLD -> {
                 if (world == null) {
                     Audience.empty()
@@ -178,12 +194,13 @@ class NotificationService(
                     Audience.audience(world.players)
                 }
             }
+
             AudienceScope.SERVER -> {
                 Audience.audience(Bukkit.getOnlinePlayers())
             }
         }
     }
-    
+
     private fun playersNearby(location: Location, world: World, radiusBlocks: Int): List<Player> {
         return world.players.filter { player: Player ->
             val playerLoc = player.location
@@ -230,25 +247,25 @@ class NotificationService(
             dist <= radiusBlocks
         }
     }
-    
+
     private fun sendToAudience(audience: Audience, config: NotificationConfig) {
         if (config.message != Component.empty()) {
             audience.sendMessage(config.message)
         }
-        
+
         if (config.title != null || config.subtitle != null) {
             val title = Title.title(
                 config.title ?: Component.empty(),
                 config.subtitle ?: Component.empty(),
                 Title.Times.times(
-                    java.time.Duration.ofMillis(100),
-                    java.time.Duration.ofMillis(config.titleDurationTicks * 50L),
-                    java.time.Duration.ofMillis(500)
+                    Duration.ofMillis(100),
+                    Duration.ofMillis(config.titleDurationTicks * 50L),
+                    Duration.ofMillis(500)
                 )
             )
             audience.showTitle(title)
         }
-        
+
         if (config.sound != null) {
             audience.playSound(
                 Sound.sound()

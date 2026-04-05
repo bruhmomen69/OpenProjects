@@ -8,9 +8,11 @@ import bruh.regionrestore.timer.RestoreJob
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import org.slf4j.LoggerFactory
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
+import java.util.UUID
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Default
 import revxrsal.commands.annotation.Optional
@@ -26,7 +28,7 @@ class RestoreCommands(
     private val config: RegionRestoreConfig,
     private val translations: TranslationAPI
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(RestoreCommands::class.java)
+    private val log = LoggerFactory.getLogger(RestoreCommands::class.java)
 
     @Subcommand("restore version")
     @CommandPermission("regionrestore.restore")
@@ -74,7 +76,7 @@ class RestoreCommands(
         }
 
         val job = RestoreJob(
-            id = java.util.UUID.randomUUID(),
+            id = UUID.randomUUID(),
             world = targetWorld,
             targetChunkX = templateVersion.data.minChunkX,
             targetChunkZ = templateVersion.data.minChunkZ,
@@ -137,7 +139,7 @@ class RestoreCommands(
         }
 
         val job = RestoreJob(
-            id = java.util.UUID.randomUUID(),
+            id = UUID.randomUUID(),
             world = targetWorld,
             targetChunkX = templateVersion.data.minChunkX,
             targetChunkZ = templateVersion.data.minChunkZ,
@@ -190,7 +192,7 @@ class RestoreCommands(
         }
 
         val job = RestoreJob(
-            id = java.util.UUID.randomUUID(),
+            id = UUID.randomUUID(),
             world = targetWorld,
             targetChunkX = templateVersion.data.minChunkX,
             targetChunkZ = templateVersion.data.minChunkZ,
@@ -259,7 +261,7 @@ class RestoreCommands(
         val targetChunkZ = floor(z / 16.0).toInt()
 
         val job = RestoreJob(
-            id = java.util.UUID.randomUUID(),
+            id = UUID.randomUUID(),
             world = targetWorld,
             targetChunkX = targetChunkX,
             targetChunkZ = targetChunkZ,

@@ -1,42 +1,32 @@
 package bruh.regionrestore
 
-import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
-import kotlinx.coroutines.runBlocking
-import revxrsal.commands.bukkit.BukkitLamp
-import revxrsal.commands.autocomplete.SuggestionProvider
-import bruh.regionrestore.cmd.SuggestTemplateName
-import bruh.regionrestore.cmd.SuggestVersionId
-import bruh.regionrestore.cmd.SuggestVersionNumber
-import bruh.regionrestore.cmd.SuggestInstanceId
-import bruh.regionrestore.api.RegionRestore as RegionRestoreApiHolder
 import bruh.regionrestore.api.createRegionRestoreApi
 import bruh.regionrestore.cloner.MassClonerService
-import bruh.regionrestore.cmd.TemplateCommands
-import bruh.regionrestore.cmd.RestoreCommands
-import bruh.regionrestore.cmd.ClonerCommands
-import bruh.regionrestore.cmd.InstanceCommands
-import bruh.regionrestore.cmd.TimerCommands
-import bruh.regionrestore.cmd.SelectionCommands
-import bruh.regionrestore.cmd.GuiCommands
+import bruh.regionrestore.cmd.*
 import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.config.RegionRestoreConfigLoader
+import bruh.regionrestore.hooks.MiniPlaceholdersHook
+import bruh.regionrestore.hooks.PlaceholderAPIHook
 import bruh.regionrestore.loader.PaperNmsAdapterLoader
 import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.notification.NotificationService
 import bruh.regionrestore.selection.SelectionService
 import bruh.regionrestore.selection.SelectionWandService
-import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.template.TemplateCache
+import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.timer.SchedulerService
 import bruh.regionrestore.translations.CommandMessages
 import bruh.regionrestore.translations.GuiMessages
-import bruh.regionrestore.hooks.PlaceholderAPIHook
-import bruh.regionrestore.hooks.MiniPlaceholdersHook
-import bruh.zchat.utils.itemapi.ItemAPI
 import bruh.zchat.utils.itemapi.HoconItemDataStore
+import bruh.zchat.utils.itemapi.ItemAPI
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
 import bruh.zchat.utils.translations.translationApi
+import com.github.shynixn.mccoroutine.folia.SuspendingJavaPlugin
+import kotlinx.coroutines.runBlocking
+import revxrsal.commands.autocomplete.SuggestionProvider
+import revxrsal.commands.bukkit.BukkitLamp
+import bruh.regionrestore.api.RegionRestore as RegionRestoreApiHolder
 
 class RegionRestorePlugin : SuspendingJavaPlugin() {
     lateinit var nmsAdapter: PaperNmsAdapter
@@ -118,9 +108,24 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
 
         notificationService = NotificationService(this, config.notifications)
 
-        schedulerService = SchedulerService(this, notificationService, config.restore, config.notifications, config.entityKiller, nmsAdapter)
+        schedulerService = SchedulerService(
+            this,
+            notificationService,
+            config.restore,
+            config.notifications,
+            config.entityKiller,
+            nmsAdapter
+        )
 
-        massClonerService = MassClonerService(this, nmsAdapter, templateRepository, schedulerService, config.massCloner, config.restore, templateCache)
+        massClonerService = MassClonerService(
+            this,
+            nmsAdapter,
+            templateRepository,
+            schedulerService,
+            config.massCloner,
+            config.restore,
+            templateCache
+        )
         massClonerService.initialize()
 
         // Expose public API for other plugins
@@ -169,7 +174,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                         runBlocking { templateRepository.listTemplates() }
                     }
                 }
-                
+
                 // Version ID suggestions for string parameters - includes special "active" keyword
                 providers.addProviderForAnnotation(SuggestVersionId::class.java) { _ ->
                     SuggestionProvider { _ ->
@@ -207,59 +212,73 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                 }
             }
             .build()
-        lamp.register(TemplateCommands(
-            nmsAdapter,
-            templateRepository,
-            config,
-            translations
-        ))
-        lamp.register(RestoreCommands(
-            nmsAdapter,
-            templateRepository,
-            schedulerService,
-            config,
-            translations
-        ))
-        lamp.register(ClonerCommands(
-            massClonerService,
-            config,
-            translations
-        ))
-        lamp.register(InstanceCommands(
-            nmsAdapter,
-            templateRepository,
-            massClonerService,
-            config,
-            translations,
-            this,
-            menuAPI
-        ))
-        lamp.register(TimerCommands(
-            nmsAdapter,
-            templateRepository,
-            massClonerService,
-            config,
-            translations
-        ))
-        lamp.register(SelectionCommands(
-            nmsAdapter,
-            templateRepository,
-            config,
-            translations,
-            selectionService,
-            selectionWandService,
-            this
-        ))
-        lamp.register(GuiCommands(
-            nmsAdapter,
-            templateRepository,
-            schedulerService,
-            config,
-            massClonerService,
-            menuAPI,
-            this,
-            translations
-        ))
+        lamp.register(
+            TemplateCommands(
+                nmsAdapter,
+                templateRepository,
+                config,
+                translations
+            )
+        )
+        lamp.register(
+            RestoreCommands(
+                nmsAdapter,
+                templateRepository,
+                schedulerService,
+                config,
+                translations
+            )
+        )
+        lamp.register(
+            ClonerCommands(
+                massClonerService,
+                config,
+                translations
+            )
+        )
+        lamp.register(
+            InstanceCommands(
+                nmsAdapter,
+                templateRepository,
+                massClonerService,
+                config,
+                translations,
+                this,
+                menuAPI
+            )
+        )
+        lamp.register(
+            TimerCommands(
+                nmsAdapter,
+                templateRepository,
+                massClonerService,
+                config,
+                translations
+            )
+        )
+        lamp.register(
+            SelectionCommands(
+                nmsAdapter,
+                templateRepository,
+                config,
+                translations,
+                selectionService,
+                selectionWandService,
+                this
+            )
+        )
+        lamp.register(
+            GuiCommands(
+                nmsAdapter,
+                templateRepository,
+                schedulerService,
+                config,
+                massClonerService,
+                menuAPI,
+                this,
+                translations
+            )
+        )
     }
 
     private fun setupPlaceholderHooks() {

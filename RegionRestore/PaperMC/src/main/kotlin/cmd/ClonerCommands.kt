@@ -5,6 +5,7 @@ import bruh.regionrestore.cloner.VersionMode
 import bruh.regionrestore.config.RegionRestoreConfig
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import org.slf4j.LoggerFactory
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -18,7 +19,7 @@ class ClonerCommands(
     private val config: RegionRestoreConfig,
     private val translations: TranslationAPI
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(ClonerCommands::class.java)
+    private val log = LoggerFactory.getLogger(ClonerCommands::class.java)
 
     @Subcommand("cloner status")
     @CommandPermission("regionrestore.cloner.status")
@@ -67,8 +68,10 @@ class ClonerCommands(
                     unparsed("target", targetCount.toString())
                 })
                 actor.sendMessage(translations.getComponent(CommandMessages.CLONER_POOL_VERSION) {
-                    unparsed("version", pool.versionMode.toString() +
-                            (if (pool.versionMode == VersionMode.PINNED) " #${pool.pinnedVersionId}" else " (active)"))
+                    unparsed(
+                        "version", pool.versionMode.toString() +
+                                (if (pool.versionMode == VersionMode.PINNED) " #${pool.pinnedVersionId}" else " (active)")
+                    )
                 })
                 actor.sendMessage(translations.getComponent(CommandMessages.CLONER_POOL_SETTINGS) {
                     unparsed("separation", pool.separationChunks.toString())
@@ -150,12 +153,12 @@ class ClonerCommands(
 
         val worldsToRegen = if (world != null) listOf(world) else emptyList()
         val result = massClonerService.regeneratePools(worldsToRegen)
-        
+
         result.onFailure {
             log.error("Failed to persist state after regenerating pools", it)
             actor.sendMessage(translations.getComponent(CommandMessages.CLONER_SAVE_FAILED))
         }
-        
+
         result.onSuccess { (removed, allocated) ->
             actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_COMPLETE))
             actor.sendMessage(translations.getComponent(CommandMessages.CLONER_REGEN_REMOVED) {

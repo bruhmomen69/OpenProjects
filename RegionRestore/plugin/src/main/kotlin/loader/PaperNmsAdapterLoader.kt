@@ -1,7 +1,7 @@
 package bruh.regionrestore.loader
 
-import org.bukkit.Bukkit
 import bruh.regionrestore.nms.PaperNmsAdapter
+import org.bukkit.Bukkit
 
 object PaperNmsAdapterLoader {
     private val versionAdapters = mapOf(
@@ -16,18 +16,18 @@ object PaperNmsAdapterLoader {
         "26.1" to "bruh.regionrestore.nms.v26_1.PaperNmsAdapter26_1",
         "26.1.1" to "bruh.regionrestore.nms.v26_1.PaperNmsAdapter26_1"
     )
-    
+
     fun load(): PaperNmsAdapter {
         val version = Bukkit.getMinecraftVersion()
         val adapterClassName = versionAdapters[version]
             ?: throw UnsupportedOperationException("RegionRestore does not support Minecraft version $version")
-        
+
         val adapterClass = try {
             Class.forName(adapterClassName)
         } catch (e: ClassNotFoundException) {
             throw IllegalStateException("Failed to load adapter class $adapterClassName", e)
         }
-        
+
         return try {
             adapterClass.getDeclaredConstructor().newInstance() as PaperNmsAdapter
         } catch (e: Exception) {

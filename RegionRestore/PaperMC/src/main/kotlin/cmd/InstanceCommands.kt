@@ -10,6 +10,7 @@ import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.menuapi.MenuAPI
 import bruh.zchat.utils.translations.TranslationAPI
+import org.slf4j.LoggerFactory
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -18,6 +19,7 @@ import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Optional
 import revxrsal.commands.annotation.Subcommand
 import revxrsal.commands.bukkit.annotation.CommandPermission
+import java.util.UUID
 
 @Command("regionrestore", "rr", "arena")
 class InstanceCommands(
@@ -29,7 +31,7 @@ class InstanceCommands(
     private val plugin: JavaPlugin,
     private val menuAPI: MenuAPI
 ) {
-    private val log = org.slf4j.LoggerFactory.getLogger(InstanceCommands::class.java)
+    private val log = LoggerFactory.getLogger(InstanceCommands::class.java)
 
     @Subcommand("instance create")
     @CommandPermission("regionrestore.instance.create")
@@ -84,7 +86,7 @@ class InstanceCommands(
         )
 
         val instance = RegionInstance.create(
-            instanceId = java.util.UUID.randomUUID(),
+            instanceId = UUID.randomUUID(),
             worldName = targetWorld.name,
             templateName = templateName,
             versionId = versionId ?: templateVersion.versionId,
@@ -179,7 +181,7 @@ class InstanceCommands(
     @Subcommand("instance info")
     @CommandPermission("regionrestore.instance.info")
     suspend fun instanceInfo(actor: CommandSender, @SuggestInstanceId instanceId: String) {
-        val id = java.util.UUID.fromString(instanceId)
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -223,7 +225,7 @@ class InstanceCommands(
     @Subcommand("instance delete")
     @CommandPermission("regionrestore.instance.delete")
     suspend fun deleteInstance(actor: CommandSender, @SuggestInstanceId instanceId: String) {
-        val id = java.util.UUID.fromString(instanceId)
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
@@ -271,7 +273,7 @@ class InstanceCommands(
     @Subcommand("instance restore")
     @CommandPermission("regionrestore.instance.restore")
     suspend fun restoreInstance(actor: CommandSender, @SuggestInstanceId instanceId: String) {
-        val id = java.util.UUID.fromString(instanceId)
+        val id = UUID.fromString(instanceId)
         val instance = massClonerService.getInstance(id)
 
         if (instance == null) {
