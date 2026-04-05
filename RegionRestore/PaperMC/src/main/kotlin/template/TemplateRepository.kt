@@ -48,11 +48,15 @@ class TemplateRepository(
     @Volatile
     private var cache: TemplateCache? = null
 
-    // In-memory cache of active version IDs (templateName -> activeVersionId)
-    // This avoids repeated index.yml reads and prevents circular dependency with TemplateCache
+    /**
+    * In-memory cache of active version IDs (templateName -> activeVersionId)
+    * This avoids repeated index.yml reads and prevents circular dependency with TemplateCache
+    */
     private val activeVersionIds = ConcurrentHashMap<String, Int>()
 
-    // Mutex to synchronize access to index file and related state
+    /**
+     * Mutex to synchronize access to index file and related state
+     */
     private val indexMutex = Mutex()
 
     /**
@@ -115,15 +119,7 @@ class TemplateRepository(
         templatesFolder.createDirectories()
     }
 
-    suspend fun save() {
-        // TemplateRepository doesn't maintain in-memory state that needs persistence.
-        // All state is persisted immediately to disk (index.yml, version files).
-        // This method exists for API compatibility and potential future use.
-    }
-
     suspend fun load() {
-        // Scan templates index and log what's available.
-        // This is useful for debugging and verifying template discovery.
         val indexConfig = loadTemplatesIndex()
 
         logger.info("Discovered ${indexConfig.templates.size} template(s):")
@@ -141,7 +137,6 @@ class TemplateRepository(
         template: RegionTemplate,
         minecraftVersion: String
     ): RegionTemplateVersion = withContext(Dispatchers.IO) {
-        // Ensure the persisted RegionTemplate carries the provided name/description so metadata stays intact
         val templateWithMetadata = template.copy(
             name = name,
             description = description
@@ -168,7 +163,6 @@ class TemplateRepository(
             val newIndex = TemplateIndex(
                 templateName = name,
                 versions = index.versions + versionInfo,
-                // Always make the freshly-saved version the active version
                 activeVersionId = versionId
             )
 
@@ -201,19 +195,13 @@ class TemplateRepository(
         name: String,
         versionId: Int
     ): RegionTemplateVersion? {
-        // If cache is available, use it
         cache?.let { c ->
             c.get(name, versionId)?.let { return it }
         }
 
-        // Fallback to direct disk load (cache not initialized yet)
         return loadTemplateVersionFromDisk(name, versionId)
     }
 
-    /**
-     * Internal method to load template directly from disk (bypasses cache).
-     * Used by TemplateCache for loading and for fallback when cache is not initialized.
-     */
     suspend fun loadTemplateVersionFromDisk(
         name: String,
         versionId: Int
@@ -241,11 +229,9 @@ class TemplateRepository(
     }
 
     suspend fun loadActiveTemplateVersion(name: String): RegionTemplateVersion? {
-        // Look up active version ID from in-memory cache (fast, no circular dependency)
         var activeVersionId = activeVersionIds[name]
 
         if (activeVersionId == null || activeVersionId == 0) {
-            // No active version set, try to fall back to the latest version
             val versions = getTemplateVersions(name)
 
             if (versions == null) {
@@ -253,7 +239,6 @@ class TemplateRepository(
                 return null
             }
 
-            // Fall back to the latest version (highest version ID)
             activeVersionId = versions?.maxOfOrNull { it.versionId } ?: run {
                 logger.warn("Template $name has no versions??")
                 return null
@@ -265,7 +250,6 @@ class TemplateRepository(
     }
 
     suspend fun setActiveVersion(name: String, versionId: Int): Boolean = withContext(Dispatchers.IO) {
-        // Atomic operation: load index, validate, modify, save, update cache
         indexMutex.withLock {
             val indexConfig = loadTemplatesIndexUnlocked()
             val index = indexConfig.templates[name] ?: return@withLock false
@@ -278,7 +262,6 @@ class TemplateRepository(
             indexConfig.templates[name] = newIndex
             saveTemplatesIndexUnlocked(indexConfig)
 
-            // Update the in-memory cache
             activeVersionIds[name] = versionId
 
             logger.info("Set active version of template $name to $versionId")
@@ -294,16 +277,13 @@ class TemplateRepository(
             return@withContext false
         }
 
-        // Get versions while holding the lock to ensure consistency
         val versions = indexMutex.withLock {
             val indexConfig = loadTemplatesIndexUnlocked()
             val index = indexConfig.templates[name]
             index?.versions
         }
 
-        // Remove all versions of this template from cache to release ByteBufs
-        // (TemplateCache handles its own synchronization, so we do this outside the index lock)
-        val cacheRef = cache  // Capture in local variable to avoid smart cast issue
+        val cacheRef = cache
         if (versions != null && cacheRef != null) {
             for (version in versions) {
                 cacheRef.remove(name, version.versionId)
@@ -312,13 +292,11 @@ class TemplateRepository(
 
         templateFolder.toFile().deleteRecursively()
 
-        // Atomic operation: update index and in-memory cache
         indexMutex.withLock {
             val indexConfig = loadTemplatesIndexUnlocked()
             indexConfig.templates.remove(name)
             saveTemplatesIndexUnlocked(indexConfig)
 
-            // Remove from in-memory cache
             activeVersionIds.remove(name)
         }
 

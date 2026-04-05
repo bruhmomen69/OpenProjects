@@ -103,9 +103,6 @@ interface TemplateApi {
     /** Reload the templates index from disk, logging discovered templates. */
     suspend fun reloadIndex()
 
-    /** Persist any in-memory index state (currently a no-op, reserved for future use). */
-    suspend fun saveIndex()
-
     val nms: PaperNmsAdapter
 
     // High-level helpers

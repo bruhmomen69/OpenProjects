@@ -137,10 +137,6 @@ private class PaperTemplateApi(
         templateRepository.load()
     }
 
-    override suspend fun saveIndex() {
-        templateRepository.save()
-    }
-
     override suspend fun createTemplateFromChunks(
         name: String,
         description: String,

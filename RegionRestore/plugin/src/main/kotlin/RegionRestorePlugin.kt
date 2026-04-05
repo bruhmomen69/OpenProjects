@@ -69,32 +69,23 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
     override suspend fun onEnableAsync() {
         slF4JLogger.info("Loading RegionRestore...")
 
-        // Initialize translation system
         translations = translationApi()
         translations.register("commands", CommandMessages::class)
         translations.register("gui", GuiMessages::class)
-        slF4JLogger.info("Translation system initialized")
-        // Switch to configured language before loading to ensure correct files are read
         translations.switchLanguage(config.language)
-        slF4JLogger.info("Switched to language ${config.language}")
         translations.load()
-        slF4JLogger.info("Translation system loaded")
 
         menuAPI = MenuAPI(this)
 
-        // Initialize ItemAPI for tracked items (wand, etc.)
-        // Using HoconItemDataStore for file-based persistence
         val itemsDataStore = HoconItemDataStore(dataFolder.toPath().resolve("items"))
         itemAPI = ItemAPI(this, itemsDataStore)
 
-        // Initialize selection system
         selectionService = SelectionService()
         selectionWandService = SelectionWandService(this, itemAPI, selectionService, translations)
         slF4JLogger.info("Selection wand system initialized")
 
         templateRepository = TemplateRepository(dataFolder.toPath(), slF4JLogger, nmsAdapter)
 
-        // Initialize cache with settings from config
         templateCache = TemplateCache(
             repository = templateRepository,
             ttlMinutes = config.templates.cacheTtlMinutes,
@@ -103,7 +94,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         templateRepository.setCache(templateCache)
         slF4JLogger.info("Initialized template cache (TTL=${config.templates.cacheTtlMinutes}m, max=${config.templates.cacheMaxSize})")
 
-        // Load template repository (scans templates folder, logs what's available)
         templateRepository.load()
 
         notificationService = NotificationService(this, config.notifications)
@@ -128,7 +118,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         )
         massClonerService.initialize()
 
-        // Expose public API for other plugins
         val api = createRegionRestoreApi(
             config = config,
             configLoader = configLoader,
@@ -157,9 +146,7 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
         selectionWandService.close()
         itemAPI.close()
         templateCache.clear()
-        templateRepository.save()
 
-        // Clear API reference
         RegionRestoreApiHolder.clearApi()
 
         slF4JLogger.info("RegionRestore disabled!")
@@ -168,14 +155,12 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
     private fun setupCommands() {
         val lamp = BukkitLamp.builder(this)
             .suggestionProviders { providers ->
-                // Template name suggestions
                 providers.addProviderForAnnotation(SuggestTemplateName::class.java) { _ ->
                     SuggestionProvider { _ ->
                         runBlocking { templateRepository.listTemplates() }
                     }
                 }
 
-                // Version ID suggestions for string parameters - includes special "active" keyword
                 providers.addProviderForAnnotation(SuggestVersionId::class.java) { _ ->
                     SuggestionProvider { _ ->
                         val allVersionIds = runBlocking {
@@ -189,7 +174,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                     }
                 }
 
-                // Numeric-only version ID suggestions for Int parameters
                 providers.addProviderForAnnotation(SuggestVersionNumber::class.java) { _ ->
                     SuggestionProvider { _ ->
                         runBlocking {
@@ -202,7 +186,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                     }
                 }
 
-                // Instance ID suggestions for commands that take an instanceId parameter
                 providers.addProviderForAnnotation(SuggestInstanceId::class.java) { _ ->
                     SuggestionProvider { _ ->
                         massClonerService.listInstances(null, null)
@@ -282,7 +265,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
     }
 
     private fun setupPlaceholderHooks() {
-        // Register PlaceholderAPI expansion if available
         if (server.pluginManager.isPluginEnabled("PlaceholderAPI")) {
             try {
                 PlaceholderAPIHook(this, massClonerService, templateRepository).register()
@@ -292,7 +274,6 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
             }
         }
 
-        // Register MiniPlaceholders expansion if available
         if (server.pluginManager.isPluginEnabled("MiniPlaceholders")) {
             try {
                 MiniPlaceholdersHook.register(massClonerService, templateRepository)
