@@ -5,15 +5,18 @@ import bruh.regionrestore.nms.PaperNmsAdapter
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
-import net.kyori.adventure.text.minimessage.MiniMessage.miniMessage
-import org.slf4j.LoggerFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
-import java.time.Instant
+import org.bukkit.plugin.java.JavaPlugin
+import org.slf4j.LoggerFactory
 import revxrsal.commands.annotation.Command
 import revxrsal.commands.annotation.Subcommand
+import revxrsal.commands.bukkit.actor.BukkitCommandActor
 import revxrsal.commands.bukkit.annotation.CommandPermission
+import java.time.Instant
 import kotlin.math.floor
 
 @Command("regionrestore", "rr", "arena")
@@ -21,14 +24,15 @@ class TemplateCommands(
     private val nmsAdapter: PaperNmsAdapter,
     private val templateRepository: TemplateRepository,
     private val config: RegionRestoreConfig,
-    private val translations: TranslationAPI
+    private val translations: TranslationAPI,
+    private val plugin: JavaPlugin
 ) {
     private val log = LoggerFactory.getLogger(TemplateCommands::class.java)
 
     @Subcommand("template create")
     @CommandPermission("regionrestore.template.create")
     suspend fun createTemplate(
-        actor: CommandSender,
+        actor: BukkitCommandActor,
         name: String,
         minX: Int,
         minZ: Int,
@@ -36,17 +40,14 @@ class TemplateCommands(
         maxZ: Int,
         world: String? = null
     ) {
-        val player = actor as? Player ?: run {
-            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
-            return
-        }
-
         val targetWorld = if (world != null) {
             Bukkit.getWorld(world)
         } else {
-            player.world
+            val player = actor as? Player
+
+            player?.world
         } ?: run {
-            actor.sendMessage(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
+            actor.reply(translations.getComponent(CommandMessages.WORLD_NOT_FOUND) {
                 unparsed("world", world ?: "unknown")
             })
             return
@@ -57,15 +58,18 @@ class TemplateCommands(
         val minChunkZ = floor(minZ / 16.0).toInt()
         val maxChunkZ = floor(maxZ / 16.0).toInt()
 
-        val template = nmsAdapter.serializeArea(targetWorld, minChunkX, minChunkZ, maxChunkX, maxChunkZ)
+        withContext(Dispatchers.Default) {
+            val template = nmsAdapter.serializeArea(targetWorld, minChunkX, minChunkZ, maxChunkX, maxChunkZ)
 
-        val descriptionFormat = config.templates.defaultDescriptionFormat
-        val description = descriptionFormat.replace("<player>", player.name)
-        templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)
+            val descriptionFormat = config.templates.defaultDescriptionFormat
+            val description = descriptionFormat.replace("<player>", actor.name())
+            templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)
 
-        actor.sendMessage(translations.getComponent(CommandMessages.TEMPLATE_CREATED) {
-            unparsed("name", name)
-        })
+            actor.reply(translations.getComponent(CommandMessages.TEMPLATE_CREATED) {
+                unparsed("name", name)
+            })
+        }
+
     }
 
     @Subcommand("template list")

@@ -79,14 +79,20 @@ object NmsAdapterCommon {
             }, executor))
         }
 
-        for (chunk in queue) {
+        val fullDebug = queue.size <= 14
+
+        for ((idx, chunk) in queue.withIndex()) {
             val data = chunk.join()
 
             bigBuffer.writeInt(data.originalByteSize)
             bigBuffer.writeInt(data.smallBytes.size)
-            SERIAL_LOGGER.info("Compressed to ${data.smallBytes.size} bytes from ${data.originalByteSize} bytes.")
+            if (fullDebug) {
+                SERIAL_LOGGER.info("Compressed batch $idx to ${data.smallBytes.size / 1000}KB.")
+            }
             bigBuffer.writeBytes(data.smallBytes)
         }
+
+        SERIAL_LOGGER.info("Finished serializing and compressing ${queue.size} chunksets.")
 
         return bigBuffer
     }

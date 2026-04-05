@@ -38,13 +38,6 @@ class RestoreCommands(
         @SuggestVersionId @Optional @Default("active") versionOrActive: String = "active",
         @Optional scope: AudienceScope? = config.notifications.defaultAudienceScope
     ) {
-        val player = actor as? Player ?: run {
-            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
-            return
-        }
-
-        val targetWorld = player.world
-
         val scope = scope ?: config.notifications.defaultAudienceScope
 
         val templateVersion = if (versionOrActive.equals("active", true)) {
@@ -75,6 +68,14 @@ class RestoreCommands(
             })
         }
 
+        val targetWorld = Bukkit.getWorld(templateVersion.data.sourceWorld) ?: run {
+            val player = actor as? Player ?: run {
+                actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
+                return
+            }
+            player.world
+        }
+
         val job = RestoreJob(
             id = UUID.randomUUID(),
             world = targetWorld,
@@ -103,13 +104,6 @@ class RestoreCommands(
         @SuggestVersionId versionOrActive: String = "active",
         scope: AudienceScope = config.notifications.defaultAudienceScope
     ) {
-        val player = actor as? Player ?: run {
-            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
-            return
-        }
-
-        val targetWorld = player.world
-
         val templateVersion = if (versionOrActive == "active") {
             templateRepository.loadActiveTemplateVersion(name)
         } else {
@@ -136,6 +130,14 @@ class RestoreCommands(
                 unparsed("template_version", templateVersion.minecraftVersion)
                 unparsed("server_version", nmsAdapter.minecraftVersion)
             })
+        }
+
+        val targetWorld = Bukkit.getWorld(templateVersion.data.sourceWorld) ?: run {
+            val player = actor as? Player ?: run {
+                actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
+                return
+            }
+            player.world
         }
 
         val job = RestoreJob(
@@ -168,13 +170,6 @@ class RestoreCommands(
         actor: CommandSender,
         @SuggestTemplateName name: String
     ) {
-        val player = actor as? Player ?: run {
-            actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
-            return
-        }
-
-        val targetWorld = player.world
-
         val templateVersion = templateRepository.loadActiveTemplateVersion(name)
 
         if (templateVersion == null) {
@@ -189,6 +184,14 @@ class RestoreCommands(
                 unparsed("template_version", templateVersion.minecraftVersion)
                 unparsed("server_version", nmsAdapter.minecraftVersion)
             })
+        }
+
+        val targetWorld = Bukkit.getWorld(templateVersion.data.sourceWorld) ?: run {
+            val player = actor as? Player ?: run {
+                actor.sendMessage(translations.getComponent(CommandMessages.PLAYER_ONLY))
+                return
+            }
+            player.world
         }
 
         val job = RestoreJob(

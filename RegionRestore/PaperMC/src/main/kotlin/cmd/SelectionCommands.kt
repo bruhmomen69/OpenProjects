@@ -7,6 +7,7 @@ import bruh.regionrestore.selection.SelectionWandService
 import bruh.regionrestore.template.TemplateRepository
 import bruh.regionrestore.translations.CommandMessages
 import bruh.zchat.utils.translations.TranslationAPI
+import com.github.shynixn.mccoroutine.folia.asyncDispatcher
 import com.github.shynixn.mccoroutine.folia.globalRegionDispatcher
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -77,6 +78,10 @@ class SelectionCommands(
         })
 
         withContext(plugin.globalRegionDispatcher) {
+
+        }
+
+        withContext(plugin.asyncDispatcher) {
             val template = nmsAdapter.serializeArea(
                 selection.world,
                 selection.minChunkX,
@@ -84,7 +89,6 @@ class SelectionCommands(
                 selection.maxChunkX,
                 selection.maxChunkZ
             )
-
             val descriptionFormat = config.templates.defaultDescriptionFormat
             val description = descriptionFormat.replace("<player>", player.name)
             templateRepository.saveTemplate(name, description, template, nmsAdapter.minecraftVersion)

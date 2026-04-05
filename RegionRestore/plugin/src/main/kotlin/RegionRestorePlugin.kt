@@ -200,7 +200,8 @@ class RegionRestorePlugin : SuspendingJavaPlugin() {
                 nmsAdapter,
                 templateRepository,
                 config,
-                translations
+                translations,
+                this
             )
         )
         lamp.register(

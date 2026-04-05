@@ -12,6 +12,7 @@ import com.mayakapps.kache.KacheStrategy
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
 import net.minecraft.core.BlockPos
 import net.minecraft.network.FriendlyByteBuf
@@ -40,6 +41,11 @@ import java.util.concurrent.ExecutorService
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
+import kotlin.math.roundToLong
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalAtomicApi::class)
 class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
@@ -500,7 +506,8 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
         return ChunkRestoreData(template, originChunkX, originChunkZ, level, chunkData, chunk, fBuffer, chonkHandle)
     }
 
-    private fun serializeChunks(
+
+    private suspend fun serializeChunks(
         minXChunk: Int,
         maxXChunk: Int,
         minZChunk: Int,
@@ -508,107 +515,143 @@ class PaperNmsAdapter26_1 : PaperNmsAdapter, ChunkByChunkRestore {
         world: World
     ): HashMap<Pair<Int, Int>, ByteBuf> {
         val chunks = HashMap<Pair<Int, Int>, ByteBuf>()
+        val tasks = ArrayList<CompletableFuture<Triple<Int, Int, ByteBuf>>>()
+        val queue = AtomicInt(0)
+        val complete = AtomicInt(0)
+
+        // 8GB default if no mem limit, otherwise 900CPS/5GB, which should prevent memory overload.
+        val maxMem =
+            if (Runtime.getRuntime().maxMemory() == Long.MAX_VALUE) 8000000000L else Runtime.getRuntime().maxMemory()
+        val maxSpeed = (maxMem / 1000 / 1000 / 5.55).roundToLong()
+
+        val totalChunks = (maxXChunk - minXChunk + 1) * (maxZChunk - minZChunk + 1)
+        var lastNotification = Clock.System.now()
 
         for (x in minXChunk..maxXChunk) {
             for (z in minZChunk..maxZChunk) {
-                val chunk = world.getChunkAt(x, z)
-                chunk.load()
+                val cnt = queue.incrementAndFetch()
+                if (cnt > maxSpeed) {
+                    delay(100.milliseconds)
 
-                val buffer = Unpooled.directBuffer(1024)
-                val fBuffer = FriendlyByteBuf(buffer)
-
-                val nmsChunk = (chunk as CraftChunk).getHandle(ChunkStatus.FULL)
-
-                val sections = nmsChunk.sections.map { it.copy() }
-                fBuffer.writeShort(sections.size)
-                for (section in sections) {
-                    section.write(fBuffer)
-                }
-
-                val skyNibbles = nmsChunk.`starlight$getSkyNibbles`()
-                val blockNibbles = nmsChunk.`starlight$getBlockNibbles`()
-
-                fBuffer.writeShort(skyNibbles.size)
-                for (array in skyNibbles) {
-                    val old = STATE_VISIBLE_FIELD.get(array) as Int
-                    fBuffer.writeShort(old)
-                    if (old != 0 && old != 1) {
-                        STATE_VISIBLE_FIELD.set(array, 2)
-                        var bytes = array.saveState.data
-                        if (bytes == null) bytes = ByteArray(SWMRNibbleArray.ARRAY_SIZE)
-                        fBuffer.writeInt(bytes.size)
-                        fBuffer.writeBytes(bytes)
-                        if (old != 2) STATE_VISIBLE_FIELD.set(array, old)
+                    val now = Clock.System.now()
+                    if (now - lastNotification > 2.5.seconds) {
+                        val completed = complete.load()
+                        NmsAdapterCommon.NMS_LOGGER.warn("Too many concurrent chunk loads, throttling... ($cnt in queue, $completed/$totalChunks already completed")
+                        lastNotification = now
                     }
                 }
 
-                fBuffer.writeShort(blockNibbles.size)
-                for (array in blockNibbles) {
-                    val old = STATE_VISIBLE_FIELD.get(array) as Int
-                    fBuffer.writeShort(old)
-                    if (old != 0 && old != 1) {
-                        STATE_VISIBLE_FIELD.set(array, 2)
-                        var bytes = array.saveState.data
-                        if (bytes == null) bytes = ByteArray(SWMRNibbleArray.ARRAY_SIZE)
-                        fBuffer.writeInt(bytes.size)
-                        fBuffer.writeBytes(bytes)
-                        if (old != 2) STATE_VISIBLE_FIELD.set(array, old)
-                    }
-                }
+                val task =
+                    world.getChunkAtAsync(x, z).thenApplyAsync({
+                        val chunk = world.getChunkAtAsync(x, z).join()
 
-                val skyEmptinessMap = nmsChunk.`starlight$getSkyEmptinessMap`()
-                val blockEmptinessMap = nmsChunk.`starlight$getBlockEmptinessMap`()
+                        val buffer = Unpooled.directBuffer(1024)
+                        val fBuffer = FriendlyByteBuf(buffer)
 
-                fBuffer.writeInt(skyEmptinessMap.size)
-                for (bool in skyEmptinessMap) {
-                    fBuffer.writeBoolean(bool)
-                }
+                        val nmsChunk = (chunk as CraftChunk).getHandle(ChunkStatus.FULL)
 
-                fBuffer.writeInt(blockEmptinessMap.size)
-                for (bool in blockEmptinessMap) {
-                    fBuffer.writeBoolean(bool)
-                }
+                        val sections = nmsChunk.sections.map { it.copy() }
+                        fBuffer.writeShort(sections.size)
+                        for (section in sections) {
+                            section.write(fBuffer)
+                        }
 
-                val heightmaps = nmsChunk.getHeightmaps()
-                    .filter { entry1 -> entry1.key.sendToClient() }
-                    .associate { entry -> entry.key to entry.value.rawData.clone() }
+                        val skyNibbles = nmsChunk.`starlight$getSkyNibbles`()
+                        val blockNibbles = nmsChunk.`starlight$getBlockNibbles`()
 
-                fBuffer.writeShort(heightmaps.size)
-                for (heightmap in heightmaps) {
-                    fBuffer.writeUtf(heightmap.key.name)
-                    fBuffer.writeLongArray(heightmap.value)
-                }
+                        fBuffer.writeShort(skyNibbles.size)
+                        for (array in skyNibbles) {
+                            val old = STATE_VISIBLE_FIELD.get(array) as Int
+                            fBuffer.writeShort(old)
+                            if (old != 0 && old != 1) {
+                                STATE_VISIBLE_FIELD.set(array, 2)
+                                var bytes = array.saveState.data
+                                if (bytes == null) bytes = ByteArray(SWMRNibbleArray.ARRAY_SIZE)
+                                fBuffer.writeInt(bytes.size)
+                                fBuffer.writeBytes(bytes)
+                                if (old != 2) STATE_VISIBLE_FIELD.set(array, old)
+                            }
+                        }
 
-                val invTiles =
-                    nmsChunk.blockEntities.filter { it.value is BaseContainerBlockEntity }
-                fBuffer.writeShort(invTiles.size)
-                for (invTile in invTiles) {
-                    val tile = invTile.value as BaseContainerBlockEntity
-                    val contents = tile.contents
-                        .mapIndexed { idx, stack -> Pair(stack, idx) }
-                        .filter { !it.first.isEmpty }
-                        .map { Pair(it.first.asBukkitMirror().serializeAsBytes(), it.second) }
-                    val size = contents.size
+                        fBuffer.writeShort(blockNibbles.size)
+                        for (array in blockNibbles) {
+                            val old = STATE_VISIBLE_FIELD.get(array) as Int
+                            fBuffer.writeShort(old)
+                            if (old != 0 && old != 1) {
+                                STATE_VISIBLE_FIELD.set(array, 2)
+                                var bytes = array.saveState.data
+                                if (bytes == null) bytes = ByteArray(SWMRNibbleArray.ARRAY_SIZE)
+                                fBuffer.writeInt(bytes.size)
+                                fBuffer.writeBytes(bytes)
+                                if (old != 2) STATE_VISIBLE_FIELD.set(array, old)
+                            }
+                        }
 
-                    val classNameStr = tile.javaClass.name.encodeToByteArray()
-                    fBuffer.writeShort(classNameStr.size)
-                    fBuffer.writeBytes(classNameStr)
+                        val skyEmptinessMap = nmsChunk.`starlight$getSkyEmptinessMap`()
+                        val blockEmptinessMap = nmsChunk.`starlight$getBlockEmptinessMap`()
 
-                    fBuffer.writeInt(invTile.key.x)
-                    fBuffer.writeInt(invTile.key.y)
-                    fBuffer.writeInt(invTile.key.z)
+                        fBuffer.writeInt(skyEmptinessMap.size)
+                        for (bool in skyEmptinessMap) {
+                            fBuffer.writeBoolean(bool)
+                        }
 
-                    fBuffer.writeShort(size)
-                    for (item in contents) {
-                        fBuffer.writeShort(item.second)
-                        fBuffer.writeShort(item.first.size)
-                        fBuffer.writeBytes(item.first)
-                    }
-                }
+                        fBuffer.writeInt(blockEmptinessMap.size)
+                        for (bool in blockEmptinessMap) {
+                            fBuffer.writeBoolean(bool)
+                        }
 
-                chunks[Pair(x, z)] = buffer
+                        val heightmaps = nmsChunk.getHeightmaps()
+                            .filter { entry1 -> entry1.key.sendToClient() }
+                            .associate { entry -> entry.key to entry.value.rawData.clone() }
+
+                        fBuffer.writeShort(heightmaps.size)
+                        for (heightmap in heightmaps) {
+                            fBuffer.writeUtf(heightmap.key.name)
+                            fBuffer.writeLongArray(heightmap.value)
+                        }
+
+                        val invTiles =
+                            nmsChunk.blockEntities.filter { it.value is BaseContainerBlockEntity }
+                        fBuffer.writeShort(invTiles.size)
+                        for (invTile in invTiles) {
+                            val tile = invTile.value as BaseContainerBlockEntity
+                            val contents = tile.contents
+                                .mapIndexed { idx, stack -> Pair(stack, idx) }
+                                .filter { !it.first.isEmpty }
+                                .map { Pair(it.first.asBukkitMirror().serializeAsBytes(), it.second) }
+                            val size = contents.size
+
+                            val classNameStr = tile.javaClass.name.encodeToByteArray()
+                            fBuffer.writeShort(classNameStr.size)
+                            fBuffer.writeBytes(classNameStr)
+
+                            fBuffer.writeInt(invTile.key.x)
+                            fBuffer.writeInt(invTile.key.y)
+                            fBuffer.writeInt(invTile.key.z)
+
+                            fBuffer.writeShort(size)
+                            for (item in contents) {
+                                fBuffer.writeShort(item.second)
+                                fBuffer.writeShort(item.first.size)
+                                fBuffer.writeBytes(item.first)
+                            }
+                        }
+
+                        Triple(x, z, buffer)
+                    }, NmsAdapterCommon.RESTORE_POOL)
+                        .whenComplete { _, _ ->
+                            queue.decrementAndFetch()
+                            complete.incrementAndFetch()
+                        }
+                tasks.add(task)
             }
         }
+
+        tasks.forEach {
+            val (x, z, buffer) = it.await()
+            chunks[Pair(x, z)] = buffer
+        }
+
         return chunks
     }
 
