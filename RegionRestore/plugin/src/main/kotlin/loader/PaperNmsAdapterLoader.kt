@@ -14,7 +14,8 @@ object PaperNmsAdapterLoader {
         "1.21.10" to "bruh.regionrestore.nms.v1_21_10.PaperNmsAdapter1_21_10",
         "1.21.11" to "bruh.regionrestore.nms.v1_21_11.PaperNmsAdapter1_21_11",
         "26.1" to "bruh.regionrestore.nms.v26_1.PaperNmsAdapter26_1",
-        "26.1.1" to "bruh.regionrestore.nms.v26_1.PaperNmsAdapter26_1"
+        "26.1.1" to "bruh.regionrestore.nms.v26_1.PaperNmsAdapter26_1",
+        "26.2" to "bruh.regionrestore.nms.v26_2.PaperNmsAdapter26_2"
     )
 
     fun load(): PaperNmsAdapter {

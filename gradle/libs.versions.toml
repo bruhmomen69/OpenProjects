@@ -23,7 +23,7 @@ nettyBuffer = "4.1.115.Final"
 mccoroutine = "2.22.0"
 
 # Lamp command framework
-lamp = "4.0.0-rc.12"
+lamp = "4.0.0-rc.17"
 
 # Kyori Adventure
 adventure = "4.23.0"
@@ -49,7 +49,7 @@ lettuce = "7.2.1.RELEASE"
 kache = "2.1.1"
 
 # Utilities
-xseries = "13.6.0"
+xseries = "13.7.1"
 anvilgui = "2.0.4-20251228.114051-1"
 zstd = "1.5.7-2"
 oshi = "6.10.0"

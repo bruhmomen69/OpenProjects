@@ -18,6 +18,7 @@ dependencies {
     implementation(project(":RegionRestore:nms:PaperMC-1_21_10"))
     implementation(project(":RegionRestore:nms:PaperMC-1_21_11"))
     implementation(project(":RegionRestore:nms:PaperMC-26_1"))
+    implementation(project(":RegionRestore:nms:PaperMC-26_2"))
     compileOnly(libs.paperApi)
     compileOnly(libs.placeholderapi)
     compileOnly(libs.miniplaceholders)
@@ -48,11 +49,15 @@ tasks.runServer {
     // Configure the Minecraft version for our task.
     // This is the only required configuration besides applying the plugin.
     // Your plugin's jar (or shadowJar if present) will be used automatically.
-    minecraftVersion("1.21.11")
+    minecraftVersion("26.2")
+    runDirectory.set(layout.buildDirectory.dir("run-26.2"))
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    })
 
     downloadPlugins {
         url("https://ci.lucko.me/job/spark/524/artifact/spark-bukkit/build/libs/spark-1.10.172-bukkit.jar")
-        modrinth("fastasyncworldedit", "2.15.0")
+        modrinth("fastasyncworldedit", "2.15.4")
     }
 }
 
@@ -73,4 +78,3 @@ tasks.processResources {
         expand(props)
     }
 }
-
