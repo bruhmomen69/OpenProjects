@@ -9,3 +9,7 @@ dependencies {
     implementation(libs.kache)
     compileOnly(libs.nettyBuffer)
 }
+
+kotlin {
+    jvmToolchain(21)
+}
