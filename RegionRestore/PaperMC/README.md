@@ -26,7 +26,7 @@ The NMS (Net Minecraft Server) abstraction layer handles version-specific Minecr
 - **[`ChunkByChunkRestore`](src/main/kotlin/nms/ChunkByChunkRestore.kt)**: Interface for streaming restore support
 - **[`RegionTemplate`](src/main/kotlin/nms/PaperNmsAdapter.kt)**: Data class for region snapshot metadata and chunk data
 
-Version-specific adapters (in `nms/` submodules) implement these interfaces for each Minecraft/Paper version (1.21.4 through 26.1).
+Version-specific adapters (in `nms/` submodules) implement these interfaces for each Minecraft/Paper version (1.21.4 through 26.2).
 
 ### Timer Package (`timer/`)
 

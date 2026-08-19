@@ -43,14 +43,14 @@ Ideal for:
 
 | Platform | Supported Versions |
 |----------|--------------------|
-| Paper    | 1.21.4 - 1.21.11   |
-| Folia    | 1.21.4 - 1.21.11   |
+| Paper    | 1.21.4 - 26.2      |
+| Folia    | 1.21.4 - 26.2      |
 
 ### Minecraft Version Support
 
 RegionRestore uses NMS adapters for maximum performance on specific versions:
 
-- 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11
+- 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.1.1, 26.2
 
 > **Note:** The plugin requires a matching NMS adapter for your server version. Updates are released shortly after new
 > Minecraft versions.
